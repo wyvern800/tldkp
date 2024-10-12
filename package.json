@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node src/shardManager.js",
-    "dev": "nodemon src/shardManager.js"
+    "dev": "concurrently \"npm run dev:bot\" \"npm run dev:client\"",
+    "dev:bot": "nodemon src/shardManager.js",
+    "dev:client": "npm --prefix frontend run dev"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
@@ -15,6 +17,7 @@
     "firebase-admin": "^12.6.0"
   },
   "devDependencies": {
+    "concurrently": "^9.0.1",
     "nodemon": "^3.1.7"
   }
 }
