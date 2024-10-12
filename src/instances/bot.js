@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, PermissionFlagsBits } from "discord.js";
 import { handleCommands } from "../../utils/commands.js";
-import { loadCommands, isInteractionPermitted } from "../../utils/commands.js";
+import { loadCommands } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
 import { logError } from "../../database/repository.js";
@@ -48,14 +48,6 @@ export const createBotClient = () => {
   client.on("interactionCreate", async (interaction) => {
     if (interaction.isCommand()) {
       const { commandName } = interaction;
-
-      // Check if user can use this command
-      if (!isInteractionPermitted([PermissionFlagsBits.SendMessages])) {
-        return interaction.reply({
-          content: "You don't have permission to use these commands.",
-          ephemeral: true,
-        });
-      }
 
       await handleCommands(interaction, commandName?.toLowerCase());
     }

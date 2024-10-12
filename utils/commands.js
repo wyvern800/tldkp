@@ -1,4 +1,4 @@
-import { REST, Routes, ApplicationCommandOptionType } from "discord.js";
+import { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } from "discord.js";
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
@@ -120,12 +120,6 @@ export const handleCheck = async (interaction) => {
   const user = interaction.user;
 
   try {
-    await api.logError(interaction.guild, 'test', { message: 'mamei'});
-  } catch (error) {
-    console.log(error);  
-  }
-
-  try {
     const dkp = await api.getDkpByUserId(
       interaction,
       interaction.guild.id,
@@ -148,6 +142,7 @@ export const handleCheck = async (interaction) => {
 
 // ---------------------------------------------------------------
 
+// Here's the commands list
 const commands = [
   {
     name: "dkp-manage",
@@ -189,11 +184,13 @@ const commands = [
       },
     ],
     commandExecution: api.handleUpdateDkp,
+    permissions: [PermissionFlagsBits.SendMessages]
   },
   {
     name: "dkp-check",
     description: "Shows informations about your DKP",
     commandExecution: handleCheck,
+    permissions: [PermissionFlagsBits.SendMessages]
   },
   {
     name: "clear",
@@ -207,6 +204,7 @@ const commands = [
       },
     ],
     commandExecution: handleClear,
+    permissions: [PermissionFlagsBits.Administrator]
   },
 ];
 
@@ -226,6 +224,14 @@ export async function handleCommands(interaction, commandName) {
       `Command not found: ${commandName}`
     );
     return;
+  }
+
+  // Check if user can use this command
+  if (!isInteractionPermitted(commandToFind.permissions)) {
+    return interaction.reply({
+      content: "You don't have permission to use this command.",
+      ephemeral: true,
+    });
   }
 
   return commandToFind.commandExecution(interaction);
