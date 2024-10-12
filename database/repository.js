@@ -2,6 +2,7 @@ import { db } from "./firebase.js"; // Import Firestore
 import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
 import { updateDkp, setDkp, isPositiveNumber } from "../utils/index.js";
+import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 
 const PREFIX = "Firebase";
 
@@ -85,6 +86,7 @@ export async function guildCreate(guild) {
     },
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    language: LANGUAGE_EN,
     memberDkps: [],
   };
 
@@ -248,6 +250,37 @@ export async function updateNickname(interaction, guildData) {
     interaction.reply({ content: msg, ephemeral: true });
   } catch (err) {
     const msg = `Failed to update your in-game nickname.`;
+    new Logger(interaction).error(PREFIX, msg, err);
+    interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Handles the language change
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function changeLanguage(interaction) {
+  const language = interaction.options.getString("language");
+
+  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+
+  const newGuildData = {...guildDataResponse, language };
+
+  const langs = {
+    [LANGUAGE_EN]: "English (en-US)",
+    [LANGUAGE_PT_BR] : "Brazilian Portuguese (pt-BR)",
+  }
+  const newLang = langs[language] ?? LANGUAGE_EN;
+
+  try {
+    await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+    const msg = `The bot responses language was set to: ${newLang}!`;
+    new Logger(interaction).log(PREFIX, msg);
+    interaction.reply({ content: msg, ephemeral: true });
+  } catch (err) {
+    const msg = `Failed to update the language.`;
     new Logger(interaction).error(PREFIX, msg, err);
     interaction.reply({ content: msg, ephemeral: true });
   }

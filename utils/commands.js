@@ -9,6 +9,7 @@ import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
 import { isAfter, add, formatDistance } from "date-fns";
 import admin from "firebase-admin";
+import { LANGUAGE_EN, LANGUAGE_PT_BR } from "./constants.js";
 
 config();
 
@@ -206,7 +207,7 @@ export const updateNickname = async (interaction) => {
         const allowedDateFormatted = formatDistance(future, new Date(), {
           addSuffix: true,
         });
-        const msg = `You can only change your nickname ${allowedDateFormatted}.`;
+        const msg = `You can only change your nickname once in 12 hours, you will be able ${allowedDateFormatted}.`;
         new Logger(interaction).log(PREFIX, msg);
         return interaction.reply({
           content: msg,
@@ -215,7 +216,6 @@ export const updateNickname = async (interaction) => {
       }
     }
   } catch (error) {
-    console.log("Error:", error); // Improved error logging
     const msg = "Error updating in-game nickname";
     new Logger(interaction).log(PREFIX, msg);
     return interaction.reply({
@@ -279,7 +279,7 @@ const commands = [
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
-    name: "set-nickname",
+    name: "dkp-set-nickname",
     description: "Sets your ingame name",
     options: [
       {
@@ -305,6 +305,31 @@ const commands = [
     ],
     commandExecution: handleClear,
     permissions: [PermissionFlagsBits.Administrator],
+  },
+  {
+    name: "dkp-change-language",
+    description:
+      "Changes the language of the responses of the bot.",
+    options: [
+      {
+        name: "language",
+        description: "Are you Setting, Increasing or Decreasing?",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          {
+            name: "English (en-us)",
+            value: LANGUAGE_EN,
+          },
+          {
+            name: "Portuguese (pt-BR)",
+            value: LANGUAGE_PT_BR,
+          },
+        ],
+      },
+    ],
+    commandExecution: api.changeLanguage,
+    permissions: [PermissionFlagsBits.SendMessages],
   },
 ];
 
