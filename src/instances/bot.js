@@ -1,7 +1,16 @@
 import { Client, GatewayIntentBits, PermissionFlagsBits } from "discord.js";
-import { handleClear } from "../../utils/commands/index.js";
-import { loadCommands } from "../../utils/index.js";
+import { handleCommands } from "../../utils/commands.js";
+import { loadCommands, isInteractionPermitted } from "../../utils/commands.js";
+import * as api from "../../database/repository.js";
+import { Logger } from "../../utils/logger.js";
 
+const PREFIX = "Discord.js";
+
+/**
+ * Creates the bot client
+ *
+ * @returns { void }
+ */
 export const createBotClient = () => {
   const client = new Client({
     intents: [
@@ -14,8 +23,22 @@ export const createBotClient = () => {
 
   // When bot is started
   client.once("ready", async () => {
-    loadCommands(client);
-    console.log(`[DiscordJS] Logged in as ${client.user.tag}!`);
+    await loadCommands(client)
+      .then(() => new Logger().log(PREFIX, `Logged in as ${client.user.tag}!`))
+      .catch(() => new Logger().error(PREFIX, `Failed to load commands`))
+      .finally(() =>
+        new Logger().log(
+          PREFIX,
+          `Bot is in ${client.guilds.cache.size} guild(s).`
+        )
+      );
+  });
+
+  // When the bot joins a new guild
+  client.on("guildCreate", async (guild) => {
+    await api
+      .guildCreate(guild.id)
+      .catch(() => new Logger().error(PREFIX, `Failed to create guild`));
   });
 
   // When interactions happen
@@ -23,20 +46,15 @@ export const createBotClient = () => {
     if (interaction.isCommand()) {
       const { commandName } = interaction;
 
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      // Check if user can use this command
+      if (!isInteractionPermitted([PermissionFlagsBits.SendMessages])) {
         return interaction.reply({
           content: "You don't have permission to use these commands.",
           ephemeral: true,
         });
       }
 
-      switch (commandName.toLowerCase()) {
-        case "clear":
-          return await handleClear(interaction);
-        default:
-          console.log(`Command not found: ${commandName}`);
-          break;
-      }
+      await handleCommands(interaction, commandName?.toLowerCase());
     }
   });
 
