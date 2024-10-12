@@ -7,6 +7,8 @@ import {
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
+import { isAfter, add, formatDistance } from "date-fns";
+import admin from "firebase-admin";
 
 config();
 
@@ -30,7 +32,11 @@ export async function isInteractionPermitted(interaction, permissions) {
  */
 export async function loadCommands() {
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-  const correctedCommands = commands?.map((command) => ({ ...command, commandExecution: undefined, permissions: undefined }));
+  const correctedCommands = commands?.map((command) => ({
+    ...command,
+    commandExecution: undefined,
+    permissions: undefined,
+  }));
 
   try {
     if (process.env.ENV === "dev") {
@@ -124,14 +130,14 @@ export const handleCheck = async (interaction) => {
   const user = interaction.user;
 
   try {
-    const dkp = await api.getDkpByUserId(
+    const { ign, dkp } = await api.getDkpByUserId(
       interaction,
       interaction.guild.id,
       user.id
     );
 
     return interaction.reply({
-      content: `Your current DKP is ${dkp}`,
+      content: `Your current DKP with **${ign}** is **${dkp}**!`,
       ephemeral: true,
     });
   } catch (error) {
@@ -156,9 +162,7 @@ export const updateNickname = async (interaction) => {
 
   try {
     const guildData = await api.getGuildConfig(interaction.guild.id);
-
-    let copyGuildData = [...guildData];
-
+    let copyGuildData = { ...guildData };
     const { memberDkps } = guildData;
 
     let memberIndex = memberDkps.findIndex(
@@ -166,17 +170,43 @@ export const updateNickname = async (interaction) => {
     );
 
     if (memberIndex !== -1) {
-      copyGuildData[memberIndex].ign = nickname;
+      const { updatedAt } = memberDkps[memberIndex]; // Assuming this is a Firestore Timestamp
+      const notSetYet = !updatedAt; // Check if updatedAt is set
 
-      try {
-        await api.updateNickname(interaction.guild.id, copyGuildData);
+      // Ensure updatedAt is a valid Timestamp
+      const updatedAtDate = updatedAt instanceof admin.firestore.Timestamp
+        ? updatedAt.toDate() // Convert Timestamp to Date
+        : new Date(); 
 
-        return interaction.reply({
-          content: `Your nickname has been upadted to `,
-          ephemeral: true,
+      // Check if the date is valid
+      if (isNaN(updatedAtDate.getTime())) {
+        throw new Error("Invalid updatedAt date.");
+      }
+
+      const future = add(updatedAtDate, { hours: 12 });
+
+      // You can only change the nickname if it is not set yet or if 12 hours have passed since updatedAt
+      if (notSetYet || isAfter(new Date(), future)) {
+        // Update the nickname
+        copyGuildData.memberDkps[memberIndex].ign = nickname;
+        copyGuildData.memberDkps[memberIndex].updatedAt = new Date();
+
+        try {
+          await api.updateNickname(interaction, copyGuildData);
+        } catch (err) {
+          const msg = "Error setting in-game nickname";
+          new Logger(interaction).log(PREFIX, msg);
+          return interaction.reply({
+            content: msg,
+            ephemeral: true,
+          });
+        }
+      } else {
+        // Send a message if nickname change is not allowed
+        const allowedDateFormatted = formatDistance(future, new Date(), {
+          addSuffix: true,
         });
-      } catch (err) {
-        const msg = "Error setting in-game nickname";
+        const msg = `You can only change your nickname ${allowedDateFormatted}.`;
         new Logger(interaction).log(PREFIX, msg);
         return interaction.reply({
           content: msg,
@@ -185,7 +215,8 @@ export const updateNickname = async (interaction) => {
       }
     }
   } catch (error) {
-    const msg = "Error checking DKP";
+    console.log("Error:", error); // Improved error logging
+    const msg = "Error updating in-game nickname";
     new Logger(interaction).log(PREFIX, msg);
     return interaction.reply({
       content: msg,
@@ -193,6 +224,7 @@ export const updateNickname = async (interaction) => {
     });
   }
 };
+
 
 // ---------------------------------------------------------------
 
@@ -257,7 +289,7 @@ const commands = [
         required: true,
       },
     ],
-    commandExecution: handleClear,
+    commandExecution: updateNickname,
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
@@ -271,7 +303,7 @@ const commands = [
         required: true,
       },
     ],
-    commandExecution: updateNickname,
+    commandExecution: handleClear,
     permissions: [PermissionFlagsBits.Administrator],
   },
 ];

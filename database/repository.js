@@ -66,7 +66,7 @@ export async function getDkpByUserId(interaction, guildId, userId) {
   }
 
   // Return the DKP of the user
-  return userDkpData.dkp;
+  return userDkpData;
 }
 
 /**
@@ -228,4 +228,27 @@ export async function handleUpdateDkp(interaction) {
   } ${value?.dkp}!`;
   new Logger(interaction).log(PREFIX, msg);
   return interaction.reply({ content: msg, ephemeral: true });
+}
+
+
+/**
+ * Handles the nickname update
+ *
+ * @param { any } interaction The interaction
+ * @param { string } guildData The new nickname
+ * @returns { any } Response
+ */
+export async function updateNickname(interaction, guildData) {
+  const nickname = interaction.options.getString("nickname");
+
+  try {
+    await db.collection("guilds").doc(interaction.guild.id).update(guildData);
+    const msg = `Your in-game nickname was changed to: ${nickname}!`;
+    new Logger(interaction).log(PREFIX, msg);
+    interaction.reply({ content: msg, ephemeral: true });
+  } catch (err) {
+    const msg = `Failed to update your in-game nickname.`;
+    new Logger(interaction).error(PREFIX, msg, err);
+    interaction.reply({ content: msg, ephemeral: true });
+  }
 }
