@@ -1,4 +1,9 @@
-import { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } from "discord.js";
+import {
+  REST,
+  Routes,
+  ApplicationCommandOptionType,
+  PermissionFlagsBits,
+} from "discord.js";
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
@@ -25,6 +30,7 @@ export async function isInteractionPermitted(interaction, permissions) {
  */
 export async function loadCommands() {
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+  const correctedCommands = commands?.map((command) => ({ ...command, commandExecution: undefined, permissions: undefined }));
 
   try {
     if (process.env.ENV === "dev") {
@@ -33,13 +39,11 @@ export async function loadCommands() {
           process.env.CLIENT_ID,
           process.env.GUILD_ID
         ),
-        { body: commands }
+        { body: correctedCommands }
       );
     } else {
       await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
-        body: commands?.map((command) => {
-          return { ...command, commandExecution: undefined };
-        }),
+        body: correctedCommands,
       });
     }
     new Logger().log(
@@ -140,6 +144,56 @@ export const handleCheck = async (interaction) => {
   }
 };
 
+/**
+ * Updates the Nickname
+ *
+ * @param { any } interaction Interação
+ * @returns { void }
+ */
+export const updateNickname = async (interaction) => {
+  const user = interaction.user;
+  const nickname = interaction.options.getString("nickname");
+
+  try {
+    const guildData = await api.getGuildConfig(interaction.guild.id);
+
+    let copyGuildData = [...guildData];
+
+    const { memberDkps } = guildData;
+
+    let memberIndex = memberDkps.findIndex(
+      (member) => member.userId === user.id
+    );
+
+    if (memberIndex !== -1) {
+      copyGuildData[memberIndex].ign = nickname;
+
+      try {
+        await api.updateNickname(interaction.guild.id, copyGuildData);
+
+        return interaction.reply({
+          content: `Your nickname has been upadted to `,
+          ephemeral: true,
+        });
+      } catch (err) {
+        const msg = "Error setting in-game nickname";
+        new Logger(interaction).log(PREFIX, msg);
+        return interaction.reply({
+          content: msg,
+          ephemeral: true,
+        });
+      }
+    }
+  } catch (error) {
+    const msg = "Error checking DKP";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({
+      content: msg,
+      ephemeral: true,
+    });
+  }
+};
+
 // ---------------------------------------------------------------
 
 // Here's the commands list
@@ -184,13 +238,27 @@ const commands = [
       },
     ],
     commandExecution: api.handleUpdateDkp,
-    permissions: [PermissionFlagsBits.SendMessages]
+    permissions: [PermissionFlagsBits.SendMessages],
   },
   {
     name: "dkp-check",
     description: "Shows informations about your DKP",
     commandExecution: handleCheck,
-    permissions: [PermissionFlagsBits.SendMessages]
+    permissions: [PermissionFlagsBits.SendMessages],
+  },
+  {
+    name: "set-nickname",
+    description: "Sets your ingame name",
+    options: [
+      {
+        name: "nickname",
+        description: "Yor Throne & Liberty nickname",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+    commandExecution: handleClear,
+    permissions: [PermissionFlagsBits.SendMessages],
   },
   {
     name: "clear",
@@ -203,8 +271,8 @@ const commands = [
         required: true,
       },
     ],
-    commandExecution: handleClear,
-    permissions: [PermissionFlagsBits.Administrator]
+    commandExecution: updateNickname,
+    permissions: [PermissionFlagsBits.Administrator],
   },
 ];
 
