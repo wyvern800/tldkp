@@ -1,7 +1,6 @@
-import { REST, Routes } from "discord.js";
+import { REST, Routes, ApplicationCommandOptionType } from "discord.js";
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
-import { STRING, INTEGER } from "../utils/constants.js";
 import * as api from "../database/repository.js";
 
 config();
@@ -38,7 +37,9 @@ export async function loadCommands() {
       );
     } else {
       await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
-        body: commands?.map(command => { return { ...command, commandExecution: undefined }}),
+        body: commands?.map((command) => {
+          return { ...command, commandExecution: undefined };
+        }),
       });
     }
     new Logger().log(
@@ -110,18 +111,90 @@ export const handleClear = async (interaction) => {
 };
 
 /**
- * Handle the prefix
+ * Check DKP
  *
- * @param { any } interaction The interaction
- * @returns { void } What happened
+ * @param { any } interaction Interação
+ * @returns { void }
  */
-async function handlePrefix(interaction) {
-  await api.handlePrefixCall(interaction);
-}
+export const handleCheck = async (interaction) => {
+  const user = interaction.user;
+
+  try {
+    await api.logError(interaction.guild, 'test', { message: 'mamei'});
+  } catch (error) {
+    console.log(error);  
+  }
+
+  try {
+    const dkp = await api.getDkpByUserId(
+      interaction,
+      interaction.guild.id,
+      user.id
+    );
+
+    return interaction.reply({
+      content: `Your current DKP is ${dkp}`,
+      ephemeral: true,
+    });
+  } catch (error) {
+    const msg = "Error checking DKP";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({
+      content: msg,
+      ephemeral: true,
+    });
+  }
+};
 
 // ---------------------------------------------------------------
 
 const commands = [
+  {
+    name: "dkp-manage",
+    description:
+      "Manages the DKP of a player (You can set, increase or decrease)",
+    options: [
+      {
+        name: "user",
+        description: "The player we are going to attribute the DKP to",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: "operation",
+        description: "Are you Setting, Increasing or Decreasing?",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          {
+            name: "Set a player's DKP",
+            value: "set",
+          },
+          {
+            name: "Increase a player's DKP",
+            value: "add",
+          },
+          {
+            name: "Decrease a player's DKP",
+            value: "remove",
+          },
+        ],
+      },
+      {
+        name: "amount",
+        description:
+          "The value we are goinmg to set/increase/decrease fom the DKP of a player",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+      },
+    ],
+    commandExecution: api.handleUpdateDkp,
+  },
+  {
+    name: "dkp-check",
+    description: "Shows informations about your DKP",
+    commandExecution: handleCheck,
+  },
   {
     name: "clear",
     description: "Cleans messages from discord",
@@ -129,24 +202,11 @@ const commands = [
       {
         name: "amount",
         description: "Amount of messages to exclude",
-        type: INTEGER,
+        type: ApplicationCommandOptionType.Integer,
         required: true,
       },
     ],
     commandExecution: handleClear,
-  },
-  {
-    name: "prefix",
-    description: "test prefix",
-    options: [
-      {
-        name: "prefix",
-        description: "prefix",
-        type: STRING,
-        required: true,
-      },
-    ],
-    commandExecution: handlePrefix,
   },
 ];
 
@@ -156,7 +216,9 @@ const commands = [
  * @param { string } commandName The command name
  */
 export async function handleCommands(interaction, commandName) {
-  const commandToFind = commands?.find(c => c.name?.toLowerCase() === commandName);
+  const commandToFind = commands?.find(
+    (c) => c.name?.toLowerCase() === commandName
+  );
 
   if (!commandToFind) {
     new Logger(interaction).log(

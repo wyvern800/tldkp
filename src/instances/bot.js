@@ -3,6 +3,7 @@ import { handleCommands } from "../../utils/commands.js";
 import { loadCommands, isInteractionPermitted } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
+import { logError } from "../../database/repository.js";
 
 const PREFIX = "Discord.js";
 
@@ -37,8 +38,10 @@ export const createBotClient = () => {
   // When the bot joins a new guild
   client.on("guildCreate", async (guild) => {
     await api
-      .guildCreate(guild.id)
-      .catch(() => new Logger().error(PREFIX, `Failed to create guild`));
+      .guildCreate(guild)
+      .catch(async (error) => {
+        await api.logError(guild, `Failed to create guild.`, error);
+      });
   });
 
   // When interactions happen
@@ -55,6 +58,17 @@ export const createBotClient = () => {
       }
 
       await handleCommands(interaction, commandName?.toLowerCase());
+    }
+  });
+
+  // Handle global issues
+  client.on('unhandledRejection', async (reason, promise) => {
+    console.error('Unhandled Promise Rejection:', reason);
+    new Logger().error(`Unhandled Promise Rejection: ${reason}`);	
+    try {
+      await logError('', reason);
+    } catch (error) {
+      new Logger().error(PREFIX, `Unhandled promise rejection: ${reason}`);	
     }
   });
 
