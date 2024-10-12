@@ -62,11 +62,10 @@ export const createBotClient = () => {
   });
 
   // Handle global issues
-  client.on('unhandledRejection', async (reason, promise) => {
-    console.error('Unhandled Promise Rejection:', reason);
-    new Logger().error(`Unhandled Promise Rejection: ${reason}`);	
+  client.on('unhandledRejection', async (reason, _) => {
     try {
-      await logError('', reason);
+      new Logger().error(`Unhandled Promise Rejection: ${reason}`);	
+      await logError(PREFIX, `Unhandled Promise Rejection: ${reason}`, reason);
     } catch (error) {
       new Logger().error(PREFIX, `Unhandled promise rejection: ${reason}`);	
     }
