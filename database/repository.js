@@ -47,7 +47,7 @@ export async function getDkpByUserId(interaction, guildId, userId) {
   // If the document doesn't exist, log an error and return null
   if (!doc.exists) {
     new Logger(interaction).log(PREFIX, `Guild not found`);
-    return null;
+    return 'guild-not-found';
   }
 
   const guildData = doc.data();
@@ -63,7 +63,7 @@ export async function getDkpByUserId(interaction, guildId, userId) {
   // If user not found, log an error and return null
   if (!userDkpData) {
     new Logger(interaction).log(PREFIX, `No DKP found for user ${userId}`);
-    return null;
+    return 'dkp-not-found';
   }
 
   // Return the DKP of the user

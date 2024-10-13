@@ -131,23 +131,36 @@ export const handleCheck = async (interaction) => {
   const user = interaction.user;
 
   try {
-    const { ign, dkp } = await api.getDkpByUserId(
+    const response = await api.getDkpByUserId(
       interaction,
       interaction.guild.id,
       user.id
     );
+    if (response === "dkp-not-found") {
+      return interaction.reply({
+        content: `You don't have DKP yet.`,
+        ephemeral: true,
+      });
+    } else if (response === "guild-not-found") {
+      return interaction.reply({
+        content: `Guild not found.`,
+        ephemeral: true,
+      });
+    } else {
+      const { ign, dkp } = response;
 
-    return interaction.reply({
-      content: `Your current DKP is **${dkp}**!  
-          ${ign ? `IGN: **${ign}**` : ''} 
+      return interaction.reply({
+        content: `Your current DKP is **${dkp}**!  
+                ${ign ? `IGN: **${ign}**` : ""} 
       `,
-      ephemeral: true,
-    });
+        ephemeral: true,
+      });
+    }
   } catch (error) {
     const msg = "Error checking DKP";
     new Logger(interaction).error(PREFIX, msg);
     try {
-      await api?.logError(interaction.guild, msg, err);
+      await api?.logError(interaction.guild, msg, error);
     } catch (err) {}
     return interaction.reply({
       content: msg,
@@ -180,9 +193,10 @@ export const updateNickname = async (interaction) => {
       const notSetYet = !updatedAt; // Check if updatedAt is set
 
       // Ensure updatedAt is a valid Timestamp
-      const updatedAtDate = updatedAt instanceof admin.firestore.Timestamp
-        ? updatedAt.toDate() // Convert Timestamp to Date
-        : new Date(); 
+      const updatedAtDate =
+        updatedAt instanceof admin.firestore.Timestamp
+          ? updatedAt.toDate() // Convert Timestamp to Date
+          : new Date();
 
       // Check if the date is valid
       if (isNaN(updatedAtDate.getTime())) {
@@ -229,7 +243,6 @@ export const updateNickname = async (interaction) => {
     });
   }
 };
-
 
 // ---------------------------------------------------------------
 
@@ -299,8 +312,7 @@ const commands = [
   },
   {
     name: "dkp-change-language",
-    description:
-      "Changes the language of the responses of the bot.",
+    description: "Changes the language of the responses of the bot.",
     options: [
       {
         name: "language",
