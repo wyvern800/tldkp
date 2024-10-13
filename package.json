@@ -8,7 +8,7 @@
     "dev": "concurrently \"npm run dev:bot\" \"npm run dev:client\"",
     "dev:bot": "nodemon src/shardManager.js",
     "dev:client": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build"
+    "build": "npm --prefix frontend install && npm --prefix frontend run build && npm install"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
