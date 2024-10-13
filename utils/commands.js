@@ -22,9 +22,8 @@ const PREFIX = "Discord.js/SlashCommands";
  * @param { PermissionFlagsBits[] } permissions Permissions
  * @returns { boolean } Wheter if its allowed or not
  */
-export async function isInteractionPermitted(interaction, permissions) {
-  return permissions
-    ?.every((permission) => interaction?.member?.permissions.has(permission));
+export function isInteractionPermitted(interaction, permissions) {
+  return permissions?.every((permission) => interaction?.member?.permissions.has(permission));
 }
 
 /**
@@ -379,27 +378,31 @@ export async function handleCommands(interaction, commandName) {
   }
 
   // Check if user can use this command
-  if (!isInteractionPermitted(commandToFind.permissions)) {
-    return interaction.reply({
+  if (!isInteractionPermitted(interaction, commandToFind.permissions)) {
+    interaction.reply({
       content: "You don't have permission to use this command.",
       ephemeral: true,
     });
-  }
-
-  try {
-    return commandToFind.commandExecution(interaction);
-  } catch (e) {
-    new Logger(interaction).error(
-      `${PREFIX}`,
-      `Error executing command: ${commandName}`,
-      e
-    );
+  } else {
     try {
-      await api?.logError(interaction.guild, `Error executing command: ${commandName}`, e);
-    } catch (err) {}
-    return interaction.reply({
-      content: "An error occurred while executing the command.",
-      ephemeral: true,
-    });
+      return commandToFind.commandExecution(interaction);
+    } catch (e) {
+      new Logger(interaction).error(
+        `${PREFIX}`,
+        `Error executing command: ${commandName}`,
+        e
+      );
+      try {
+        await api?.logError(
+          interaction.guild,
+          `Error executing command: ${commandName}`,
+          e
+        );
+      } catch (err) {}
+      return interaction.reply({
+        content: "An error occurred while executing the command.",
+        ephemeral: true,
+      });
+    }
   }
 }
