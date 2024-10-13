@@ -143,7 +143,10 @@ export const handleCheck = async (interaction) => {
     });
   } catch (error) {
     const msg = "Error checking DKP";
-    new Logger(interaction).log(PREFIX, msg);
+    new Logger(interaction).error(PREFIX, msg);
+    try {
+      await api?.logError(interaction.guild, msg, err);
+    } catch (err) {}
     return interaction.reply({
       content: msg,
       ephemeral: true,
