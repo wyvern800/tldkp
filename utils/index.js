@@ -7,26 +7,31 @@ import { logError } from "../database/repository.js";
  * @param {number} amount - The amount to add or set for the user's DKP.
  */
 export async function updateDkp(dkpArray, userId, amount, user, serverName) {
-  const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
-
-  if (userIndex !== -1) {
-      // Update the existing user's DKP value
-      dkpArray[userIndex].dkp += amount;
-  } else {
+    const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
+  
+    if (userIndex !== -1) {
+      // Calculate the new DKP value only once
+      const currentDkp = dkpArray[userIndex].dkp;
+      const newDkpValue = currentDkp + amount;
+  
+      // If the new DKP value is less than 0, set it to 0
+      dkpArray[userIndex].dkp = newDkpValue < 0 ? 0 : newDkpValue;
+    } else {
       // Create a new DKP object and add it to the array
-      const newDKPObject = { userId, dkp: amount };
+      const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount };
       dkpArray.push(newDKPObject);
-  }
-
-  // Send a private message to the user about the DKP update
-  const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount}** in the server **${serverName}**.`;
-  try {
+    }
+  
+    // Send a private message to the user about the DKP update
+    const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount}** in the server **${serverName}**.`;
+    try {
       await user.send({ content: message, ephemeral: true });
-  } catch (error) {
+    } catch (error) {
       const msg = `Could not send DM to user ${userId}`;
-      await logError({ name: serverName }, msg, error)
+      await logError({ name: serverName }, msg, error);
+    }
   }
-}
+  
 
 /**
  * Sets the DKP value for a user in the provided DKP array and sends a private message.

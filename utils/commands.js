@@ -24,7 +24,6 @@ const PREFIX = "Discord.js/SlashCommands";
  */
 export async function isInteractionPermitted(interaction, permissions) {
   return permissions
-    ?.map()
     ?.every((permission) => interaction?.member?.permissions.has(permission));
 }
 
