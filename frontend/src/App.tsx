@@ -1,35 +1,30 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Container, useColorModeValue } from "@chakra-ui/react";
+import Navbar from "./Components/Navbar";
+import StackExp from "./Components/StackExp";
+import Footer from "./Components/Footer";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const bg = useColorModeValue("blue.600", "white");
+  const gradient = useColorModeValue(
+    "linear(to-r, teal.500, green.500)",
+    "linear(to-r, teal.900, green.900)"
+  );
 
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Container
+      maxW="100vw"
+      bg={bg}
+      bgGradient={gradient}
+      minH="100vh"
+      centerContent
+      alignItems="center"
+      justifyContent="space-between"
+    >
+      <Navbar />
+      <StackExp />
+      <Footer />
+    </Container>
+  );
 }
 
-export default App
+export default App;
