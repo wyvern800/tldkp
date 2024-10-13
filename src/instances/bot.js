@@ -58,9 +58,14 @@ export const createBotClient = () => {
     try {
       new Logger().error(`Unhandled Promise Rejection: ${reason}`);	
       await logError(PREFIX, `Unhandled Promise Rejection: ${reason}`, reason);
-    } catch (error) {
-      new Logger().error(PREFIX, `Unhandled promise rejection: ${reason}`);	
-    }
+    } catch (error) {}
+  });
+
+  process.on('uncaughtException', async (error) => {
+    try {
+      new Logger().error(`Uncaugth exception: ${error}`);	
+      await logError(PREFIX, `Uncaugth exception: ${error}`, error);
+    } catch (err) {}
   });
 
   return client;
