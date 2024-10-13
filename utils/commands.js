@@ -138,7 +138,9 @@ export const handleCheck = async (interaction) => {
     );
 
     return interaction.reply({
-      content: `Your current DKP with **${ign}** is **${dkp}**!`,
+      content: `Your current DKP is **${dkp}**!  
+          ${ign ? `IGN: **${ign}**` : ''} 
+      `,
       ephemeral: true,
     });
   } catch (error) {
