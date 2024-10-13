@@ -10,7 +10,7 @@ export const createServer = () => {
   app.use(express.static(path.join(__dirname, "frontend", "build")));
 
   // Basic HTTP server
-  app.get("/", (req, res) => {
+  app.get("/health", (req, res) => {
     res.send("Bot is running!");
   });
 
