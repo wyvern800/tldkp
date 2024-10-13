@@ -293,20 +293,6 @@ const commands = [
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
-    name: "clear",
-    description: "Cleans messages from discord",
-    options: [
-      {
-        name: "amount",
-        description: "Amount of messages to exclude",
-        type: ApplicationCommandOptionType.Integer,
-        required: true,
-      },
-    ],
-    commandExecution: handleClear,
-    permissions: [PermissionFlagsBits.Administrator],
-  },
-  {
     name: "dkp-change-language",
     description:
       "Changes the language of the responses of the bot.",
@@ -330,6 +316,31 @@ const commands = [
     ],
     commandExecution: api.changeLanguage,
     permissions: [PermissionFlagsBits.SendMessages],
+  },
+  {
+    name: "help",
+    description: "Get help from the bot",
+    commandExecution: async (interaction) => {
+      return interaction.reply({
+        content: "https://tldkp.net",
+        ephemeral: true,
+      });
+    },
+    permissions: [PermissionFlagsBits.SendMessages],
+  },
+  {
+    name: "clear",
+    description: "Cleans messages from discord",
+    options: [
+      {
+        name: "amount",
+        description: "Amount of messages to exclude",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+      },
+    ],
+    commandExecution: handleClear,
+    permissions: [PermissionFlagsBits.Administrator],
   },
 ];
 

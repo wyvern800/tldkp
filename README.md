@@ -5,6 +5,6 @@
 - Repo adicionado - OK  
 - Criar sistema de linguagem/localização - WIP  
   - Base adicionada, seletor / comando de trocar linguagem - OK  
-- Adicionar comando de help  
-- Criar forma de adicionar o bot aos servidores dos donos  
+- Adicionar comando de help - OK
+- Criar forma de adicionar o bot aos servidores dos donos - OK
 - Adicionar forma de interagir com o comando apenas se for de uma role específica determinada pelo site  
