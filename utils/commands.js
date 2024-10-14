@@ -247,7 +247,7 @@ export const updateNickname = async (interaction) => {
 // Here's the commands list
 export const commands = [
   {
-    name: "dkp-manage",
+    name: "manage",
     description:
       "Manages the DKP of a player (You can set, increase or decrease)",
     options: [
@@ -289,13 +289,13 @@ export const commands = [
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
-    name: "dkp-check",
+    name: "check",
     description: "Shows informations about your DKP",
     commandExecution: handleCheck,
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
-    name: "dkp-set-nickname",
+    name: "nickname",
     description: "Sets your ingame name",
     options: [
       {
@@ -309,7 +309,7 @@ export const commands = [
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
-    name: "dkp-change-language",
+    name: "language",
     description: "Changes the language of the responses of the bot.",
     options: [
       {
@@ -345,13 +345,13 @@ export const commands = [
   },
   {
     name: "clear",
-    description: "Cleans messages from discord",
+    description: "Cleans messages from a channel (Limited to 100 messages)",
     options: [
       {
         name: "amount",
         description: "Amount of messages to exclude",
         type: ApplicationCommandOptionType.Integer,
-        required: true,
+        required: true
       },
     ],
     commandExecution: handleClear,

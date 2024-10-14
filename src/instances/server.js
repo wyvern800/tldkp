@@ -3,7 +3,6 @@ import path from "path";
 import cors from "cors";
 import { commands } from "../../utils/commands.js";
 import { parseRoutes, getRoutes } from "../middlewares/routeCapturer.js";
-import { generateOrigins } from "../../utils/index.js";
 
 export const createServer = (client) => {
   const app = express();
