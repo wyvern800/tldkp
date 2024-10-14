@@ -3,6 +3,7 @@ import path from "path";
 import cors from "cors";
 import { commands } from "../../utils/commands.js";
 import { parseRoutes, getRoutes } from "../middlewares/routeCapturer.js";
+import { generateOrigins } from "../../utils/index.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -11,7 +12,7 @@ export const createServer = (client) => {
 
   app.use(
     cors({
-      origin: ["http://localhost:3000", "http://localhost:5173"],
+      origin: generateOrigins(),
       methods: ["GET", "POST"],
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
