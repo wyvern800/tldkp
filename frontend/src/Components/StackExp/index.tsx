@@ -14,7 +14,7 @@ function Feature({ title, desc, ...rest }: FeaturePropsType) {
   return (
     <Box p={5} shadow="md" borderWidth="1px" {...rest}>
       <Heading fontSize="xl">{title}</Heading>
-      <Text mt={4}>{desc}</Text>
+      <Text mt={4} fontSize="xl">{desc}</Text>
     </Box>
   );
 }
@@ -32,7 +32,7 @@ function StackEx(): ReactNode {
       />
       <Feature
         title="Steady & Simple"
-        desc="There are no complications using it, everything you want you can throw a command and config what you need"
+        desc="There are no complications using it, everything you want you can config via command lines"
       />
       <Feature
         title="Customizable"

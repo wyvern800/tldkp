@@ -3,14 +3,18 @@
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
+  "proxy": "http://localhost:3000",
   "scripts": {
     "start": "node src/shardManager.js",
     "dev": "concurrently \"npm run dev:bot\" \"npm run dev:client\"",
     "dev:bot": "nodemon src/shardManager.js",
     "dev:client": "npm --prefix frontend run dev",
+    "dev:api": "nodemon src/startExpress.js",
+    "dev:site": "concurrently \"npm run dev:client\" \"npm run dev:api\"",
     "build": "npm --prefix frontend install && npm --prefix frontend run build && npm install"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "discord.js": "^14.0.0",
     "dotenv": "^10.0.0",

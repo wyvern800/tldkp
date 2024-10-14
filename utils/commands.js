@@ -245,7 +245,7 @@ export const updateNickname = async (interaction) => {
 // ---------------------------------------------------------------
 
 // Here's the commands list
-const commands = [
+export const commands = [
   {
     name: "dkp-manage",
     description:
@@ -280,7 +280,7 @@ const commands = [
       {
         name: "amount",
         description:
-          "The value we are goinmg to set/increase/decrease fom the DKP of a player",
+          "The value we are going to set/increase/decrease fom the DKP of a player",
         type: ApplicationCommandOptionType.Integer,
         required: true,
       },
@@ -356,7 +356,7 @@ const commands = [
     ],
     commandExecution: handleClear,
     permissions: [PermissionFlagsBits.Administrator],
-  },
+  }
 ];
 
 /**

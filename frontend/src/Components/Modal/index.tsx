@@ -49,6 +49,7 @@ function Modal({
         closeOnOverlayClick={closeOnOverlayClick}
         onClose={onClose}
         isCentered={isCentered}
+        size="3xl"
       >
         <ModalOverlay
           bg="blackAlpha.300"
