@@ -26,6 +26,14 @@ export const createServer = (client) => {
   const apiRouter = express.Router();
   apiRouter.use(express.json());
 
+  apiRouter.use(
+    cors({
+      origin: '*',
+      methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type", "Authorization"]
+    })
+  );
+
   // Middleware to parse the routes to display as default endpoint
   parseRoutes(apiRouter);
 
