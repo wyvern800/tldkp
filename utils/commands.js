@@ -342,7 +342,7 @@ export const commands = [
   },
   {
     name: "check-other",
-    description: "Sets your ingame name",
+    description: "Check other people's DKP",
     options: [
       {
         name: "user",
