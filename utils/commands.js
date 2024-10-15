@@ -148,9 +148,56 @@ export const handleCheck = async (interaction) => {
       const { ign, dkp } = response;
 
       return interaction.reply({
-        content: `Your current DKP is **${dkp}**!  
-                ${ign ? `IGN: **${ign}**` : ""} 
-      `,
+        content: `Your current DKP is **${dkp}**!
+        ${ign ? `IGN: **${ign}**` : ""}`,
+        ephemeral: true,
+      });
+    }
+  } catch (error) {
+    const msg = "Error checking DKP";
+    new Logger(interaction).error(PREFIX, msg);
+    try {
+      await api?.logError(interaction.guild, msg, error);
+    } catch (err) {}
+    return interaction.reply({
+      content: msg,
+      ephemeral: true,
+    });
+  }
+};
+
+/**
+ * Check other player's DKP
+ *
+ * @param { any } interaction Interação
+ * @returns { void }
+ */
+export const checkOther = async (interaction) => {
+  const { options } = interaction;
+  const user = options.getUser("user");
+  console.log(user)
+  try {
+    const response = await api.getDkpByUserId(
+      interaction,
+      interaction.guild.id,
+      user.id
+    );
+    if (response === "dkp-not-found") {
+      return interaction.reply({
+        content: `${user.globalName} doesn't have DKP yet.`,
+        ephemeral: true,
+      });
+    } else if (response === "guild-not-found") {
+      return interaction.reply({
+        content: `Guild not found.`,
+        ephemeral: true,
+      });
+    } else {
+      const { ign, dkp } = response;
+
+      return interaction.reply({
+        content: `${user.globalName}'s current DKP is **${dkp}**!
+        ${ign ? `IGN: **${ign}**` : ""}`,
         ephemeral: true,
       });
     }
@@ -295,12 +342,26 @@ export const commands = [
     permissions: [PermissionFlagsBits.SendMessages],
   },
   {
+    name: "check-other",
+    description: "Sets your ingame name",
+    options: [
+      {
+        name: "user",
+        description: "Target user we're checking DKP from",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+    ],
+    commandExecution: checkOther,
+    permissions: [PermissionFlagsBits.Administrator],
+  },
+  {
     name: "nickname",
     description: "Sets your ingame name",
     options: [
       {
         name: "nickname",
-        description: "Yor Throne & Liberty nickname",
+        description: "Your Throne & Liberty nickname",
         type: ApplicationCommandOptionType.String,
         required: true,
       },
