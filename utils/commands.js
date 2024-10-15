@@ -175,7 +175,6 @@ export const handleCheck = async (interaction) => {
 export const checkOther = async (interaction) => {
   const { options } = interaction;
   const user = options.getUser("user");
-  console.log(user)
   try {
     const response = await api.getDkpByUserId(
       interaction,
