@@ -1,7 +1,7 @@
 import { Container, useColorModeValue } from "@chakra-ui/react";
-import Navbar from "./Components/Navbar";
 import StackExp from "./Components/StackExp";
 import Footer from "./Components/Footer";
+import Navbar from "./Components/Navbar";
 
 function App() {
   const bg = useColorModeValue("blue.600", "white");
@@ -20,7 +20,7 @@ function App() {
       alignItems="center"
       justifyContent="space-between"
     >
-      <Navbar />
+      <Navbar></Navbar>
       <StackExp />
       <Footer />
     </Container>

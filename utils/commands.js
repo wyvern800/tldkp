@@ -10,6 +10,7 @@ import * as api from "../database/repository.js";
 import { isAfter, add, formatDistance } from "date-fns";
 import admin from "firebase-admin";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "./constants.js";
+import { servers } from "./servers.js";
 
 config();
 
@@ -30,7 +31,8 @@ export function isInteractionPermitted(interaction, permissions) {
  * Loads commands to discord cache
  */
 export async function loadCommands() {
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+  servers.forEach(async (serverId) => {
+    const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
   const correctedCommands = commands?.map((command) => ({
     ...command,
     commandExecution: undefined,
@@ -42,7 +44,7 @@ export async function loadCommands() {
       await rest.put(
         Routes.applicationGuildCommands(
           process.env.CLIENT_ID,
-          process.env.GUILD_ID
+          serverId
         ),
         { body: correctedCommands }
       );
@@ -60,6 +62,7 @@ export async function loadCommands() {
   } catch (error) {
     new Logger().log(PREFIX, error);
   }
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 
-import { Box, Heading, Text, Stack } from "@chakra-ui/react";
+import { Box, Heading, Text, Stack, HStack } from "@chakra-ui/react";
+import { MdGroups2 } from "react-icons/md";
 
 // const bg = useColorModeValue("teal", "gray");
 
@@ -14,14 +15,16 @@ function Feature({ title, desc, ...rest }: FeaturePropsType) {
   return (
     <Box p={5} shadow="md" borderWidth="1px" {...rest}>
       <Heading fontSize="xl">{title}</Heading>
-      <Text mt={4} fontSize="xl">{desc}</Text>
+      <Text mt={4} fontSize="xl">
+        {desc}
+      </Text>
     </Box>
   );
 }
 
 function StackEx(): ReactNode {
   return (
-    <Stack spacing={8} direction="column">
+    <Stack spacing={8} direction="column" width="60%" marginBottom="5">
       <Feature
         title="Manage your guild member's DKP"
         desc="The Dragon Kill Points (DKP) system is a method used in MMORPGs (Massively Multiplayer Online Role-Playing Games) to distribute loot among players after defeating bosses or completing raids. DKP is a type of currency that players earn by participating in these activities, and they can spend their points to bid on or claim items dropped by defeated enemies."

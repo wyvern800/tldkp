@@ -23,12 +23,17 @@ import {
 import { CiAt } from "react-icons/ci";
 import { VscSymbolParameter } from "react-icons/vsc";
 import { MoonIcon, SunIcon } from "@chakra-ui/icons";
-import { FaHeart } from "react-icons/fa";
 import Modal from "../Modal";
 import icon from "../../assets/tl.webp";
 import api from "../../services/axiosInstance";
 import { CommandType, CommandOptions } from "../../types/CommandType";
 import { TiSortNumerically } from "react-icons/ti";
+import { MdDashboard } from "react-icons/md";
+import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { Link } from "react-router-dom";
+import { FaDiscord } from "react-icons/fa";
+import { RiSlashCommands } from "react-icons/ri";
+import { IoAddOutline } from "react-icons/io5";
 
 function Navbar() {
   const { colorMode, toggleColorMode } = useColorMode();
@@ -40,8 +45,8 @@ function Navbar() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await api.get<CommandType[]>("/commands");
-        setCommands(response.data);
+        const response = await api.get("/commands");
+        setCommands(response?.data?.data);
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error("Error fetching data:", error.message);
@@ -76,7 +81,12 @@ function Navbar() {
         p="5"
         direction={["row", "column"]}
       >
-        <Flex minWidth="100%" alignItems="center" direction={["column", "row"]}>
+        <Flex
+          minWidth="100%"
+          alignItems="center"
+          justifyContent="center"
+          direction={["column", "row"]}
+        >
           <Box>
             <HStack spacing="5px">
               <Image
@@ -91,38 +101,62 @@ function Navbar() {
                 colorScheme="gray.600"
                 placement="auto-start"
               >
-                <Heading size="lg">TLDKP</Heading>
+                <Link to="/">
+                  <Heading size="lg" textShadow={"2px 2px #0000008a"}>TLDKP</Heading>
+                </Link>
               </Tooltip>
             </HStack>
             <Spacer />
           </Box>
           <Spacer />
           <Stack direction={["column", "row"]} alignItems="center" gap="5">
-            <Button colorScheme="teal" onClick={() => onOpen()}>
+            <SignedOut>
+              <Link to="/sign-in">
+                <Button leftIcon={<FaDiscord />} colorScheme="teal">
+                  Login with Discord
+                </Button>
+              </Link>
+            </SignedOut>
+            <Button
+              leftIcon={<RiSlashCommands />}
+              colorScheme="teal"
+              onClick={() => onOpen()}
+            >
               Commands
             </Button>
+
             <Button
+              leftIcon={<IoAddOutline />}
               colorScheme="teal"
               onClick={() => {
                 window.open(
-                  "https://discord.com/oauth2/authorize?client_id=1294518658944598067",
+                  import.meta.env.VITE_BOT_INSTALL,
                   "_blank"
                 );
               }}
             >
               Add to my server
             </Button>
-            <Button leftIcon={<FaHeart />} colorScheme="gray" variant="outline">
-              Sponsor
-            </Button>
-            <Icon
+
+            {/*<Icon
               _hover={{ cursor: "pointer", opacity: 0.7 }}
               as={colorMode === "light" ? MoonIcon : SunIcon}
               w={5}
               h={5}
               color="white"
               onClick={toggleColorMode}
-            />
+            />*/}
+            <SignedIn>
+              <UserButton>
+                <UserButton.MenuItems>
+                  <UserButton.Link
+                    label="Dashboard"
+                    labelIcon={<MdDashboard />}
+                    href="/dashboard"
+                  />
+                </UserButton.MenuItems>
+              </UserButton>
+            </SignedIn>
           </Stack>
         </Flex>
         <Divider p="2" />
@@ -135,16 +169,17 @@ function Navbar() {
         >
           {commands ? (
             <UnorderedList spacing={3}>
-              {commands?.map((command: CommandType) => {
+              {commands?.map((command: CommandType, index) => {
                 const commandOptions = command.options;
                 return (
-                  <ListItem>
+                  <ListItem key={`${command.name}${index}`}>
                     <Tag marginRight="2">/{command.name}</Tag>
                     {commandOptions &&
                       commandOptions.map(
                         (commandOption: CommandOptions, index: number) => {
                           return (
                             <Tooltip
+                              key={`${commandOption.name}${index}`}
                               label={commandOption.description}
                               hasArrow
                               arrowSize={15}

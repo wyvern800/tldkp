@@ -3,17 +3,27 @@ import path from "path";
 import cors from "cors";
 import { commands } from "../../utils/commands.js";
 import { parseRoutes, getRoutes } from "../middlewares/routeCapturer.js";
+import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
+import { getAuth } from "@clerk/express";
+import "dotenv/config";
+import Clerk from "../../utils/clerk.js";
+import axios from "axios";
+import ResponseBase from "../../utils/responses.js";
+import { getGuildsByOwnerOrUser } from "../../database/repository.js";
 
 export const createServer = (client) => {
   const app = express();
 
   const port = process.env.PORT || 3000;
 
+  // start clerk
+  const { users } = new Clerk().getInstance();
+
   app.use(
     cors({
-      origin: '*',
+      origin: "*",
       methods: ["GET", "POST", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"]
+      allowedHeaders: ["Content-Type", "Authorization"],
     })
   );
 
@@ -27,9 +37,9 @@ export const createServer = (client) => {
 
   apiRouter.use(
     cors({
-      origin: '*',
+      origin: "*",
       methods: ["GET", "POST"],
-      allowedHeaders: ["Content-Type", "Authorization"]
+      allowedHeaders: ["Content-Type", "Authorization"],
     })
   );
 
@@ -45,26 +55,9 @@ export const createServer = (client) => {
   );
 
   apiRouter.get(
-    "/health",
-    (req, res) => {
-      if (client) {
-        const status = client.user.presence.status; // Get the bot's status
-        if (status === "online") {
-          res.status(200).send("Bot is healthy!");
-        } else {
-          res.status(500).send("Bot is unhealthy!");
-        }
-      } else {
-        res.status(200).send("");
-      }
-    },
-    "Endpoint that shows bot status"
-  );
-
-  apiRouter.get(
     "/commands",
     (req, res) => {
-      return res.status(200).json(
+      return new ResponseBase(res).success(
         commands.map((command) => ({
           name: command.name,
           description: command.description,
@@ -74,6 +67,53 @@ export const createServer = (client) => {
     },
     "Endpoint that shows all the commands from the bot service"
   );
+
+  apiRouter.get(
+    "/health",
+    (req, res) => {
+      if (client) {
+        const status = client.user.presence.status; // Get the bot's status
+        if (status === "online") {
+          return new ResponseBase(res).success("Bot is healthy");
+        } else {
+          return new ResponseBase(res).error("Bot is unhealthy!");
+        }
+      } else {
+        return new ResponseBase(res).successEmpty();
+      }
+    },
+    "Endpoint that shows bot status"
+  );
+
+  // Clerk middleware
+  apiRouter.use(ClerkExpressWithAuth());
+
+  apiRouter.get("/dashboard", async (req, res) => {
+    const { userId, sessionId } = getAuth(req);
+    const user = await users.getUser(userId);
+    const discordAccount = user.externalAccounts?.find(
+      (account) => account.provider === "oauth_discord"
+    );
+
+    if (!sessionId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    if (discordAccount) {
+      const externalId = discordAccount.externalId;
+
+      // Gets the data
+      await getGuildsByOwnerOrUser(externalId).then(guild => {
+        return new ResponseBase(res).success(guild);
+      });
+    } else {
+      return new ResponseBase(res).notFound("No account was found");
+    }
+  });
+
+  apiRouter.use((err, req, res, next) => {
+    return new ResponseBase(res).notAllowed("Unauthenticated!");
+  });
 
   app.use("/api", apiRouter);
 

@@ -3,6 +3,7 @@ import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
 import { updateDkp, setDkp, isPositiveNumber } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
+import { getMemberById } from "../utils/discord.js";
 
 const PREFIX = "Firebase";
 
@@ -21,6 +22,95 @@ export async function getGuildConfig(guildId) {
   }
 
   return doc.data();
+}
+
+export async function getGuildsByOwnerOrUser(userOrOwnerId) {
+  try {
+    const guildsRef = db.collection("guilds"); // Supondo que os documentos estejam na coleção 'guilds'
+
+    const ownerQuery = guildsRef.where(
+      "guildData.ownerId",
+      "==",
+      userOrOwnerId
+    );
+    const ownerSnapshot = await ownerQuery.get();
+
+    const allGuildsSnapshot = await guildsRef.get();
+
+    const ownerGuilds = [];
+    if (!ownerSnapshot.empty) {
+      ownerSnapshot.forEach((doc) => {
+        ownerGuilds.push({ ...doc.data() });
+      });
+    }
+
+    // Guildas em que o usuário é membro
+    const memberGuilds = [];
+    allGuildsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const members = data?.memberDkps || [];
+
+      // Optionally filter only the matching member
+      const filteredMembers = members.filter(
+        (member) => member?.userId === userOrOwnerId
+      );
+      memberGuilds.push({
+        ...data,
+        memberDkps: filteredMembers, // Only include relevant members
+      });
+    });
+
+    const [owner, member] = await Promise.all([ownerGuilds, memberGuilds]).then(
+      async (values) => {
+        const parseMembers = async (_guilds) => {
+          return Promise.all(
+            _guilds.map(async (guild) => {
+              const { id, ownerId } = guild?.guildData;
+              const owner = await getMemberById(id, ownerId);
+
+              const memberDkps = await Promise.all(
+                guild?.memberDkps.map(async (member) => {
+                  const memberDiscord = await getMemberById(id, member?.userId);
+                  return {
+                    ...member,
+                    discordData: {
+                      displayName: memberDiscord?.user?.global_name ?? "",
+                      preferredColor: memberDiscord?.user?.accent_color,
+                    },
+                  };
+                })
+              );
+
+              return {
+                ...guild,
+                guildData: {
+                  ...guild?.guildData,
+                  ownerDiscordData: {
+                    displayName: owner?.user?.global_name ?? "",
+                    preferredColor: owner?.user?.accent_color,
+                  },
+                },
+                memberDkps,
+              };
+            })
+          );
+        };
+
+        const ownerGuilds = await parseMembers(values[0]);
+        const memberGuilds = await parseMembers(values[1]);
+
+        return [ownerGuilds, memberGuilds];
+      }
+    );
+
+    return {
+      ownerGuilds: owner,
+      memberGuilds: member,
+    };
+  } catch (error) {
+    console.log(error);
+    new Logger().log(PREFIX, `Some error happened`);
+  }
 }
 
 /**
@@ -47,7 +137,7 @@ export async function getDkpByUserId(interaction, guildId, userId) {
   // If the document doesn't exist, log an error and return null
   if (!doc.exists) {
     new Logger(interaction).log(PREFIX, `Guild not found`);
-    return 'guild-not-found';
+    return "guild-not-found";
   }
 
   const guildData = doc.data();
@@ -63,7 +153,7 @@ export async function getDkpByUserId(interaction, guildId, userId) {
   // If user not found, log an error and return null
   if (!userDkpData) {
     new Logger(interaction).log(PREFIX, `No DKP found for user ${userId}`);
-    return 'dkp-not-found';
+    return "dkp-not-found";
   }
 
   // Return the DKP of the user
@@ -232,7 +322,6 @@ export async function handleUpdateDkp(interaction) {
   return interaction.reply({ content: msg, ephemeral: true });
 }
 
-
 /**
  * Handles the nickname update
  *
@@ -266,16 +355,19 @@ export async function changeLanguage(interaction) {
 
   const guildDataResponse = await getGuildConfig(interaction.guild.id);
 
-  const newGuildData = {...guildDataResponse, language };
+  const newGuildData = { ...guildDataResponse, language };
 
   const langs = {
     [LANGUAGE_EN]: "English (en-US)",
-    [LANGUAGE_PT_BR] : "Brazilian Portuguese (pt-BR)",
-  }
+    [LANGUAGE_PT_BR]: "Brazilian Portuguese (pt-BR)",
+  };
   const newLang = langs[language] ?? LANGUAGE_EN;
 
   try {
-    await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+    await db
+      .collection("guilds")
+      .doc(interaction.guild.id)
+      .update(newGuildData);
     const msg = `The bot responses language was set to: ${newLang}!`;
     new Logger(interaction).log(PREFIX, msg);
     interaction.reply({ content: msg, ephemeral: true });
