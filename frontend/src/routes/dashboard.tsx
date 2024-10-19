@@ -46,10 +46,8 @@ export default function DashboardPage() {
         justifyItems: "space-between",
         width: "60%",
         minHeight: "75vh",
-        //border: "1px solid rgba(0, 0, 0, 0.2)",
         flexDirection: "column",
-        borderTopLeftRadius: "10px",
-        borderTopRightRadius: "10px",
+        borderRadius: "10px",
         backgroundColor: "rgba(0, 0, 0, 0.1)",
         border: "linear(to-r, green.500, teal.500)"
         

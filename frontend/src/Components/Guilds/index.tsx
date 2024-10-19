@@ -16,16 +16,38 @@ import {
   Tag,
   HStack,
   Spacer,
+  Text,
 } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
 import styled from "styled-components";
 import unknown from "../../assets/unknown.png";
+import { useUser } from "@clerk/clerk-react";
+import { useState, useEffect } from "react";
 
 const Logo = styled.img`
   width: 20%;
 `;
 
 const Guilds = ({ data, loaded }: any): React.ReactNode => {
+  const { isLoaded, user } = useUser();
+  const [myDiscordId, setMyDiscordId] = useState<string | undefined>("");
+
+  // Effect to get the logged user userId
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    if (!user) return;
+    const discordAccount = user.externalAccounts?.find(
+      (account) => account.provider === "discord"
+    );
+
+    console.log(discordAccount?.providerUserId);
+    setMyDiscordId(discordAccount?.providerUserId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       {!loaded ? (
@@ -34,15 +56,16 @@ const Guilds = ({ data, loaded }: any): React.ReactNode => {
         </center>
       ) : (
         <>
-          <Accordion
-            allowToggle
-          >
-            {data?.map((guild: any) => {
-              const { icon, name } = guild?.guildData ?? {};
+          <Accordion allowToggle>
+            {data?.map((guild: any, index: number) => {
+              const { icon, name, alias } = guild?.guildData ?? {};
               const { memberDkps } = guild ?? [];
 
               return (
-                <AccordionItem key={guild?.guildData?.id} defaultChecked={true}>
+                <AccordionItem
+                  key={`${guild?.guildData?.id}${index}`}
+                  defaultChecked={true}
+                >
                   <h2>
                     <AccordionButton>
                       <Box as="span" flex="1" textAlign="left">
@@ -52,7 +75,18 @@ const Guilds = ({ data, loaded }: any): React.ReactNode => {
                               style={{ width: "25px", borderRadius: "50px" }}
                               src={icon && icon !== "" ? icon : unknown}
                             ></Logo>
-                            <div>{name}</div>
+                            <HStack>
+                              {alias && alias !== null && alias !== "" ? (
+                                <>
+                                  <Text>{alias}</Text>
+                                  <Text fontSize="xs" color="lightgray">
+                                    ({name})
+                                  </Text>
+                                </>
+                              ) : (
+                                <>{name}</>
+                              )}
+                            </HStack>
                           </HStack>
                           <Spacer />
                           {memberDkps?.length && (
@@ -68,7 +102,7 @@ const Guilds = ({ data, loaded }: any): React.ReactNode => {
                   <AccordionPanel pb={4}>
                     <TableContainer>
                       {memberDkps && memberDkps?.length ? (
-                        <Table variant="simple">
+                        <Table variant="simple" size="sm" colorScheme="gray">
                           <Thead>
                             <Tr>
                               <Th>User</Th>
@@ -79,17 +113,36 @@ const Guilds = ({ data, loaded }: any): React.ReactNode => {
                             </Tr>
                           </Thead>
                           <Tbody>
-                            {memberDkps?.map((player: any) => {
-                              const { displayName } = player?.discordData ?? {};
-                              const { userId, dkp, ign } = player;
-                              return (
-                                <Tr key={userId}>
-                                  <Td>{displayName}</Td>
-                                  <Td>{ign ?? ""}</Td>
-                                  <Td isNumeric>{dkp}</Td>
-                                </Tr>
-                              );
-                            })}
+                          {memberDkps
+                              ?.filter((player: any) => player.userId === myDiscordId)
+                              ?.sort((a: any, b: any) => b.dkp - a.dkp)
+                              .map((player: any, index: number) => {
+                                const { displayName } =
+                                  player?.discordData ?? {};
+                                const { userId, dkp, ign } = player;
+                                return (
+                                  <Tr key={`${userId}${index}`} color="#81E6D9" bgColor={"#26c0ab24"}>
+                                    <Td><strong>{displayName}</strong></Td>
+                                    <Td><strong>{ign ?? ""}</strong></Td>
+                                    <Td isNumeric><strong>{dkp}</strong></Td>
+                                  </Tr>
+                                );
+                              })}
+                            {memberDkps
+                              ?.filter((player: any) => player.userId !== myDiscordId)
+                              ?.sort((a: any, b: any) => b.dkp - a.dkp)
+                              .map((player: any, index: number) => {
+                                const { displayName } =
+                                  player?.discordData ?? {};
+                                const { userId, dkp, ign } = player;
+                                return (
+                                  <Tr key={`${userId}${index}`}>
+                                    <Td>{displayName}</Td>
+                                    <Td>{ign ?? ""}</Td>
+                                    <Td isNumeric>{dkp}</Td>
+                                  </Tr>
+                                );
+                              })}
                           </Tbody>
                         </Table>
                       ) : (

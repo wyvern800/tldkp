@@ -1,6 +1,6 @@
 {
-  "name": "my-discord-bot",
-  "version": "1.0.0",
+  "name": "tldkp",
+  "version": "1.0.1",
   "main": "index.js",
   "type": "module",
   "proxy": "http://localhost:3000",

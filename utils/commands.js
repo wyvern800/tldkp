@@ -292,6 +292,69 @@ export const updateNickname = async (interaction) => {
   }
 };
 
+export const setGuildNickname = async (interaction) => {
+  const nickname = interaction.options.getString("alias");
+
+  try {
+    const guildId = interaction.guild.id;
+
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection('guilds').doc(guildId);
+
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
+    
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      throw new Error('Guild document not found');
+    }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
+
+    // Destructure the lastUpdatedGuildAlias field
+    const { lastUpdatedGuildAlias } = guildData?.guildData;
+    const notSetYet = !lastUpdatedGuildAlias;
+
+    // Handle date parsing
+    const updatedAtDate = lastUpdatedGuildAlias?.toDate ? lastUpdatedGuildAlias.toDate() : new Date();
+    if (isNaN(updatedAtDate.getTime())) {
+      new Logger(interaction).log(PREFIX, 'Invalid lastUpdatedGuildAlias date');
+      return;
+    }
+
+    const future = add(updatedAtDate, { days: 10 });
+
+    // Check if 10 days have passed or if lastUpdatedGuildAlias was never set
+    if (notSetYet || isAfter(new Date(), future)) {
+      // Perform the update in Firestore
+      await guildRef.update({
+        'guildData.alias': nickname,
+        'guildData.lastUpdatedGuildAlias': admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      const msg = "Guild alias updated successfully!";
+      return interaction.reply({ content: msg, ephemeral: true });
+    } else {
+      // Calculate the time left until the next allowed update
+      const allowedDateFormatted = formatDistance(future, new Date(), {
+        addSuffix: true,
+      });
+      const msg = `You can only change your guild alias once every 10 days, you will be able to change it ${allowedDateFormatted}.`;
+
+      new Logger(interaction).log(PREFIX, msg);
+      return interaction.reply({ content: msg, ephemeral: true });
+    }
+  } catch (error) {
+    console.log(error);
+    const msg = "Error updating guild's name (alias)";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};
+
+
+
 // ---------------------------------------------------------------
 
 // Here's the commands list
@@ -371,6 +434,20 @@ export const commands = [
     ],
     commandExecution: updateNickname,
     permissions: [PermissionFlagsBits.SendMessages],
+  },
+  {
+    name: "guild-name",
+    description: "Sets your guild name (alias)",
+    options: [
+      {
+        name: "alias",
+        description: "Your Throne & Liberty guild's name",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+    commandExecution: setGuildNickname,
+    permissions: [PermissionFlagsBits.Administrator],
   },
   {
     name: "language",

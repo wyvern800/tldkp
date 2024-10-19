@@ -177,6 +177,8 @@ export async function guildCreate(guild) {
       icon: guild.iconURL(),
       name: guild.name,
       ownerId: guild.ownerId,
+      alias: null,
+      lastUpdatedGuild : null,
     },
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
