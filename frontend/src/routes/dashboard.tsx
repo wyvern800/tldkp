@@ -28,7 +28,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetch = async () => {
       if (!isLoaded) return;
-      console.log(await getToken());
       const res = await api.get(`/dashboard`, {
         headers: {
           Authorization: `Bearer ${await getToken()}`,
@@ -46,7 +45,7 @@ export default function DashboardPage() {
         display: "flex",
         justifyItems: "space-between",
         width: "60%",
-        height: "75vh",
+        minHeight: "75vh",
         //border: "1px solid rgba(0, 0, 0, 0.2)",
         flexDirection: "column",
         borderTopLeftRadius: "10px",

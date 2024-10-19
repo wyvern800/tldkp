@@ -50,14 +50,18 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
       const data = doc.data();
       const members = data?.memberDkps || [];
 
-      // Optionally filter only the matching member
+      // Filter the members that match the userOrOwnerId
       const filteredMembers = members.filter(
         (member) => member?.userId === userOrOwnerId
       );
-      memberGuilds.push({
-        ...data,
-        memberDkps: filteredMembers, // Only include relevant members
-      });
+
+      // Only add the guild if there are matching members
+      if (filteredMembers.length > 0) {
+        memberGuilds.push({
+          ...data,
+          memberDkps: filteredMembers, // Only include relevant members
+        });
+      }
     });
 
     const [owner, member] = await Promise.all([ownerGuilds, memberGuilds]).then(

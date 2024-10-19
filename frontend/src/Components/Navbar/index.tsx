@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import {
-  useColorMode,
   Flex,
   Spacer,
   Box,
@@ -34,7 +33,6 @@ import { RiSlashCommands } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 
 function Navbar() {
-  const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [commands, setCommands] = useState<CommandType[] | null>(null);
