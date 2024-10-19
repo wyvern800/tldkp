@@ -1,6 +1,6 @@
 {
   "name": "tldkp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "index.js",
   "type": "module",
   "proxy": "http://localhost:3000",
