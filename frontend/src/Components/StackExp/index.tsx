@@ -1,7 +1,6 @@
 import { ReactNode } from "react";
 
-import { Box, Heading, Text, Stack, HStack } from "@chakra-ui/react";
-import { MdGroups2 } from "react-icons/md";
+import { Box, Heading, Text, Stack } from "@chakra-ui/react";
 
 // const bg = useColorModeValue("teal", "gray");
 

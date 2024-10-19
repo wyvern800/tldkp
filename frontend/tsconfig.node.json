@@ -18,7 +18,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": false,
-    "suppressImplicitAnyIndexErrors": true
   },
   "include": ["vite.config.ts"]
 }

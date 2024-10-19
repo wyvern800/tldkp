@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   useColorMode,
   Flex,
-  Icon,
   Spacer,
   Box,
   Heading,
@@ -22,7 +21,6 @@ import {
 } from "@chakra-ui/react";
 import { CiAt } from "react-icons/ci";
 import { VscSymbolParameter } from "react-icons/vsc";
-import { MoonIcon, SunIcon } from "@chakra-ui/icons";
 import Modal from "../Modal";
 import icon from "../../assets/tl.webp";
 import api from "../../services/axiosInstance";
