@@ -24,7 +24,9 @@ const PREFIX = "Discord.js/SlashCommands";
  * @returns { boolean } Wheter if its allowed or not
  */
 export function isInteractionPermitted(interaction, permissions) {
-  return permissions?.every((permission) => interaction?.member?.permissions.has(permission));
+  return permissions?.every((permission) =>
+    interaction?.member?.permissions.has(permission)
+  );
 }
 
 /**
@@ -32,36 +34,35 @@ export function isInteractionPermitted(interaction, permissions) {
  */
 export async function loadCommands() {
   servers.forEach(async (serverId) => {
-    const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-  const correctedCommands = commands?.map((command) => ({
-    ...command,
-    commandExecution: undefined,
-    permissions: undefined,
-  }));
-
-  try {
-    if (process.env.ENV === "dev") {
-      await rest.put(
-        Routes.applicationGuildCommands(
-          process.env.CLIENT_ID,
-          serverId
-        ),
-        { body: correctedCommands }
-      );
-    } else {
-      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
-        body: correctedCommands,
-      });
-    }
-    new Logger().log(
-      PREFIX,
-      `Started ${commands?.length} refreshing application (/) command${
-        commands?.length > 1 ? "s" : ""
-      }.`
+    const rest = new REST({ version: "10" }).setToken(
+      process.env.DISCORD_TOKEN
     );
-  } catch (error) {
-    new Logger().log(PREFIX, error);
-  }
+    const correctedCommands = commands?.map((command) => ({
+      ...command,
+      commandExecution: undefined,
+      permissions: undefined,
+    }));
+
+    try {
+      if (process.env.ENV === "dev") {
+        await rest.put(
+          Routes.applicationGuildCommands(process.env.CLIENT_ID, serverId),
+          { body: correctedCommands }
+        );
+      } else {
+        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
+          body: correctedCommands,
+        });
+      }
+      new Logger().log(
+        PREFIX,
+        `Started ${commands?.length} refreshing application (/) command${
+          commands?.length > 1 ? "s" : ""
+        }.`
+      );
+    } catch (error) {
+      new Logger().log(PREFIX, error);
+    }
   });
 }
 
@@ -399,8 +400,11 @@ export const commands = [
     name: "help",
     description: "Get help from the bot",
     commandExecution: async (interaction) => {
+      const msg = `There is a section in the website where you can see all the commands available and their usage, and also now you can check all of your member's DKPS at our brand new Dashboard.  
+      [Click here to check out!](https://tldkp.net/)
+      `;
       return interaction.reply({
-        content: "https://tldkp.net",
+        content: msg,
         ephemeral: true,
       });
     },
@@ -414,12 +418,12 @@ export const commands = [
         name: "amount",
         description: "Amount of messages to exclude",
         type: ApplicationCommandOptionType.Integer,
-        required: true
+        required: true,
       },
     ],
     commandExecution: handleClear,
     permissions: [PermissionFlagsBits.Administrator],
-  }
+  },
 ];
 
 /**

@@ -37,6 +37,13 @@ export const createBotClient = () => {
 
   // When the bot joins a new guild
   client.on("guildCreate", async (guild) => {
+    const response = await api.getGuildConfig(guild.id);
+
+    if (response) {
+      new Logger().log(PREFIX, `Guild data already exists!`);
+      return;
+    }
+
     await api
       .guildCreate(guild)
       .catch(async (error) => {

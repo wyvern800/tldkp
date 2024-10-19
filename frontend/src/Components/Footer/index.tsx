@@ -37,7 +37,7 @@ function Footer({ complete = true }) {
                 isExternal
                 textShadow={"2px 2px 5px #0000008a"}
               >
-                Collaborate repository on Github <ExternalLinkIcon mx="2px" />
+                View source on Github / Collaborate <ExternalLinkIcon mx="2px" />
               </Link>
 
               <Link
@@ -45,7 +45,7 @@ function Footer({ complete = true }) {
                 isExternal
                 textShadow={"2px 2px 5px #0000008a"}
               >
-                Donate <ExternalLinkIcon mx="2px" />
+                Give us a donation <ExternalLinkIcon mx="2px" />
               </Link>
             </VStack>
             <VStack direction={["column", "row"]}>
@@ -54,14 +54,14 @@ function Footer({ complete = true }) {
                 isExternal
                 textShadow={"2px 2px 5px #0000008a"}
               >
-                Give us a Feedback
+                Give us a suggestion / feedback
               </Link>
               <Link
-                href="https://www.paypal.com/donate/?hosted_button_id=A9XGWD2V94UZ4"
+                href="https://discord.com/channels/1294519069059584041/1297002082183675905"
                 isExternal
                 textShadow={"2px 2px 5px #0000008a"}
               >
-                Changelog
+                Changelog (temporary)
               </Link>
             </VStack>
           </Stack>

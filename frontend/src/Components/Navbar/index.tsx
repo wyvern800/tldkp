@@ -17,6 +17,7 @@ import {
   Skeleton,
   TagLeftIcon,
   TagLabel,
+  Badge
 } from "@chakra-ui/react";
 import { CiAt } from "react-icons/ci";
 import { VscSymbolParameter } from "react-icons/vsc";
@@ -98,7 +99,9 @@ function Navbar() {
                 placement="auto-start"
               >
                 <Link to="/">
-                  <Heading size="lg" textShadow={"2px 2px #0000008a"}>TLDKP</Heading>
+                  <Heading size="lg" textShadow={"2px 2px #0000008a"}>
+                    TLDKP
+                  </Heading>
                 </Link>
               </Tooltip>
             </HStack>
@@ -110,6 +113,9 @@ function Navbar() {
               <Link to="/sign-in">
                 <Button leftIcon={<FaDiscord />} colorScheme="teal">
                   Login with Discord
+                  <Badge ml="3" colorScheme="black">
+                    New
+                  </Badge>
                 </Button>
               </Link>
             </SignedOut>
@@ -125,10 +131,7 @@ function Navbar() {
               leftIcon={<IoAddOutline />}
               colorScheme="teal"
               onClick={() => {
-                window.open(
-                  import.meta.env.VITE_BOT_INSTALL,
-                  "_blank"
-                );
+                window.open(import.meta.env.VITE_BOT_INSTALL, "_blank");
               }}
             >
               Add to my server
