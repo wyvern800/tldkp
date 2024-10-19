@@ -399,7 +399,7 @@ export const commands = [
       },
     ],
     commandExecution: api.handleUpdateDkp,
-    permissions: [PermissionFlagsBits.SendMessages],
+    permissions: [PermissionFlagsBits.Administrator],
   },
   {
     name: "check",
