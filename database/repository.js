@@ -59,7 +59,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
       if (filteredMembers.length > 0) {
         memberGuilds.push({
           ...data,
-          memberDkps: filteredMembers, // Only include relevant members
+          memberDkps: members, // Only include relevant members
         });
       }
     });
@@ -75,6 +75,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
               const memberDkps = await Promise.all(
                 guild?.memberDkps.map(async (member) => {
                   const memberDiscord = await getMemberById(id, member?.userId);
+
                   return {
                     ...member,
                     discordData: {
