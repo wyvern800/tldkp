@@ -293,6 +293,21 @@ export const updateNickname = async (interaction) => {
   }
 };
 
+/**
+ * Sets the in-game nickname (alias) for a guild.
+ *
+ * This function retrieves the alias from the interaction options and updates the corresponding guild document in Firestore.
+ * If the guild document does not exist, it throws an error.
+ * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
+ *
+ * @param {any} interaction - The interaction object from Discord.
+ * @param {any} interaction.options - The options object from the interaction.
+ * @param {Function} interaction.options.getString - Function to get a string option from the interaction.
+ * @param {string} interaction.options.getString.alias - The alias to set for the guild.
+ * @param {any} interaction.guild - The guild object from Discord.
+ * @param {string} interaction.guild.id - The ID of the guild.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ */
 export const setGuildNickname = async (interaction) => {
   const nickname = interaction.options.getString("alias");
 
@@ -391,6 +406,52 @@ export const setupAutoDecay = async (interaction) => {
     return interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error while setting up the auto-decaying system";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};
+
+/**
+ * Toggles DKP notifications for a guild.
+ *
+ * This function fetches the guild document from Firestore using the guild ID from the interaction.
+ * If the guild document exists, it toggles the DKP notifications setting.
+ * If the guild document does not exist, it logs an error message.
+ *
+ * @param {any} interaction - The interaction object from Discord.
+ * @param {any} interaction.guild - The guild object from Discord.
+ * @param {string} interaction.guild.id - The ID of the guild.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ */
+export const toggleDkpNotifications = async (interaction) => {
+  try {
+    const guildId = interaction.guild.id;
+
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
+
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+    }
+    
+    const togglablesPrefix = "togglables.dkpSystem";
+
+    const enabled = guildSnapshot.data()?.togglables?.dkpSystem?.dmNotifications;
+
+    const newValue = !enabled;
+
+    await guildRef.update({
+      [`${togglablesPrefix}.dmNotifications`]: newValue,
+    });
+
+    const msg = `Togglable: directly messages updated to: ${newValue}!`;
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error updating decay";
     new Logger(interaction).log(PREFIX, msg);
     return interaction.reply({ content: msg, ephemeral: true });
   }
@@ -668,6 +729,13 @@ export const commands = [
     },
     permissions: [PermissionFlagsBits.SendMessages],
     commandCategory: "General"
+  },
+  {
+    name: "dkp-notifications-toggle",
+    description:
+      "Toggles the sending of DKP changes notifications.",
+    commandExecution: toggleDkpNotifications,
+    permissions: [PermissionFlagsBits.Administrator],
   },
   {
     name: "clear",
