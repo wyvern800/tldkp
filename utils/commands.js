@@ -736,6 +736,7 @@ export const commands = [
       "Toggles the sending of DKP changes notifications.",
     commandExecution: toggleDkpNotifications,
     permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "DKP System"
   },
   {
     name: "clear",
