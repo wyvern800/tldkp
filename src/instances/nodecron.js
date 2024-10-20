@@ -20,7 +20,7 @@ const PREFIX = "Cron";
  * Logs the execution of the decay system for monitoring purposes.
  */
 const decay = async () => {
-  const decaytask = cron.schedule(
+  const decayTask = cron.schedule(
     process.env.ENV = "development" ? "*/15 * * * * *": "0 0 * * *",
     async () => {
       const guilds = await api.getAllGuilds(); // Await the promise
@@ -86,7 +86,7 @@ const decay = async () => {
     }
   );
 
-  return decaytask;
+  return decayTask;
 };
 
 /**
