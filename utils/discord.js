@@ -1,7 +1,5 @@
 import { REST, Routes } from "discord.js";
 import { config } from "dotenv";
-import { Logger } from "../utils/logger.js";
-import { servers } from "../utils/servers.js";
 
 config();
 

@@ -17,7 +17,7 @@ import {
   Skeleton,
   TagLeftIcon,
   TagLabel,
-  Badge
+  Badge,
 } from "@chakra-ui/react";
 import { CiAt } from "react-icons/ci";
 import { VscSymbolParameter } from "react-icons/vsc";
@@ -37,13 +37,19 @@ function Navbar() {
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [commands, setCommands] = useState<CommandType[] | null>(null);
+  const [categories, setCategories] = useState<string[] | null>(null);
 
   // Get the commands
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await api.get("/commands");
+        const commandCategories = new Set<string>();
+        response?.data?.data?.forEach((command: CommandType) => {
+          commandCategories.add(command.commandCategory);
+        });
         setCommands(response?.data?.data);
+        setCategories(Array.from(commandCategories));
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error("Error fetching data:", error.message);
@@ -68,6 +74,60 @@ function Navbar() {
       ? TiSortNumerically
       : VscSymbolParameter;
   }
+
+  const Commands = ({
+    commandsData,
+    category,
+  }: {
+    commandsData: CommandType[];
+    category: string;
+  }) => {
+    return (
+      <>
+        <Heading>{category}</Heading>
+        {commandsData
+          ?.filter((command) => command.commandCategory === category)
+          .map((command: CommandType, index) => {
+            const commandOptions = command.options;
+            return (
+              <ListItem key={`${command.name}${index}`}>
+                <Tag marginRight="2">/{command.name}</Tag>
+                {commandOptions &&
+                  commandOptions.map(
+                    (commandOption: CommandOptions, index: number) => {
+                      return (
+                        <Tooltip
+                          key={`${commandOption.name}${index}`}
+                          label={commandOption.description}
+                          hasArrow
+                          arrowSize={15}
+                        >
+                          <Tag
+                            key={index}
+                            marginRight="2"
+                            variant="subtle"
+                            colorScheme="gray.400"
+                            _hover={{ cursor: "help" }}
+                          >
+                            <TagLeftIcon
+                              boxSize={
+                                commandOption.type === 6 ? "15px" : "20px"
+                              }
+                              as={getParameterIcon(commandOption)}
+                            />
+                            <TagLabel>{commandOption.name}</TagLabel>
+                          </Tag>
+                        </Tooltip>
+                      );
+                    }
+                  )}
+                {command.description}
+              </ListItem>
+            );
+          })}
+      </>
+    );
+  };
 
   return (
     <>
@@ -166,46 +226,11 @@ function Navbar() {
           isCentered={true}
           closeOnOverlayClick={true}
         >
-          {commands ? (
+          {commands && categories ? (
             <UnorderedList spacing={3}>
-              {commands?.map((command: CommandType, index) => {
-                const commandOptions = command.options;
-                return (
-                  <ListItem key={`${command.name}${index}`}>
-                    <Tag marginRight="2">/{command.name}</Tag>
-                    {commandOptions &&
-                      commandOptions.map(
-                        (commandOption: CommandOptions, index: number) => {
-                          return (
-                            <Tooltip
-                              key={`${commandOption.name}${index}`}
-                              label={commandOption.description}
-                              hasArrow
-                              arrowSize={15}
-                            >
-                              <Tag
-                                key={index}
-                                marginRight="2"
-                                variant="subtle"
-                                colorScheme="gray.400"
-                                _hover={{ cursor: "help" }}
-                              >
-                                <TagLeftIcon
-                                  boxSize={
-                                    commandOption.type === 6 ? "15px" : "20px"
-                                  }
-                                  as={getParameterIcon(commandOption)}
-                                />
-                                <TagLabel>{commandOption.name}</TagLabel>
-                              </Tag>
-                            </Tooltip>
-                          );
-                        }
-                      )}
-                    {command.description}
-                  </ListItem>
-                );
-              })}
+              {categories.map((category: string) => (
+                <Commands commandsData={commands} category={category} />
+              ))}
             </UnorderedList>
           ) : (
             <>

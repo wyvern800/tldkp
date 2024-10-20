@@ -41,6 +41,7 @@ export async function loadCommands() {
       ...command,
       commandExecution: undefined,
       permissions: undefined,
+      commandCategory: undefined
     }));
 
     try {
@@ -299,14 +300,14 @@ export const setGuildNickname = async (interaction) => {
     const guildId = interaction.guild.id;
 
     // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection('guilds').doc(guildId);
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
     // Fetch the document snapshot
     const guildSnapshot = await guildRef.get();
-    
+
     // Ensure the document exists
     if (!guildSnapshot.exists) {
-      throw new Error('Guild document not found');
+      throw new Error("Guild document not found");
     }
 
     // Get the data from the document snapshot
@@ -317,9 +318,11 @@ export const setGuildNickname = async (interaction) => {
     const notSetYet = !lastUpdatedGuildAlias;
 
     // Handle date parsing
-    const updatedAtDate = lastUpdatedGuildAlias?.toDate ? lastUpdatedGuildAlias.toDate() : new Date();
+    const updatedAtDate = lastUpdatedGuildAlias?.toDate
+      ? lastUpdatedGuildAlias.toDate()
+      : new Date();
     if (isNaN(updatedAtDate.getTime())) {
-      new Logger(interaction).log(PREFIX, 'Invalid lastUpdatedGuildAlias date');
+      new Logger(interaction).log(PREFIX, "Invalid lastUpdatedGuildAlias date");
       return;
     }
 
@@ -329,8 +332,9 @@ export const setGuildNickname = async (interaction) => {
     if (notSetYet || isAfter(new Date(), future)) {
       // Perform the update in Firestore
       await guildRef.update({
-        'guildData.alias': nickname,
-        'guildData.lastUpdatedGuildAlias': admin.firestore.FieldValue.serverTimestamp(),
+        "guildData.alias": nickname,
+        "guildData.lastUpdatedGuildAlias":
+          admin.firestore.FieldValue.serverTimestamp(),
       });
 
       const msg = "Guild alias updated successfully!";
@@ -353,7 +357,116 @@ export const setGuildNickname = async (interaction) => {
   }
 };
 
+export const setupAutoDecay = async (interaction) => {
+  const percentage = interaction.options.getNumber("percentage");
+  const interval = interaction.options.getInteger("interval");
 
+  try {
+    const guildId = interaction.guild.id;
+
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
+
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+    }
+
+    const togglablesPrefix = "togglables.decaySystem";
+
+    await guildRef.update({
+      [`${togglablesPrefix}.percentage`]: percentage,
+      [`${togglablesPrefix}.interval`]: interval,
+      [`${togglablesPrefix}.enabled`]: false,
+      [`${togglablesPrefix}.minimumCap`]: 100,
+    });
+
+    const msg = `The auto decaying system was set, now you must execute **/decay-toggle** once to enable the scheduler, please have in mind
+      that if you don't enable the system, the decay will not be executed, also the default minimum cap is 100, which means a person will only
+      lose their DKPs only if their cap is above 100, if it reaches 100, it will stop being removed, you can change that with **/decay-change-minimum-cap** command.
+    `;
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error while setting up the auto-decaying system";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};
+
+export const toggleDecay = async (interaction) => {
+
+  try {
+    const guildId = interaction.guild.id;
+
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
+
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+    }
+    
+    const togglablesPrefix = "togglables.decaySystem";
+
+    const enabled = guildSnapshot.data()?.togglables?.decaySystem?.enabled;
+    console.log(enabled)
+
+    await guildRef.update({
+      [`${togglablesPrefix}.enabled`]: !enabled,
+      [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
+    });
+
+    const msg = "Togglable: decay updated successfully!";
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error updating decay";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};
+
+export const setMinimumCap = async (interaction) => {
+  const minimumCap = interaction.options.getInteger("minimum_cap");
+
+  if (minimumCap < 0) {
+    interaction.reply({ content: "Value must be above zero", ephemeral: true });
+    return
+  }
+
+  try {
+    const guildId = interaction.guild.id;
+
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
+
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+    }
+    
+    const togglablesPrefix = "togglables.decaySystem";
+
+    await guildRef.update({
+      [`${togglablesPrefix}.minimumCap`]: minimumCap,
+    });
+
+    const msg = `Togglable: decay minimum cap updated successfully to **${minimumCap}**!`;
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error updating decay";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};
 
 // ---------------------------------------------------------------
 
@@ -400,12 +513,14 @@ export const commands = [
     ],
     commandExecution: api.handleUpdateDkp,
     permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "DKP System"
   },
   {
     name: "check",
     description: "Shows informations about your DKP",
     commandExecution: handleCheck,
     permissions: [PermissionFlagsBits.SendMessages],
+    commandCategory: "DKP System"
   },
   {
     name: "check-other",
@@ -420,6 +535,7 @@ export const commands = [
     ],
     commandExecution: checkOther,
     permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "DKP System"
   },
   {
     name: "nickname",
@@ -434,6 +550,7 @@ export const commands = [
     ],
     commandExecution: updateNickname,
     permissions: [PermissionFlagsBits.SendMessages],
+    commandCategory: "General"
   },
   {
     name: "guild-name",
@@ -448,6 +565,69 @@ export const commands = [
     ],
     commandExecution: setGuildNickname,
     permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "General"
+  },
+  {
+    name: "decay-set-auto",
+    description:
+      "Sets the values of the 'dkp decay' system, you have to enable the system after these settings",
+    options: [
+      {
+        name: "percentage",
+        description:
+          "The amount in 'percentage' of how much DKP it will be decayed",
+        type: ApplicationCommandOptionType.Number,
+        required: true,
+      },
+      {
+        name: "interval",
+        description:
+          "The amount in 'days' of the decaying interval (The delay of when it will be executed)",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+        choices: [
+          {
+            name: "Every 7 days",
+            value: 7,
+          },
+          {
+            name: "Every 14 days",
+            value: 14,
+          },
+          {
+            name: "Every 30 days",
+            value: 30,
+          },
+        ],
+      },
+    ],
+    commandExecution: setupAutoDecay,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Decay System"
+  },
+  {
+    name: "decay-change-minimum-cap",
+    description:
+      "Sets the minimum DKP value someone can lose for the 'dkp decay' system.",
+    options: [
+      {
+        name: "minimum_cap",
+        description: "The minimum cap value",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+      }
+    ],
+    commandExecution: setMinimumCap,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Decay System"
+  },
+  {
+    name: "decay-toggle",
+    description:
+      "Toggles the 'dkp decay' system.",
+    commandExecution: toggleDecay,
+    permissions: [PermissionFlagsBits.Administrator],
+    category: "Decay System"
   },
   {
     name: "language",
@@ -472,13 +652,14 @@ export const commands = [
     ],
     commandExecution: api.changeLanguage,
     permissions: [PermissionFlagsBits.SendMessages],
+    commandCategory: "General"
   },
   {
     name: "help",
     description: "Get help from the bot",
     commandExecution: async (interaction) => {
       const msg = `There is a section in the website where you can see all the commands available and their usage, and also now you can check all of your member's DKPS at our brand new Dashboard.  
-      [Click here to check out!](https://tldkp.net/)
+      [Click here to check out!](https://tldkp.online/)
       `;
       return interaction.reply({
         content: msg,
@@ -486,6 +667,7 @@ export const commands = [
       });
     },
     permissions: [PermissionFlagsBits.SendMessages],
+    commandCategory: "General"
   },
   {
     name: "clear",
@@ -500,6 +682,7 @@ export const commands = [
     ],
     commandExecution: handleClear,
     permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "General"
   },
 ];
 
