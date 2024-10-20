@@ -3,6 +3,9 @@ import * as api from "../../database/repository.js";
 import { add, isEqual, isAfter } from "date-fns";
 import admin from "firebase-admin";
 import { Logger } from "../../utils/logger.js";
+import { config } from "dotenv";
+
+config();
 
 const PREFIX = "Cron";
 
@@ -18,7 +21,7 @@ const PREFIX = "Cron";
  */
 const decay = async () => {
   const decaytask = cron.schedule(
-    "0 0 * * *",
+    process.env.ENV = "development" ? "*/15 * * * * *": "0 0 * * *",
     async () => {
       const guilds = await api.getAllGuilds(); // Await the promise
 
@@ -33,7 +36,7 @@ const decay = async () => {
               ? lastUpdated.toDate() // Convert Timestamp to Date
               : new Date();
 
-          const futureDate = add(lastUpdatedDate, { seconds: interval });
+          const futureDate = add(lastUpdatedDate, { days: interval });
 
           if (
             lastUpdated &&
