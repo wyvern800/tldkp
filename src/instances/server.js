@@ -23,8 +23,8 @@ export const createServer = (client) => {
   const { users } = new Clerk().getInstance();
 
   const limiter = rateLimit({
-    windowMs: process.env.MAX_REQ_TIME,
-    max: process.env.LIMIT_REQUESTS
+    windowMs: parseInt(process.env.MAX_REQ_TIME, 10),
+    max: parseInt(process.env.LIMIT_REQUESTS, 10)
   });
 
   app.use(limiter);
