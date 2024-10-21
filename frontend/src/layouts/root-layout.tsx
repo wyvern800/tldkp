@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { ClerkProvider, ClerkLoaded, ClerkLoading } from "@clerk/clerk-react";
-import { Container, useColorModeValue, useDisclosure } from "@chakra-ui/react";
+import { Container, useColorModeValue/*, useDisclosure*/ } from "@chakra-ui/react";
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
 import { Spinner } from "@chakra-ui/react";
@@ -25,7 +25,7 @@ export default function RootLayout() {
 
   return (
     <>
-      <Modal
+      {/*<Modal
         title="We're experiencing attacks"
         state={{ isOpen, onClose }}
         isCentered={true}
@@ -34,7 +34,7 @@ export default function RootLayout() {
         Hello, sorry for the inconvenience, but we're currently experiencing attacks to our databases which caused the usage
         to be disabled. We're working on fixing this issue and we'll be back soon. Thank you for your patience.
         There is no ETA for when we'll be back, but we're working on it.
-      </Modal>
+      </Modal>*/}
       <ClerkProvider
         routerPush={(to) => navigate(to)}
         routerReplace={(to) => navigate(to, { replace: true })}
