@@ -27,8 +27,6 @@ export const createServer = (client) => {
     max: parseInt(process.env.LIMIT_REQUESTS, 10)
   });
 
-  app.use(limiter);
-
   app.use(
     cors({
       origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
@@ -96,6 +94,8 @@ export const createServer = (client) => {
     },
     "Endpoint that shows bot status"
   );
+
+  apiRouter.use(limiter);
 
   // Clerk middleware
   apiRouter.use(ClerkExpressWithAuth());
