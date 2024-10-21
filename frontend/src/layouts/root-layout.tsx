@@ -4,12 +4,12 @@ import { Container, useColorModeValue/*, useDisclosure*/ } from "@chakra-ui/reac
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
 import { Spinner } from "@chakra-ui/react";
-import Modal from "../Components/Modal";
-import { useEffect } from "react";
+//import Modal from "../Components/Modal";
+//import { useEffect } from "react";
 
 export default function RootLayout() {
   const navigate = useNavigate();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  //const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Modal for advising users that the website is under attack
   /*useEffect(() => {
