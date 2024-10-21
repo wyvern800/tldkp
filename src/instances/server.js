@@ -30,7 +30,7 @@ export const createServer = (client) => {
   // test
   app.set('trust proxy', parseInt(process.env.TRUST_PROXY, 10))
   app.get('/ip', (request, response) => {
-    const clientIp = request.headers['x-forwarded-for'] || request.ip;
+    const clientIp = request.headers['true-client-ip'] || request.headers['x-forwarded-for'] || request.ip;
     console.log('Client IP:', clientIp);
     response.send(clientIp);
   })
