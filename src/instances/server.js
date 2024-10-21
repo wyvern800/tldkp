@@ -9,6 +9,10 @@ import "dotenv/config";
 import Clerk from "../../utils/clerk.js";
 import ResponseBase from "../../utils/responses.js";
 import { getGuildsByOwnerOrUser } from "../../database/repository.js";
+import { config } from "dotenv";
+import rateLimit from "express-rate-limit";
+
+config();
 
 export const createServer = (client) => {
   const app = express();
@@ -18,11 +22,20 @@ export const createServer = (client) => {
   // start clerk
   const { users } = new Clerk().getInstance();
 
+  // Limit each IP to 100 requests per 15 minutes
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.LIMIT_REQUESTS
+  });
+
+  app.use(limiter);
+
   app.use(
     cors({
-      origin: "*",
+      origin: process.env.ENV === 'development' ? "*" : "https://tldkp.online",
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
+      optionsSuccessStatus: 200
     })
   );
 
@@ -36,7 +49,7 @@ export const createServer = (client) => {
 
   apiRouter.use(
     cors({
-      origin: "*",
+      origin: process.env.ENV === 'development' ? "*" : "https://tldkp.online",
       methods: ["GET", "POST"],
       allowedHeaders: ["Content-Type", "Authorization"],
     })
