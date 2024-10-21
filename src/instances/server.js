@@ -32,7 +32,7 @@ export const createServer = (client) => {
 
   app.use(
     cors({
-      origin: process.env.ENV === 'development' ? "*" : "https://tldkp.online",
+      origin: process.env.ENV === 'development' ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200
