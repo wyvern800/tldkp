@@ -22,9 +22,8 @@ export const createServer = (client) => {
   // start clerk
   const { users } = new Clerk().getInstance();
 
-  // Limit each IP to 100 requests per 15 minutes
   const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: process.env.MAX_REQ_TIME,
     max: process.env.LIMIT_REQUESTS
   });
 
