@@ -11,10 +11,10 @@ import ResponseBase from "../../utils/responses.js";
 import { getGuildsByOwnerOrUser } from "../../database/repository.js";
 import { config } from "dotenv";
 import rateLimit from "express-rate-limit";
-
 config();
 
 export const createServer = (client) => {
+
   const app = express();
 
   const port = process.env.PORT || 3000;
@@ -32,7 +32,7 @@ export const createServer = (client) => {
 
   app.use(
     cors({
-      origin: process.env.ENV === 'development' ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200
@@ -49,7 +49,7 @@ export const createServer = (client) => {
 
   apiRouter.use(
     cors({
-      origin: process.env.ENV === 'development' ? "*" : "https://tldkp.online",
+      origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST"],
       allowedHeaders: ["Content-Type", "Authorization"],
     })

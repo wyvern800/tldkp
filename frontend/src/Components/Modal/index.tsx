@@ -26,6 +26,7 @@ type ModalPropTypes = {
   state: StatePropType;
   isCentered?: boolean;
   closeOnOverlayClick?: boolean;
+  closeOnEsc?: boolean;
 };
 
 function Modal({
@@ -34,6 +35,7 @@ function Modal({
   state,
   isCentered,
   closeOnOverlayClick,
+  closeOnEsc = false
 }: ModalPropTypes): ReactNode {
   const { isOpen, onClose } = state ?? {};
 
@@ -50,6 +52,7 @@ function Modal({
         onClose={onClose}
         isCentered={isCentered}
         size="3xl"
+        closeOnEsc={closeOnEsc}
       >
         <ModalOverlay
           bg="blackAlpha.300"

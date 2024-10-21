@@ -21,7 +21,7 @@ const PREFIX = "Cron";
  */
 const decay = async () => {
   const decayTask = cron.schedule(
-    process.env.ENV = "development" ? "*/15 * * * * *": "0 0 * * *",
+    process.env.ENV === "dev" ? "*/15 * * * * *": "0 0 * * *",
     async () => {
       const guilds = await api.getAllGuilds(); // Await the promise
 
