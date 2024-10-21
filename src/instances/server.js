@@ -28,7 +28,7 @@ export const createServer = (client) => {
   });
 
   // test
-  app.set('trust proxy', 2 /* number of proxies between user and server */)
+  app.set('trust proxy', parseInt(process.env.TRUST_PROXY, 10))
   app.get('/ip', (request, response) => response.send(request.ip))
   
   app.use(
