@@ -6,7 +6,7 @@ import { logError } from "../database/repository.js";
  * @param {string} userId - The ID of the user to update.
  * @param {number} amount - The amount to add or set for the user's DKP.
  */
-export async function updateDkp(dkpArray, userId, amount, user, serverName) {
+export async function updateDkp(dkpArray, userId, amount, user, serverName, guildDataResponse) {
     const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
   
     if (userIndex !== -1) {
@@ -23,12 +23,15 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName) {
     }
   
     // Send a private message to the user about the DKP update
-    const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount}** in the server **${serverName}**.`;
-    try {
-      await user.send({ content: message, ephemeral: true });
-    } catch (error) {
-      const msg = `Could not send DM to user ${userId}`;
-      await logError({ name: serverName }, msg, error);
+    const { dmNotifications } = guildDataResponse?.togglables?.dkpSystem;
+    if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) {
+      const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount}** in the server **${serverName}**.`;
+      try {
+        await user.send({ content: message, ephemeral: true });
+      } catch (error) {
+        const msg = `Could not send DM to user ${userId}`;
+        await logError({ name: serverName }, msg, error);
+      }
     }
   }
   
@@ -42,7 +45,7 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName) {
  * @param {User} user - The user object to send a private message.
  * @param {string} serverName - The name of the server (guild) where the DKP was changed.
  */
-export async function setDkp(dkpArray, userId, amount, user, serverName) {
+export async function setDkp(dkpArray, userId, amount, user, serverName, guildDataResponse) {
   const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
 
   if (userIndex !== -1) {
@@ -55,11 +58,15 @@ export async function setDkp(dkpArray, userId, amount, user, serverName) {
   }
 
   // Construct the message including the server name
-  const message = `Your DKP has been set to ${amount} in the server **${serverName}**.`;
-  try {
-      await user.send(message);
-  } catch (error) {
-      console.error(`Could not send DM to user ${userId}:`, error);
+  const { dmNotifications } = guildDataResponse?.togglables?.dkpSystem;
+  console.log(dmNotifications)
+  if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) { 
+    const message = `Your DKP has been set to ${amount} in the server **${serverName}**.`;
+    try {
+        await user.send(message);
+    } catch (error) {
+        console.error(`Could not send DM to user ${userId}:`, error);
+    }
   }
 }
 

@@ -7,7 +7,6 @@ import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import { getAuth } from "@clerk/express";
 import "dotenv/config";
 import Clerk from "../../utils/clerk.js";
-import axios from "axios";
 import ResponseBase from "../../utils/responses.js";
 import { getGuildsByOwnerOrUser } from "../../database/repository.js";
 
@@ -62,6 +61,7 @@ export const createServer = (client) => {
           name: command.name,
           description: command.description,
           options: command.options,
+          commandCategory: command.commandCategory
         }))
       );
     },

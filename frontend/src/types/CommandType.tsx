@@ -8,4 +8,5 @@ export interface CommandType {
   name: string;
   description: string;
   options: CommandOptions[]
+  commandCategory: string;
 } 

@@ -24,6 +24,28 @@ export async function getGuildConfig(guildId) {
   return doc.data();
 }
 
+/**
+ * Gets the guild config
+ *
+ * @param { string } guildId The guild id
+ * @returns { any } Data
+ */
+export async function getAllGuilds() {
+  const snapshot = await db.collection("guilds").get();
+
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No guilds found`);
+    return [];
+  }
+
+  const guilds = [];
+  snapshot.forEach(doc => {
+    guilds.push({ id: doc.id, ...doc.data() });
+  });
+
+  return guilds;
+}
+
 export async function getGuildsByOwnerOrUser(userOrOwnerId) {
   try {
     const guildsRef = db.collection("guilds"); // Supondo que os documentos estejam na coleção 'guilds'
@@ -184,7 +206,12 @@ export async function guildCreate(guild) {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     language: LANGUAGE_EN,
-    memberDkps: [],
+    memberDkps: [],    
+    togglables: {
+      dkpSystem: {
+        dmNotifications: true
+      }
+    }
   };
 
   const res = await db.collection("guilds").doc(guild.id).set(defaultConfig);
@@ -268,7 +295,7 @@ export async function handleUpdateDkp(interaction) {
         return interaction.reply({ content: errorMsg, ephemeral: true });
       }
 
-      setDkp(newDkp, user.id, amount, user, guildDataResponse?.guildData?.name);
+      setDkp(newDkp, user.id, amount, user, guildDataResponse?.guildData?.name, guildDataResponse);
 
       // Update the guild data with the new memberDkps array and the current timestamp
       newGuildData = {
@@ -294,7 +321,8 @@ export async function handleUpdateDkp(interaction) {
         user.id,
         choices === "add" ? amount : -amount,
         user,
-        guildDataResponse?.guildData?.name
+        guildDataResponse?.guildData?.name,
+        guildDataResponse
       );
 
       // Update the guild data with the new memberDkps array and the current timestamp
