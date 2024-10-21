@@ -27,6 +27,10 @@ export const createServer = (client) => {
     max: parseInt(process.env.LIMIT_REQUESTS, 10)
   });
 
+  // test
+  app.set('trust proxy', 1 /* number of proxies between user and server */)
+  app.get('/ip', (request, response) => response.send(request.ip))
+  
   app.use(
     cors({
       origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
