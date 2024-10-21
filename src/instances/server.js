@@ -34,6 +34,17 @@ export const createServer = (client) => {
     console.log('Client IP:', clientIp);
     response.send(clientIp);
   })
+
+  app.get('/debug', (req, res) => {
+    const debugInfo = {
+        'Original IP': req.ip,
+        'X-Forwarded-For': req.headers['x-forwarded-for'],
+        'All Headers': req.headers,
+        'Trust Proxy Setting': app.get('trust proxy')
+    };
+    console.log(debugInfo);
+    res.json(debugInfo); // Send the debug info as JSON
+  });
   
   app.use(
     cors({
