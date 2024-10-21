@@ -12,10 +12,10 @@ export default function RootLayout() {
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Modal for advising users that the website is under attack
-  useEffect(() => {
+  /*useEffect(() => {
     onOpen();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []);*/
 
   const bg = useColorModeValue("blue.600", "white");
   const gradient = useColorModeValue(
