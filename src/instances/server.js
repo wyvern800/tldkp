@@ -32,7 +32,7 @@ export const createServer = (client) => {
   app.get('/ip', (request, response) => {
     const clientIp = request.headers['x-forwarded-for'] || request.ip;
     console.log('Client IP:', clientIp);
-    res.send(clientIp);
+    response.send(clientIp);
   })
   
   app.use(
