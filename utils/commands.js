@@ -372,6 +372,22 @@ export const setGuildNickname = async (interaction) => {
   }
 };
 
+/**
+ * Sets up the auto decay system for a guild.
+ *
+ * This function retrieves the decay percentage and interval from the interaction options and updates the corresponding guild document in Firestore.
+ * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
+ *
+ * @param {any} interaction - The interaction object from Discord.
+ * @param {any} interaction.options - The options object from the interaction.
+ * @param {Function} interaction.options.getNumber - Function to get a number option from the interaction.
+ * @param {number} interaction.options.getNumber.percentage - The decay percentage to set for the guild.
+ * @param {Function} interaction.options.getInteger - Function to get an integer option from the interaction.
+ * @param {number} interaction.options.getInteger.interval - The decay interval to set for the guild.
+ * @param {any} interaction.guild - The guild object from Discord.
+ * @param {string} interaction.guild.id - The ID of the guild.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ */
 export const setupAutoDecay = async (interaction) => {
   const percentage = interaction.options.getNumber("percentage");
   const interval = interaction.options.getInteger("interval");
@@ -457,6 +473,19 @@ export const toggleDkpNotifications = async (interaction) => {
   }
 };
 
+/**
+ * Toggles the decay system for a guild.
+ *
+ * This function retrieves the guild document from Firestore using the guild ID from the interaction.
+ * If the guild document exists, it toggles the decay system settings.
+ * If the guild document does not exist, it logs an error message.
+ * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
+ *
+ * @param {any} interaction - The interaction object from Discord.
+ * @param {any} interaction.guild - The guild object from Discord.
+ * @param {string} interaction.guild.id - The ID of the guild.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ */
 export const toggleDecay = async (interaction) => {
 
   try {
@@ -476,14 +505,19 @@ export const toggleDecay = async (interaction) => {
     const togglablesPrefix = "togglables.decaySystem";
 
     const enabled = guildSnapshot.data()?.togglables?.decaySystem?.enabled;
-    console.log(enabled)
+    const { percentage, interval, minimumCap } = guildSnapshot.data()?.togglables?.decaySystem;
+
+    if (!percentage || !interval || !minimumCap) {
+      const msg = "You must set the decay system first, use **/decay-set-auto** to set the values";
+      return interaction.reply({ content: msg, ephemeral: true });
+    }
 
     await guildRef.update({
       [`${togglablesPrefix}.enabled`]: !enabled,
       [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
     });
 
-    const msg = "Togglable: decay updated successfully!";
+    const msg = `Togglable: decaying system is now ${!enabled ? 'enabled': 'disabled'}!`;
     return interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error updating decay";
@@ -492,6 +526,65 @@ export const toggleDecay = async (interaction) => {
   }
 };
 
+/**
+ * Toggles the decay system for a guild.
+ *
+ * This function retrieves the guild document from Firestore using the guild ID from the interaction.
+ * If the guild document exists, it toggles the decay system settings.
+ * If the guild document does not exist, it logs an error message.
+ * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
+ *
+ * @param {any} interaction - The interaction object from Discord.
+ * @param {any} interaction.guild - The guild object from Discord.
+ * @param {string} interaction.guild.id - The ID of the guild.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ */
+export const toggleDecaySystem = async (interaction) => {
+  try {
+    const guildId = interaction.guild.id;
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    const guildSnapshot = await guildRef.get();
+
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      const msg = "Guild document not found";
+      return interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    const guildData = guildSnapshot.data();
+    const enabled = guildData?.decaySystem?.enabled || false;
+    const togglablesPrefix = "decaySystem";
+
+    await guildRef.update({
+      [`${togglablesPrefix}.enabled`]: !enabled,
+      [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
+    });
+
+    const msg = `Togglable: decaying system is now ${!enabled ? 'enabled' : 'disabled'}!`;
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error updating decay";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};
+
+/**
+ * Sets the minimum cap for a guild.
+ *
+ * This function retrieves the minimum cap value from the interaction options and updates the corresponding guild document in Firestore.
+ * If the minimum cap value is less than zero, it sends an ephemeral reply to the user indicating that the value must be above zero.
+ * If the guild document does not exist, it throws an error.
+ * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
+ *
+ * @param {any} interaction - The interaction object from Discord.
+ * @param {any} interaction.options - The options object from the interaction.
+ * @param {Function} interaction.options.getInteger - Function to get an integer option from the interaction.
+ * @param {number} interaction.options.getInteger.minimum_cap - The minimum cap value to set for the guild.
+ * @param {any} interaction.guild - The guild object from Discord.
+ * @param {string} interaction.guild.id - The ID of the guild.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ */
 export const setMinimumCap = async (interaction) => {
   const minimumCap = interaction.options.getInteger("minimum_cap");
 

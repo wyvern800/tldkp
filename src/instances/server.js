@@ -68,6 +68,7 @@ export const createServer = (client) => {
       origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST"],
       allowedHeaders: ["Content-Type", "Authorization"],
+      optionsSuccessStatus: 200
     })
   );
 
