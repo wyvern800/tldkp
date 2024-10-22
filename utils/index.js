@@ -8,6 +8,15 @@ import { logError } from "../database/repository.js";
  */
 export async function updateDkp(dkpArray, userId, amount, user, serverName, guildDataResponse) {
     const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
+
+    const allowBelowZero = guildDataResponse?.togglables?.dkpSystem?.allowBelowZero;
+    const allowBelowZeroBoolean = (allowBelowZero && allowBelowZero === true) || allowBelowZero === undefined || allowBelowZero === null;
+
+    // Validate the amount for positive number
+    if (!isPositiveNumber(amount) && !allowBelowZeroBoolean) {
+      const errorMsg = "The DKP amount must be a positive number.";
+      return interaction.reply({ content: errorMsg, ephemeral: true });
+    }
   
     if (userIndex !== -1) {
       // Calculate the new DKP value only once
@@ -48,6 +57,15 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName, guil
 export async function setDkp(dkpArray, userId, amount, user, serverName, guildDataResponse) {
   const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
 
+  const allowBelowZero = guildDataResponse?.togglables?.dkpSystem?.allowBelowZero;
+  const allowBelowZeroBoolean = (allowBelowZero && allowBelowZero === true) || allowBelowZero === undefined || allowBelowZero === null;
+
+  // Validate the amount for positive number
+  if (!isPositiveNumber(amount) && !allowBelowZeroBoolean) {
+    const errorMsg = "The DKP amount must be a positive number.";
+    return interaction.reply({ content: errorMsg, ephemeral: true });
+  }
+
   if (userIndex !== -1) {
       // If the user exists, set their DKP value to the new amount
       dkpArray[userIndex].dkp = amount;
@@ -59,7 +77,7 @@ export async function setDkp(dkpArray, userId, amount, user, serverName, guildDa
 
   // Construct the message including the server name
   const dmNotifications = guildDataResponse?.togglables?.dkpSystem?.dmNotifications;
-  console.log(dmNotifications)
+  
   if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) { 
     const message = `Your DKP has been set to ${amount} in the server **${serverName}**.`;
     try {

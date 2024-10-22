@@ -11,6 +11,8 @@ import ResponseBase from "../../utils/responses.js";
 import { getGuildsByOwnerOrUser } from "../../database/repository.js";
 import { config } from "dotenv";
 import rateLimit from "express-rate-limit";
+import { Logger } from "../../utils/logger.js";
+
 config();
 
 export const createServer = (client) => {
@@ -18,6 +20,8 @@ export const createServer = (client) => {
   const app = express();
 
   const port = process.env.PORT || 3000;
+
+  const PREFIX = "Express.js";
 
   // start clerk
   const { users } = new Clerk().getInstance();
@@ -31,7 +35,7 @@ export const createServer = (client) => {
   app.set('trust proxy', parseInt(process.env.TRUST_PROXY, 10))
   app.get('/ip', (request, response) => {
     const clientIp = request.headers['true-client-ip'] || request.headers['x-forwarded-for'] || request.ip;
-    console.log('Client IP:', clientIp);
+    new Logger().log(PREFIX, clientIp);
     response.send(clientIp);
   })
 
@@ -42,7 +46,7 @@ export const createServer = (client) => {
         'All Headers': req.headers,
         'Trust Proxy Setting': app.get('trust proxy')
     };
-    console.log(debugInfo);
+    new Logger().log(PREFIX, debugInfo);
     res.json(debugInfo); // Send the debug info as JSON
   });
   
@@ -141,7 +145,7 @@ export const createServer = (client) => {
     } else {
       return new ResponseBase(res).notFound("No account was found");
     }
-  });
+  }, "Hold the dashboard data");
 
   apiRouter.use((err, req, res, next) => {
     return new ResponseBase(res).notAllowed("Unauthenticated!");
@@ -154,6 +158,6 @@ export const createServer = (client) => {
   });
 
   app.listen(port, () => {
-    console.log(`[Express] HTTP Server running on port ${port}`);
+    new Logger().log(PREFIX, `HTTP Server running on port ${port}`);
   });
 };

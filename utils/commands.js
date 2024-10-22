@@ -7,8 +7,6 @@ import {
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
-import { isAfter, add, formatDistance } from "date-fns";
-import admin from "firebase-admin";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "./constants.js";
 import { servers } from "./servers.js";
 
@@ -67,561 +65,6 @@ export async function loadCommands() {
   });
 }
 
-/**
- * Comando de limpar
- *
- * @param { any } interaction Interação
- * @returns { void }
- */
-export const handleClear = async (interaction) => {
-  const { options } = interaction;
-
-  const amount = options.getInteger("amount") || 100;
-  if (amount < 1 || amount > 100) {
-    interaction.reply({
-      content: "You have to type a number between 1 and 100.",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  try {
-    const fetched = await interaction?.channel?.messages?.fetch({
-      limit: amount,
-    });
-
-    if (fetched?.size > 0) {
-      await interaction.channel.bulkDelete(fetched);
-      const deleteMsg = `Deleting ${fetched.size} messages...`;
-      interaction
-        .reply({
-          content: deleteMsg,
-          ephemeral: true,
-        })
-        .then((msg) => {
-          setTimeout(() => msg.delete(), 5000);
-        });
-      new Logger(interaction).log(PREFIX, deleteMsg);
-    } else {
-      new Logger(interaction).log(
-        PREFIX,
-        `There are no messages to be deleted.`
-      );
-      interaction.reply({
-        content: `There are no messages to be deleted.`,
-        ephemeral: true,
-      });
-    }
-  } catch (error) {
-    new Logger(interaction).log(
-      PREFIX,
-      `Error cleaning messages: ${error?.message}`
-    );
-    interaction.reply({
-      content: "There was an error when deleting.",
-      ephemeral: true,
-    });
-  }
-};
-
-/**
- * Check DKP
- *
- * @param { any } interaction Interação
- * @returns { void }
- */
-export const handleCheck = async (interaction) => {
-  const user = interaction.user;
-
-  try {
-    const response = await api.getDkpByUserId(
-      interaction,
-      interaction.guild.id,
-      user.id
-    );
-    if (response === "dkp-not-found") {
-      return interaction.reply({
-        content: `You don't have DKP yet.`,
-        ephemeral: true,
-      });
-    } else if (response === "guild-not-found") {
-      return interaction.reply({
-        content: `Guild not found.`,
-        ephemeral: true,
-      });
-    } else {
-      const { ign, dkp } = response;
-
-      return interaction.reply({
-        content: `Your current DKP is **${dkp}**!
-        ${ign ? `IGN: **${ign}**` : ""}`,
-        ephemeral: true,
-      });
-    }
-  } catch (error) {
-    const msg = "Error checking DKP";
-    new Logger(interaction).error(PREFIX, msg);
-    try {
-      await api?.logError(interaction.guild, msg, error);
-    } catch (err) {}
-    return interaction.reply({
-      content: msg,
-      ephemeral: true,
-    });
-  }
-};
-
-/**
- * Check other player's DKP
- *
- * @param { any } interaction Interação
- * @returns { void }
- */
-export const checkOther = async (interaction) => {
-  const { options } = interaction;
-  const user = options.getUser("user");
-  try {
-    const response = await api.getDkpByUserId(
-      interaction,
-      interaction.guild.id,
-      user.id
-    );
-    if (response === "dkp-not-found") {
-      return interaction.reply({
-        content: `${user.globalName} doesn't have DKP yet.`,
-        ephemeral: true,
-      });
-    } else if (response === "guild-not-found") {
-      return interaction.reply({
-        content: `Guild not found.`,
-        ephemeral: true,
-      });
-    } else {
-      const { ign, dkp } = response;
-
-      return interaction.reply({
-        content: `${user.globalName}'s current DKP is **${dkp}**!
-        ${ign ? `IGN: **${ign}**` : ""}`,
-        ephemeral: true,
-      });
-    }
-  } catch (error) {
-    const msg = "Error checking DKP";
-    new Logger(interaction).error(PREFIX, msg);
-    try {
-      await api?.logError(interaction.guild, msg, error);
-    } catch (err) {}
-    return interaction.reply({
-      content: msg,
-      ephemeral: true,
-    });
-  }
-};
-
-/**
- * Updates the Nickname
- *
- * @param { any } interaction Interação
- * @returns { void }
- */
-export const updateNickname = async (interaction) => {
-  const user = interaction.user;
-  const nickname = interaction.options.getString("nickname");
-
-  try {
-    const guildData = await api.getGuildConfig(interaction.guild.id);
-    let copyGuildData = { ...guildData };
-    const { memberDkps } = guildData;
-
-    let memberIndex = memberDkps.findIndex(
-      (member) => member.userId === user.id
-    );
-
-    if (memberIndex !== -1) {
-      const { updatedAt } = memberDkps[memberIndex]; // Assuming this is a Firestore Timestamp
-      const notSetYet = !updatedAt; // Check if updatedAt is set
-
-      // Ensure updatedAt is a valid Timestamp
-      const updatedAtDate =
-        updatedAt instanceof admin.firestore.Timestamp
-          ? updatedAt.toDate() // Convert Timestamp to Date
-          : new Date();
-
-      // Check if the date is valid
-      if (isNaN(updatedAtDate.getTime())) {
-        throw new Error("Invalid updatedAt date.");
-      }
-
-      const future = add(updatedAtDate, { hours: 12 });
-
-      // You can only change the nickname if it is not set yet or if 12 hours have passed since updatedAt
-      if (notSetYet || isAfter(new Date(), future)) {
-        // Update the nickname
-        copyGuildData.memberDkps[memberIndex].ign = nickname;
-        copyGuildData.memberDkps[memberIndex].updatedAt = new Date();
-
-        try {
-          await api.updateNickname(interaction, copyGuildData);
-        } catch (err) {
-          const msg = "Error setting in-game nickname";
-          new Logger(interaction).log(PREFIX, msg);
-          return interaction.reply({
-            content: msg,
-            ephemeral: true,
-          });
-        }
-      } else {
-        // Send a message if nickname change is not allowed
-        const allowedDateFormatted = formatDistance(future, new Date(), {
-          addSuffix: true,
-        });
-        const msg = `You can only change your nickname once in 12 hours, you will be able ${allowedDateFormatted}.`;
-        new Logger(interaction).log(PREFIX, msg);
-        return interaction.reply({
-          content: msg,
-          ephemeral: true,
-        });
-      }
-    }
-  } catch (error) {
-    const msg = "Error updating in-game nickname";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({
-      content: msg,
-      ephemeral: true,
-    });
-  }
-};
-
-/**
- * Sets the in-game nickname (alias) for a guild.
- *
- * This function retrieves the alias from the interaction options and updates the corresponding guild document in Firestore.
- * If the guild document does not exist, it throws an error.
- * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.options - The options object from the interaction.
- * @param {Function} interaction.options.getString - Function to get a string option from the interaction.
- * @param {string} interaction.options.getString.alias - The alias to set for the guild.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const setGuildNickname = async (interaction) => {
-  const nickname = interaction.options.getString("alias");
-
-  try {
-    const guildId = interaction.guild.id;
-
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
-
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      throw new Error("Guild document not found");
-    }
-
-    // Get the data from the document snapshot
-    const guildData = guildSnapshot.data();
-
-    // Destructure the lastUpdatedGuildAlias field
-    const { lastUpdatedGuildAlias } = guildData?.guildData;
-    const notSetYet = !lastUpdatedGuildAlias;
-
-    // Handle date parsing
-    const updatedAtDate = lastUpdatedGuildAlias?.toDate
-      ? lastUpdatedGuildAlias.toDate()
-      : new Date();
-    if (isNaN(updatedAtDate.getTime())) {
-      new Logger(interaction).log(PREFIX, "Invalid lastUpdatedGuildAlias date");
-      return;
-    }
-
-    const future = add(updatedAtDate, { days: 10 });
-
-    // Check if 10 days have passed or if lastUpdatedGuildAlias was never set
-    if (notSetYet || isAfter(new Date(), future)) {
-      // Perform the update in Firestore
-      await guildRef.update({
-        "guildData.alias": nickname,
-        "guildData.lastUpdatedGuildAlias":
-          admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      const msg = "Guild alias updated successfully!";
-      return interaction.reply({ content: msg, ephemeral: true });
-    } else {
-      // Calculate the time left until the next allowed update
-      const allowedDateFormatted = formatDistance(future, new Date(), {
-        addSuffix: true,
-      });
-      const msg = `You can only change your guild alias once every 10 days, you will be able to change it ${allowedDateFormatted}.`;
-
-      new Logger(interaction).log(PREFIX, msg);
-      return interaction.reply({ content: msg, ephemeral: true });
-    }
-  } catch (error) {
-    console.log(error);
-    const msg = "Error updating guild's name (alias)";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
-/**
- * Sets up the auto decay system for a guild.
- *
- * This function retrieves the decay percentage and interval from the interaction options and updates the corresponding guild document in Firestore.
- * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.options - The options object from the interaction.
- * @param {Function} interaction.options.getNumber - Function to get a number option from the interaction.
- * @param {number} interaction.options.getNumber.percentage - The decay percentage to set for the guild.
- * @param {Function} interaction.options.getInteger - Function to get an integer option from the interaction.
- * @param {number} interaction.options.getInteger.interval - The decay interval to set for the guild.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const setupAutoDecay = async (interaction) => {
-  const percentage = interaction.options.getNumber("percentage");
-  const interval = interaction.options.getInteger("interval");
-
-  try {
-    const guildId = interaction.guild.id;
-
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
-
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
-    }
-
-    const togglablesPrefix = "togglables.decaySystem";
-
-    await guildRef.update({
-      [`${togglablesPrefix}.percentage`]: percentage,
-      [`${togglablesPrefix}.interval`]: interval,
-      [`${togglablesPrefix}.enabled`]: false,
-      [`${togglablesPrefix}.minimumCap`]: 100,
-    });
-
-    const msg = `The auto decaying system was set, now you must execute **/decay-toggle** once to enable the scheduler, please have in mind
-      that if you don't enable the system, the decay will not be executed, also the default minimum cap is 100, which means a person will only
-      lose their DKPs only if their cap is above 100, if it reaches 100, it will stop being removed, you can change that with **/decay-change-minimum-cap** command.
-    `;
-    return interaction.reply({ content: msg, ephemeral: true });
-  } catch (error) {
-    const msg = "Error while setting up the auto-decaying system";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
-/**
- * Toggles DKP notifications for a guild.
- *
- * This function fetches the guild document from Firestore using the guild ID from the interaction.
- * If the guild document exists, it toggles the DKP notifications setting.
- * If the guild document does not exist, it logs an error message.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const toggleDkpNotifications = async (interaction) => {
-  try {
-    const guildId = interaction.guild.id;
-
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
-
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
-    }
-    
-    const togglablesPrefix = "togglables.dkpSystem";
-
-    const enabled = guildSnapshot.data()?.togglables?.dkpSystem?.dmNotifications;
-
-    const newValue = !enabled;
-
-    await guildRef.update({
-      [`${togglablesPrefix}.dmNotifications`]: newValue,
-    });
-
-    const msg = `Togglable: directly messages updated to: ${newValue}!`;
-    return interaction.reply({ content: msg, ephemeral: true });
-  } catch (error) {
-    const msg = "Error updating decay";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
-/**
- * Toggles the decay system for a guild.
- *
- * This function retrieves the guild document from Firestore using the guild ID from the interaction.
- * If the guild document exists, it toggles the decay system settings.
- * If the guild document does not exist, it logs an error message.
- * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const toggleDecay = async (interaction) => {
-
-  try {
-    const guildId = interaction.guild.id;
-
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
-
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
-    }
-    
-    const togglablesPrefix = "togglables.decaySystem";
-
-    const enabled = guildSnapshot.data()?.togglables?.decaySystem?.enabled;
-    const { percentage, interval, minimumCap } = guildSnapshot.data()?.togglables?.decaySystem;
-
-    if (!percentage || !interval || !minimumCap) {
-      const msg = "You must set the decay system first, use **/decay-set-auto** to set the values";
-      return interaction.reply({ content: msg, ephemeral: true });
-    }
-
-    await guildRef.update({
-      [`${togglablesPrefix}.enabled`]: !enabled,
-      [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
-    });
-
-    const msg = `Togglable: decaying system is now ${!enabled ? 'enabled': 'disabled'}!`;
-    return interaction.reply({ content: msg, ephemeral: true });
-  } catch (error) {
-    const msg = "Error updating decay";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
-/**
- * Toggles the decay system for a guild.
- *
- * This function retrieves the guild document from Firestore using the guild ID from the interaction.
- * If the guild document exists, it toggles the decay system settings.
- * If the guild document does not exist, it logs an error message.
- * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const toggleDecaySystem = async (interaction) => {
-  try {
-    const guildId = interaction.guild.id;
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-    const guildSnapshot = await guildRef.get();
-
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
-      const msg = "Guild document not found";
-      return interaction.reply({ content: msg, ephemeral: true });
-    }
-
-    const guildData = guildSnapshot.data();
-    const enabled = guildData?.decaySystem?.enabled || false;
-    const togglablesPrefix = "decaySystem";
-
-    await guildRef.update({
-      [`${togglablesPrefix}.enabled`]: !enabled,
-      [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
-    });
-
-    const msg = `Togglable: decaying system is now ${!enabled ? 'enabled' : 'disabled'}!`;
-    return interaction.reply({ content: msg, ephemeral: true });
-  } catch (error) {
-    const msg = "Error updating decay";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
-/**
- * Sets the minimum cap for a guild.
- *
- * This function retrieves the minimum cap value from the interaction options and updates the corresponding guild document in Firestore.
- * If the minimum cap value is less than zero, it sends an ephemeral reply to the user indicating that the value must be above zero.
- * If the guild document does not exist, it throws an error.
- * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.options - The options object from the interaction.
- * @param {Function} interaction.options.getInteger - Function to get an integer option from the interaction.
- * @param {number} interaction.options.getInteger.minimum_cap - The minimum cap value to set for the guild.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const setMinimumCap = async (interaction) => {
-  const minimumCap = interaction.options.getInteger("minimum_cap");
-
-  if (minimumCap < 0) {
-    interaction.reply({ content: "Value must be above zero", ephemeral: true });
-    return
-  }
-
-  try {
-    const guildId = interaction.guild.id;
-
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
-
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
-    }
-    
-    const togglablesPrefix = "togglables.decaySystem";
-
-    await guildRef.update({
-      [`${togglablesPrefix}.minimumCap`]: minimumCap,
-    });
-
-    const msg = `Togglable: decay minimum cap updated successfully to **${minimumCap}**!`;
-    return interaction.reply({ content: msg, ephemeral: true });
-  } catch (error) {
-    const msg = "Error updating decay";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
 // ---------------------------------------------------------------
 
 // Here's the commands list
@@ -672,7 +115,7 @@ export const commands = [
   {
     name: "check",
     description: "Shows informations about your DKP",
-    commandExecution: handleCheck,
+    commandExecution: api.handleCheck,
     permissions: [PermissionFlagsBits.SendMessages],
     commandCategory: "DKP System"
   },
@@ -687,7 +130,7 @@ export const commands = [
         required: true,
       },
     ],
-    commandExecution: checkOther,
+    commandExecution: api.checkOther,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System"
   },
@@ -702,7 +145,7 @@ export const commands = [
         required: true,
       },
     ],
-    commandExecution: updateNickname,
+    commandExecution: api.updateNickname,
     permissions: [PermissionFlagsBits.SendMessages],
     commandCategory: "General"
   },
@@ -717,7 +160,7 @@ export const commands = [
         required: true,
       },
     ],
-    commandExecution: setGuildNickname,
+    commandExecution: api.setGuildNickname,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "General"
   },
@@ -755,7 +198,7 @@ export const commands = [
         ],
       },
     ],
-    commandExecution: setupAutoDecay,
+    commandExecution: api.setupAutoDecay,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "Decay System"
   },
@@ -771,7 +214,7 @@ export const commands = [
         required: true,
       }
     ],
-    commandExecution: setMinimumCap,
+    commandExecution: api.setMinimumCap,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "Decay System"
   },
@@ -779,7 +222,7 @@ export const commands = [
     name: "decay-toggle",
     description:
       "Toggles the 'dkp decay' system.",
-    commandExecution: toggleDecay,
+    commandExecution: api.toggleDecay,
     permissions: [PermissionFlagsBits.Administrator],
     category: "Decay System"
   },
@@ -827,9 +270,17 @@ export const commands = [
     name: "dkp-notifications-toggle",
     description:
       "Toggles the sending of DKP changes notifications.",
-    commandExecution: toggleDkpNotifications,
+    commandExecution: api.toggleDkpNotifications,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System"
+  },
+  {
+    name: "dkp-allow-below-zero",
+    description:
+      "Toggles the possibility of having DKP below zero (to allow debit).",
+    commandExecution: api.toggleBelowZero,
+    permissions: [PermissionFlagsBits.Administrator],
+    category: "DKP System"
   },
   {
     name: "clear",
@@ -842,7 +293,7 @@ export const commands = [
         required: true,
       },
     ],
-    commandExecution: handleClear,
+    commandExecution: api.handleClear,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "General"
   },
