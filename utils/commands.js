@@ -11,6 +11,7 @@ import { isAfter, add, formatDistance } from "date-fns";
 import admin from "firebase-admin";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "./constants.js";
 import { servers } from "./servers.js";
+import cache from "../utils/cache.js";
 
 config();
 
@@ -313,20 +314,25 @@ export const setGuildNickname = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
 
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
 
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      throw new Error("Guild document not found");
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        throw new Error("Guild document not found");
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
     }
-
-    // Get the data from the document snapshot
-    const guildData = guildSnapshot.data();
 
     // Destructure the lastUpdatedGuildAlias field
     const { lastUpdatedGuildAlias } = guildData?.guildData;
@@ -346,11 +352,15 @@ export const setGuildNickname = async (interaction) => {
     // Check if 10 days have passed or if lastUpdatedGuildAlias was never set
     if (notSetYet || isAfter(new Date(), future)) {
       // Perform the update in Firestore
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
       await guildRef.update({
         "guildData.alias": nickname,
         "guildData.lastUpdatedGuildAlias":
           admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Invalidate the cache
+      cache.del(cacheKey);
 
       const msg = "Guild alias updated successfully!";
       return interaction.reply({ content: msg, ephemeral: true });
@@ -394,26 +404,38 @@ export const setupAutoDecay = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
 
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
 
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        new Logger(interaction).log(PREFIX, "Guild document not found");
+        return;
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
     }
 
     const togglablesPrefix = "togglables.decaySystem";
 
-    await guildRef.update({
+    await admin.firestore().collection("guilds").doc(guildId).update({
       [`${togglablesPrefix}.percentage`]: percentage,
       [`${togglablesPrefix}.interval`]: interval,
       [`${togglablesPrefix}.enabled`]: false,
       [`${togglablesPrefix}.minimumCap`]: 100,
     });
+
+    // Invalidate the cache
+    cache.del(cacheKey);
 
     const msg = `The auto decaying system was set, now you must execute **/decay-toggle** once to enable the scheduler, please have in mind
       that if you don't enable the system, the decay will not be executed, also the default minimum cap is 100, which means a person will only
@@ -442,32 +464,42 @@ export const setupAutoDecay = async (interaction) => {
 export const toggleDkpNotifications = async (interaction) => {
   try {
     const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
 
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
 
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        new Logger(interaction).log(PREFIX, "Guild document not found");
+        return interaction.reply({ content: "Guild document not found", ephemeral: true });
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
     }
-    
+
     const togglablesPrefix = "togglables.dkpSystem";
-
-    const enabled = guildSnapshot.data()?.togglables?.dkpSystem?.dmNotifications;
-
+    const enabled = guildData?.togglables?.dkpSystem?.dmNotifications;
     const newValue = !enabled;
 
-    await guildRef.update({
+    await admin.firestore().collection("guilds").doc(guildId).update({
       [`${togglablesPrefix}.dmNotifications`]: newValue,
     });
 
-    const msg = `Togglable: directly messages updated to: ${newValue}!`;
+    // Invalidate the cache
+    cache.del(cacheKey);
+
+    const msg = `Togglable: direct messages updated to: ${newValue}!`;
     return interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
-    const msg = "Error updating decay";
+    const msg = "Error updating DKP notifications";
     new Logger(interaction).log(PREFIX, msg);
     return interaction.reply({ content: msg, ephemeral: true });
   }
@@ -487,78 +519,46 @@ export const toggleDkpNotifications = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const toggleDecay = async (interaction) => {
-
   try {
     const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
 
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
 
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        new Logger(interaction).log(PREFIX, "Guild document not found");
+        return interaction.reply({ content: "Guild document not found", ephemeral: true });
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
     }
-    
+
     const togglablesPrefix = "togglables.decaySystem";
 
-    const enabled = guildSnapshot.data()?.togglables?.decaySystem?.enabled;
-    const { percentage, interval, minimumCap } = guildSnapshot.data()?.togglables?.decaySystem;
+    const enabled = guildData?.togglables?.decaySystem?.enabled;
+    const { percentage, interval, minimumCap } = guildData?.togglables?.decaySystem;
 
     if (!percentage || !interval || !minimumCap) {
       const msg = "You must set the decay system first, use **/decay-set-auto** to set the values";
       return interaction.reply({ content: msg, ephemeral: true });
     }
 
-    await guildRef.update({
+    await admin.firestore().collection("guilds").doc(guildId).update({
       [`${togglablesPrefix}.enabled`]: !enabled,
       [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
     });
 
-    const msg = `Togglable: decaying system is now ${!enabled ? 'enabled': 'disabled'}!`;
-    return interaction.reply({ content: msg, ephemeral: true });
-  } catch (error) {
-    const msg = "Error updating decay";
-    new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
-  }
-};
-
-/**
- * Toggles the decay system for a guild.
- *
- * This function retrieves the guild document from Firestore using the guild ID from the interaction.
- * If the guild document exists, it toggles the decay system settings.
- * If the guild document does not exist, it logs an error message.
- * If an error occurs during the update process, it logs the error and sends an ephemeral reply to the user.
- *
- * @param {any} interaction - The interaction object from Discord.
- * @param {any} interaction.guild - The guild object from Discord.
- * @param {string} interaction.guild.id - The ID of the guild.
- * @returns {Promise<void>} - A promise that resolves when the operation is complete.
- */
-export const toggleDecaySystem = async (interaction) => {
-  try {
-    const guildId = interaction.guild.id;
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
-    const guildSnapshot = await guildRef.get();
-
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
-      const msg = "Guild document not found";
-      return interaction.reply({ content: msg, ephemeral: true });
-    }
-
-    const guildData = guildSnapshot.data();
-    const enabled = guildData?.decaySystem?.enabled || false;
-    const togglablesPrefix = "decaySystem";
-
-    await guildRef.update({
-      [`${togglablesPrefix}.enabled`]: !enabled,
-      [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
-    });
+    // Invalidate the cache
+    cache.del(cacheKey);
 
     const msg = `Togglable: decaying system is now ${!enabled ? 'enabled' : 'disabled'}!`;
     return interaction.reply({ content: msg, ephemeral: true });
@@ -590,28 +590,40 @@ export const setMinimumCap = async (interaction) => {
 
   if (minimumCap < 0) {
     interaction.reply({ content: "Value must be above zero", ephemeral: true });
-    return
+    return;
   }
 
   try {
     const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
 
-    // Direct query to Firestore for the specific guild document
-    const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-    // Fetch the document snapshot
-    const guildSnapshot = await guildRef.get();
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
 
-    // Ensure the document exists
-    if (!guildSnapshot.exists) {
-      new Logger(interaction).log(PREFIX, "Guild document not found");
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        new Logger(interaction).log(PREFIX, "Guild document not found");
+        return interaction.reply({ content: "Guild document not found", ephemeral: true });
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
     }
-    
+
     const togglablesPrefix = "togglables.decaySystem";
 
-    await guildRef.update({
+    await admin.firestore().collection("guilds").doc(guildId).update({
       [`${togglablesPrefix}.minimumCap`]: minimumCap,
     });
+
+    // Invalidate the cache
+    cache.del(cacheKey);
 
     const msg = `Togglable: decay minimum cap updated successfully to **${minimumCap}**!`;
     return interaction.reply({ content: msg, ephemeral: true });

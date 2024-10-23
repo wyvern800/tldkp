@@ -4,8 +4,12 @@ import { Logger } from "../utils/logger.js";
 import { updateDkp, setDkp, isPositiveNumber } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import { getMemberById } from "../utils/discord.js";
+import cache from "../utils/cache.js";
+import { config } from "dotenv";
 
 const PREFIX = "Firebase";
+
+config();
 
 /**
  * Gets the guild config
@@ -14,14 +18,22 @@ const PREFIX = "Firebase";
  * @returns { any } Data
  */
 export async function getGuildConfig(guildId) {
-  const doc = await db.collection("guilds").doc(guildId).get();
+  const cacheKey = `guild-${guildId}`;
+  let guildData = cache.get(cacheKey);
 
-  if (!doc.exists) {
-    new Logger().log(PREFIX, `No config found for guild ${guildId}`);
-    return null;
+  if (!guildData) {
+    const guildSnapshot = await db.collection("guilds").doc(guildId).get();
+
+    if (!guildSnapshot.exists) {
+      new Logger().log(PREFIX, `No config found for guild ${guildId}`);
+      return null;
+    }
+
+    guildData = guildSnapshot.data();
+    cache.set(cacheKey, guildData);
   }
 
-  return doc.data();
+  return guildData;
 }
 
 /**
@@ -31,24 +43,39 @@ export async function getGuildConfig(guildId) {
  * @returns { any } Data
  */
 export async function getAllGuilds() {
-  const snapshot = await db.collection("guilds").get();
+  const cacheKey = `guilds-all`;
+  let guildsData = cache.get(cacheKey);
 
-  if (snapshot.empty) {
-    new Logger().log(PREFIX, `No guilds found`);
-    return [];
+  if (!guildsData) {
+    const snapshot = await db.collection("guilds").get();
+
+    if (snapshot.empty) {
+      new Logger().log(PREFIX, `No guilds found`);
+      return [];
+    }
+
+    const guilds = [];
+    snapshot.forEach((doc) => {
+      guilds.push({ id: doc.id, ...doc.data() });
+    });
+
+    guildsData = guilds;
+    cache.set(cacheKey, guildsData);
   }
 
-  const guilds = [];
-  snapshot.forEach(doc => {
-    guilds.push({ id: doc.id, ...doc.data() });
-  });
-
-  return guilds;
+  return guildsData;
 }
 
 export async function getGuildsByOwnerOrUser(userOrOwnerId) {
+  const cacheKey = `guilds-${userOrOwnerId}`;
+  let cachedData = cache.get(cacheKey);
+
+  if (cachedData) {
+    return cachedData;
+  }
+
   try {
-    const guildsRef = db.collection("guilds"); // Supondo que os documentos estejam na coleção 'guilds'
+    const guildsRef = db.collection("guilds");
 
     const ownerQuery = guildsRef.where(
       "guildData.ownerId",
@@ -130,10 +157,15 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
       }
     );
 
-    return {
+    const result =  {
       ownerGuilds: owner,
       memberGuilds: member,
     };
+
+    // Store the result in the cache
+    cache.set(cacheKey, result);
+
+    return result;
   } catch (error) {
     console.log(error);
     new Logger().log(PREFIX, `Some error happened`);
@@ -148,6 +180,13 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
  * @returns { any[] } The data
  */
 export async function getData(guildId, collection) {
+  const cacheKey = `${collection}-${guildId}`;
+  let cachedData = cache.get(cacheKey);
+
+  if (cachedData) {
+    return cachedData;
+  }
+
   const doc = await db.collection(collection).doc(guildId).get();
 
   if (!doc.exists) {
@@ -155,10 +194,20 @@ export async function getData(guildId, collection) {
     return null;
   }
 
-  return doc.data();
+  const data = doc.data();
+  cache.set(cacheKey, data);
+
+  return data;
 }
 
 export async function getDkpByUserId(interaction, guildId, userId) {
+  const cacheKey = `dkp-${guildId}`;
+  let cachedData = cache.get(cacheKey);
+
+  if (cachedData) {
+    return cachedData;
+  }
+
   const doc = await db.collection("guilds").doc(guildId).get();
 
   // If the document doesn't exist, log an error and return null
@@ -183,6 +232,9 @@ export async function getDkpByUserId(interaction, guildId, userId) {
     return "dkp-not-found";
   }
 
+  // Cache the result
+  cache.set(cacheKey, userDkpData);
+
   // Return the DKP of the user
   return userDkpData;
 }
@@ -201,17 +253,17 @@ export async function guildCreate(guild) {
       name: guild.name,
       ownerId: guild.ownerId,
       alias: null,
-      lastUpdatedGuild : null,
+      lastUpdatedGuild: null,
     },
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     language: LANGUAGE_EN,
-    memberDkps: [],    
+    memberDkps: [],
     togglables: {
       dkpSystem: {
-        dmNotifications: true
-      }
-    }
+        dmNotifications: true,
+      },
+    },
   };
 
   const res = await db.collection("guilds").doc(guild.id).set(defaultConfig);
@@ -295,7 +347,14 @@ export async function handleUpdateDkp(interaction) {
         return interaction.reply({ content: errorMsg, ephemeral: true });
       }
 
-      setDkp(newDkp, user.id, amount, user, guildDataResponse?.guildData?.name, guildDataResponse);
+      setDkp(
+        newDkp,
+        user.id,
+        amount,
+        user,
+        guildDataResponse?.guildData?.name,
+        guildDataResponse
+      );
 
       // Update the guild data with the new memberDkps array and the current timestamp
       newGuildData = {
