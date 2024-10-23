@@ -1,4 +1,6 @@
 import { logError } from "../database/repository.js";
+import { Logger } from "./logger.js";
+
 /**
  * Updates the DKP value for a user in the provided DKP array.
  * 
@@ -25,7 +27,7 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName, guil
     // Send a private message to the user about the DKP update
     const dmNotifications = guildDataResponse?.togglables?.dkpSystem?.dmNotifications;
     if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) {
-      const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount}** in the server **${serverName}**.`;
+      const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount < 0 ? 0 : amount}** in the server **${serverName}**.`;
       try {
         await user.send({ content: message, ephemeral: true });
       } catch (error) {
@@ -59,13 +61,12 @@ export async function setDkp(dkpArray, userId, amount, user, serverName, guildDa
 
   // Construct the message including the server name
   const dmNotifications = guildDataResponse?.togglables?.dkpSystem?.dmNotifications;
-  console.log(dmNotifications)
   if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) { 
     const message = `Your DKP has been set to ${amount} in the server **${serverName}**.`;
     try {
         await user.send(message);
     } catch (error) {
-        console.error(`Could not send DM to user ${userId}:`, error);
+        new Logger().error("Discord.js", `Could not send DM to user ${userId}`, error);
     }
   }
 }
