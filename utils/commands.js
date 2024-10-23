@@ -7,11 +7,8 @@ import {
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
-import { isAfter, add, formatDistance } from "date-fns";
-import admin from "firebase-admin";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "./constants.js";
 import { servers } from "./servers.js";
-import cache from "../utils/cache.js";
 
 config();
 

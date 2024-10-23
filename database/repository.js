@@ -6,6 +6,7 @@ import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import { getMemberById } from "../utils/discord.js";
 import cache from "../utils/cache.js";
 import { config } from "dotenv";
+import { isAfter, add, formatDistance } from "date-fns";
 
 const PREFIX = "Firebase";
 
@@ -157,7 +158,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
       }
     );
 
-    const result =  {
+    const result = {
       ownerGuilds: owner,
       memberGuilds: member,
     };
@@ -416,27 +417,90 @@ export async function handleUpdateDkp(interaction) {
   return interaction.reply({ content: msg, ephemeral: true });
 }
 
-/**
- * Handles the nickname update
- *
- * @param { any } interaction The interaction
- * @param { string } guildData The new nickname
- * @returns { any } Response
- */
-export async function updateNickname(interaction, guildData) {
+export const updateNickname = async (interaction) => {
+  const user = interaction.user;
   const nickname = interaction.options.getString("nickname");
 
   try {
-    await db.collection("guilds").doc(interaction.guild.id).update(guildData);
-    const msg = `Your in-game nickname was changed to: ${nickname}!`;
+    const guildData = await getGuildConfig(interaction.guild.id);
+    let copyGuildData = { ...guildData };
+    const { memberDkps } = guildData;
+
+    let memberIndex = memberDkps.findIndex(
+      (member) => member.userId === user.id
+    );
+
+    if (memberIndex !== -1) {
+      const { updatedAt } = memberDkps[memberIndex]; // Assuming this is a Firestore Timestamp
+      const notSetYet = !updatedAt; // Check if updatedAt is set
+
+      // Ensure updatedAt is a valid Timestamp
+      const updatedAtDate =
+        updatedAt instanceof admin.firestore.Timestamp
+          ? updatedAt.toDate() // Convert Timestamp to Date
+          : new Date();
+
+      // Check if the date is valid
+      if (isNaN(updatedAtDate.getTime())) {
+        throw new Error("Invalid updatedAt date.");
+      }
+
+      const future = add(updatedAtDate, { hours: 12 });
+
+      // You can only change the nickname if it is not set yet or if 12 hours have passed since updatedAt
+      if (notSetYet || isAfter(new Date(), future)) {
+        // Update the nickname
+        copyGuildData.memberDkps[memberIndex].ign = nickname;
+        copyGuildData.memberDkps[memberIndex].updatedAt = new Date();
+
+        try {
+          const nickname = interaction.options.getString("nickname");
+
+          try {
+            await db
+              .collection("guilds")
+              .doc(interaction.guild.id)
+              .update(copyGuildData);
+            const msg = `Your in-game nickname was changed to: ${nickname}!`;
+            new Logger(interaction).log(PREFIX, msg);
+            interaction.reply({ content: msg, ephemeral: true });
+          } catch (err) {
+            console.log(err);
+            const msg = `Failed to update your in-game nickname.`;
+            new Logger(interaction).error(PREFIX, msg, err);
+            interaction.reply({ content: msg, ephemeral: true });
+          }
+        } catch (err) {
+          const msg = "Error setting in-game nickname";
+          new Logger(interaction).log(PREFIX, msg);
+          return interaction.reply({
+            content: msg,
+            ephemeral: true,
+          });
+        }
+      } else {
+        // Send a message if nickname change is not allowed
+        const allowedDateFormatted = formatDistance(future, new Date(), {
+          addSuffix: true,
+        });
+        const msg = `You can only change your nickname once in 12 hours, you will be able ${allowedDateFormatted}.`;
+        new Logger(interaction).log(PREFIX, msg);
+        return interaction.reply({
+          content: msg,
+          ephemeral: true,
+        });
+      }
+    }
+  } catch (error) {
+    console.log(error);
+    const msg = "Error updating in-game nickname";
     new Logger(interaction).log(PREFIX, msg);
-    interaction.reply({ content: msg, ephemeral: true });
-  } catch (err) {
-    const msg = `Failed to update your in-game nickname.`;
-    new Logger(interaction).error(PREFIX, msg, err);
-    interaction.reply({ content: msg, ephemeral: true });
+    return interaction.reply({
+      content: msg,
+      ephemeral: true,
+    });
   }
-}
+};
 
 /**
  * Handles the language change
@@ -756,12 +820,16 @@ export const setupAutoDecay = async (interaction) => {
 
     const togglablesPrefix = "togglables.decaySystem";
 
-    await admin.firestore().collection("guilds").doc(guildId).update({
-      [`${togglablesPrefix}.percentage`]: percentage,
-      [`${togglablesPrefix}.interval`]: interval,
-      [`${togglablesPrefix}.enabled`]: false,
-      [`${togglablesPrefix}.minimumCap`]: 100,
-    });
+    await admin
+      .firestore()
+      .collection("guilds")
+      .doc(guildId)
+      .update({
+        [`${togglablesPrefix}.percentage`]: percentage,
+        [`${togglablesPrefix}.interval`]: interval,
+        [`${togglablesPrefix}.enabled`]: false,
+        [`${togglablesPrefix}.minimumCap`]: 100,
+      });
 
     // Invalidate the cache
     cache.del(cacheKey);
@@ -806,7 +874,10 @@ export const toggleDkpNotifications = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({ content: "Guild document not found", ephemeral: true });
+        return interaction.reply({
+          content: "Guild document not found",
+          ephemeral: true,
+        });
       }
 
       // Get the data from the document snapshot
@@ -818,9 +889,13 @@ export const toggleDkpNotifications = async (interaction) => {
     const enabled = guildData?.togglables?.dkpSystem?.dmNotifications;
     const newValue = !enabled;
 
-    await admin.firestore().collection("guilds").doc(guildId).update({
-      [`${togglablesPrefix}.dmNotifications`]: newValue,
-    });
+    await admin
+      .firestore()
+      .collection("guilds")
+      .doc(guildId)
+      .update({
+        [`${togglablesPrefix}.dmNotifications`]: newValue,
+      });
 
     // Invalidate the cache
     cache.del(cacheKey);
@@ -863,7 +938,10 @@ export const toggleDecay = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({ content: "Guild document not found", ephemeral: true });
+        return interaction.reply({
+          content: "Guild document not found",
+          ephemeral: true,
+        });
       }
 
       // Get the data from the document snapshot
@@ -874,25 +952,35 @@ export const toggleDecay = async (interaction) => {
     const togglablesPrefix = "togglables.decaySystem";
 
     const enabled = guildData?.togglables?.decaySystem?.enabled;
-    const { percentage, interval, minimumCap } = guildData?.togglables?.decaySystem ?? {};
+    const { percentage, interval, minimumCap } =
+      guildData?.togglables?.decaySystem ?? {};
 
     if (!percentage || !interval || !minimumCap) {
-      const msg = "You must set the decay system first, use **/decay-set-auto** to set the values";
+      const msg =
+        "You must set the decay system first, use **/decay-set-auto** to set the values";
       return interaction.reply({ content: msg, ephemeral: true });
     }
 
-    await admin.firestore().collection("guilds").doc(guildId).update({
-      [`${togglablesPrefix}.enabled`]: !enabled,
-      [`${togglablesPrefix}.lastUpdated`]: !enabled ? admin.firestore.FieldValue.serverTimestamp() : null,
-    });
+    await admin
+      .firestore()
+      .collection("guilds")
+      .doc(guildId)
+      .update({
+        [`${togglablesPrefix}.enabled`]: !enabled,
+        [`${togglablesPrefix}.lastUpdated`]: !enabled
+          ? admin.firestore.FieldValue.serverTimestamp()
+          : null,
+      });
 
     // Invalidate the cache
     cache.del(cacheKey);
 
-    const msg = `Togglable: decaying system is now ${!enabled ? 'enabled' : 'disabled'}!`;
+    const msg = `Togglable: decaying system is now ${
+      !enabled ? "enabled" : "disabled"
+    }!`;
     return interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     const msg = "Error toggling decay";
     new Logger(interaction).log(PREFIX, msg);
     return interaction.reply({ content: msg, ephemeral: true });
@@ -938,7 +1026,10 @@ export const setMinimumCap = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({ content: "Guild document not found", ephemeral: true });
+        return interaction.reply({
+          content: "Guild document not found",
+          ephemeral: true,
+        });
       }
 
       // Get the data from the document snapshot
@@ -948,9 +1039,13 @@ export const setMinimumCap = async (interaction) => {
 
     const togglablesPrefix = "togglables.decaySystem";
 
-    await admin.firestore().collection("guilds").doc(guildId).update({
-      [`${togglablesPrefix}.minimumCap`]: minimumCap,
-    });
+    await admin
+      .firestore()
+      .collection("guilds")
+      .doc(guildId)
+      .update({
+        [`${togglablesPrefix}.minimumCap`]: minimumCap,
+      });
 
     // Invalidate the cache
     cache.del(cacheKey);
