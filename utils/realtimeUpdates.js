@@ -17,6 +17,7 @@ export function setupRealtimeUpdates() {
         change.type === "removed"
       ) {
         const docId = change.doc.id;
+        const docData = change.doc.data();
 
         if (process.env.ENV === "development") {
           console.log(`${change.type} ${docId}`);
