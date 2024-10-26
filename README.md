@@ -54,6 +54,9 @@ We have docker environment setup for our development project, so you can [Downlo
 * ```npm run dev:api``` - Run only the backend (server)  
 * ```npm run dev:site``` - Run only server and frontend (leave bot down)  
 
+The url to local frontend is: http://localhost:5173/  
+The backend is: http://localhost:3000/
+
 If you reached here, you're now free to develop and collaborate, lets build together <3
 
 ## Updates
