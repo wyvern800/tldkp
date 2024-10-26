@@ -1,6 +1,9 @@
-![Tux, the Linux mascot](/assets/logo.png)
+![TLDKP Your best discord bot for throne and liberty](/assets/logo.png)
 
-# TLDKP (Throne and Liberty Dragon Kill Points)
+# TLDKP Discord Bot (Throne and Liberty Dragon Kill Points)
+
+### TL;DR
+The Dragon Kill Points (DKP) system is a method used in MMORPGs (Massively Multiplayer Online Role-Playing Games) to distribute loot among players after defeating bosses or completing raids. DKP is a type of currency that players earn by participating in these activities, and they can spend their points to bid on or claim items dropped by defeated enemies.
 
 > NOTE: This project was a nightly build, which means it was coded in speedrun mode, not much focused, but ive put some more effort onto it, so you are good to use it as it is.
 
