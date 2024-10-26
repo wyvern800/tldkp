@@ -1,3 +1,5 @@
+![Tux, the Linux mascot](/assets/logo.png)
+
 # TLDKP (Throne and Liberty Dragon Kill Points)
 
 > NOTE: This project was a nightly build, which means it was coded in speedrun mode, not much focused, but ive put some more effort onto it, so you are good to use it as it is.
@@ -21,15 +23,15 @@
 > We use firebase so you'll have to setup your Cloud Firestore (Firebase), you'll have to create a discord bot application and also a Clerk account (for the authentication),
 so you'll need:
 
-1- Setup [Cloud Firestore](https://firebase.google.com) and set its vars on .env (root), the var is FIREBASE_SERVICE_ACCOUNT.  
-2- Setup [Clerk](https://clerk.com) and set its vars in **frontend/.env.local**: VITE_CLERK_PUBLISHABLE_KEY and VITE_BOT_INSTALL and in the .env in the root folder: CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY they're the same
+1. Setup [Cloud Firestore](https://firebase.google.com) and set its vars on .env (root), the var is **FIREBASE_SERVICE_ACCOUNT**.  
+2. Setup [Clerk](https://clerk.com) and set its vars in **frontend/.env.local**: **VITE_CLERK_PUBLISHABLE_KEY** and **VITE_BOT_INSTALL** and in the .env in the root folder: **CLERK_SECRET_KEY**, **CLERK_PUBLISHABLE_KEY** they're the same
 in both (frontend and root) but since vite uses the prefix **VITE_**, it had to be set this way.  
-3- Setup the [Discord Application](https://discord.com/developers/applications) and set its vars: GUILD_ID (Your discord server id), CLIENT_ID and DISCORD_TOKEN  
-4 - And last but not least, after configuring the bot application in discord dev portal, grab its install url under **Installation**, and put on the **frontend/.env.local**: VITE_BOT_INSTALL  
-5 - And you can now continue to the next steps  
+3. Setup the [Discord Application](https://discord.com/developers/applications) and set its vars: **GUILD_ID** (Your discord server id), **CLIENT_ID** and **DISCORD_TOKEN**  
+4. And last but not least, after configuring the bot application in discord dev portal, grab its install url under **Installation**, and put on the **frontend/.env.local**: **VITE_BOT_INSTALL**  
+5. And you can now continue to the next steps  
 
 ### Using docker (Recommended)
-We have docker environment setup for our development project, so you can [Download](https://www.docker.com/products/docker-desktop/) it and then just run  
+We have docker environment setup for our development project, so you can [Download](https://www.docker.com/products/docker-desktop/) it and then just run:  
 ```docker-compose -f docker-compose.dev.yml --build```
 
 ### After running the build step (to start the dev env):  
