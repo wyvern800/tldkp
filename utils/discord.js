@@ -12,7 +12,6 @@ config();
  */
 export async function getMemberById(guildId, memberId) {
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-
   try {
     return await rest.get(
       Routes.guildMember(guildId, memberId)

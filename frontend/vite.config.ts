@@ -8,6 +8,8 @@ export default defineConfig({
     outDir: "./build", // ou qualquer outra pasta que o Express use para servir arquivos estáticos
   },
   server: {
+    host: "0.0.0.0",
+    port: 5173,
     watch: {
       usePolling: true,
     },
