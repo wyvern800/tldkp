@@ -1,0 +1,7 @@
+{
+  "watch": ["src", "src/instances", "src/middlewares", "src/utils"],
+  "ext": "js,json",
+  "ignore": ["node_modules"],
+  "delay": "1000",
+  "exec": "node src/shardManager.js"
+}

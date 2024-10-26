@@ -1,0 +1,43 @@
+# Use the official Node.js image.
+FROM node:18
+
+# Create and change to the app directory.
+WORKDIR /usr/src/app
+
+RUN npm install -g yarn --force
+
+# Copy application dependency manifests to the container image.
+COPY package*.json ./
+
+# Copy frontend package files separately
+COPY frontend/package*.json ./frontend/
+
+# Set working directory for frontend
+WORKDIR /usr/src/app/frontend
+
+# Copy the entire frontend source code
+COPY frontend/ ./
+
+# Install frontend dependencies
+RUN yarn install
+
+# Build the frontend
+RUN yarn build
+
+# Switch back to the app directory for backend operations
+WORKDIR /usr/src/app
+
+# Install dependencies from the bot.
+RUN yarn install
+
+# Copy local code to the container image.
+COPY . .
+
+# Run as root
+USER root
+
+# Expose the port the app runs on
+EXPOSE 3000
+
+# Run the web service on container startup.
+CMD [ "yarn", "start" ]
