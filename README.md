@@ -30,10 +30,10 @@ in both (frontend and root) but since vite uses the prefix **VITE_**, it had to 
 
 ## Using docker (Recommended)
 We have docker environment setup for our development project, so you can [https://www.docker.com/products/docker-desktop/](Download) it and then just run
-docker-compose --build
+docker-compose -f docker-compose.dev.yml --build
 
 ### After running the build step (to start the dev env):
-docker-compose up
+docker-compose -f docker-compose.dev.yml up
 
 ## Without docker (normal way)
 1 - npm install (root folder)
