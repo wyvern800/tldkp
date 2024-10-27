@@ -62,5 +62,8 @@ If you reached here, you're now free to develop and collaborate, lets build toge
 ## Updates
 I will be pushing fixes/suggestions whenever I feel the urge to, so there is no updates schedule, that means I could push a bunch per week, but none in another, (remind that supporting me trough patreon and by direct donations can make me feel motivated to keep pushing more and more, as this is a free project but have it's costs to keep it up online).
 
+## Repomap
+![repomap](/assets/repomap.png)
+
 ## Collaboration
 Feel free to fork and contribute, its always fun to share knowledge
