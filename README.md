@@ -1,4 +1,6 @@
+<p align="center">
 ![TLDKP Your best discord bot for throne and liberty](/assets/logo.png)
+</p>
 
 # TLDKP Discord Bot (Throne and Liberty Dragon Kill Points)
 
