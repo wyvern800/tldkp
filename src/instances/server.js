@@ -30,7 +30,7 @@ export const createServer = (client) => {
 
   // test
   app.set('trust proxy', parseInt(process.env.TRUST_PROXY, 10))
-  app.get('/ip', (request, response) => {
+  /*app.get('/ip', (request, response) => {
     const clientIp = request.headers['true-client-ip'] || request.headers['x-forwarded-for'] || request.ip;
     console.log('Client IP:', clientIp);
     response.send(clientIp);
@@ -45,7 +45,7 @@ export const createServer = (client) => {
     };
     console.log(debugInfo);
     res.json(debugInfo); // Send the debug info as JSON
-  });
+  });*/
   
   app.use(
     cors({
