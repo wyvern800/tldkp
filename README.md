@@ -1,4 +1,6 @@
-![TLDKP Your best discord bot for throne and liberty](/assets/logo.png)
+<p align="center">
+<img src="/assets/logo.png" alt="Sublime's custom image"/>
+</p>
 
 # TLDKP Discord Bot (Throne and Liberty Dragon Kill Points)
 
