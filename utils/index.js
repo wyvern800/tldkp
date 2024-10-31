@@ -27,7 +27,7 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName, guil
     // Send a private message to the user about the DKP update
     const dmNotifications = guildDataResponse?.togglables?.dkpSystem?.dmNotifications;
     if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) {
-      const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp || amount < 0 ? 0 : amount}** in the server **${serverName}**.`;
+      const message = `Your DKP has been updated to **${dkpArray[userIndex]?.dkp ?? (amount < 0 ? 0 : amount)}** in the server **${serverName}**.`;
       try {
         await user.send({ content: message, ephemeral: true });
       } catch (error) {
