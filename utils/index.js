@@ -80,26 +80,3 @@ export async function setDkp(dkpArray, userId, amount, user, serverName, guildDa
 export function isPositiveNumber(value) {
   return typeof value === "number" && value > 0;
 }
-
-export function generateOrigins() {
-  const ports = [3000, 5173, 80];
-  const routes = ["localhost", "tldkp.online"];
-  const methods = ["http", "https"];
-  
-  const origins = [];
-
-  methods.forEach(method => {
-    routes.forEach(route => {
-      ports.forEach(port => {
-        if (port === 80 && method === "http") {
-          origins.push(`${method}://${route}`);
-        } else if (port === 443 && method === "https") {
-          origins.push(`${method}://${route}`);
-        } else {
-          origins.push(`${method}://${route}:${port}`);
-        }
-      });
-    });
-  });
-  return origins;
-};
