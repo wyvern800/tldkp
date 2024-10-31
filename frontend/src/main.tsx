@@ -9,12 +9,14 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 // Import the layouts
 import RootLayout from "./layouts/root-layout";
 import DashboardLayout from "./layouts/dashboard-layout";
+import AdminLayout from "./layouts/admin-layout";
 
 // Import the components
 import IndexPage from "./routes";
 import SignInPage from "./routes/sign-in";
 import SignUpPage from "./routes/sign-up";
 import DashboardPage from "./routes/dashboard";
+import AdminPage from "./routes/admin";
 
 const config = {
   initialColorMode: "light",
@@ -35,6 +37,11 @@ const router = createBrowserRouter([
         element: <DashboardLayout />,
         path: "dashboard",
         children: [{ path: "/dashboard", element: <DashboardPage /> }],
+      },
+      {
+        element: <AdminLayout />,
+        path: "admin",
+        children: [{ path: "/admin", element: <AdminPage /> }],
       },
     ],
   },

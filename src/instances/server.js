@@ -4,13 +4,14 @@ import cors from "cors";
 import { commands } from "../../utils/commands.js";
 import { parseRoutes, getRoutes } from "../middlewares/routeCapturer.js";
 import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
-import { getAuth } from "@clerk/express";
 import "dotenv/config";
 import Clerk from "../../utils/clerk.js";
 import ResponseBase from "../../utils/responses.js";
-import { getGuildsByOwnerOrUser } from "../../database/repository.js";
+import { getGuildsByOwnerOrUser, getAllGuilds } from "../../database/repository.js";
 import { config } from "dotenv";
 import rateLimit from "express-rate-limit";
+import { protectedRouteMiddleware } from "../../src/middlewares/clerkAuth.js";
+
 config();
 
 export const createServer = (client) => {
@@ -120,26 +121,34 @@ export const createServer = (client) => {
   // Clerk middleware
   apiRouter.use(ClerkExpressWithAuth());
 
+  // Protected route middleware
+  apiRouter.use(protectedRouteMiddleware);
+
   apiRouter.get("/dashboard", async (req, res) => {
-    const { userId, sessionId } = getAuth(req);
-    const user = await users.getUser(userId);
-    const discordAccount = user.externalAccounts?.find(
-      (account) => account.provider === "oauth_discord"
-    );
-
-    if (!sessionId) {
-      return new ResponseBase(res).notAllowed("User is not authenticated");
-    }
-
-    if (discordAccount) {
-      const externalId = discordAccount.externalId;
+      const { userDiscordId } = req;
 
       // Gets the data
-      await getGuildsByOwnerOrUser(externalId).then(guild => {
-        return new ResponseBase(res).success(guild);
-      });
-    } else {
-      return new ResponseBase(res).notFound("No account was found");
+      if (userDiscordId) {
+        await getGuildsByOwnerOrUser(userDiscordId).then(guild => {
+          return new ResponseBase(res).success(guild);
+        });
+      }
+  });
+
+  apiRouter.get('/admin', async (req, res) => {
+    const { userDiscordId } = req;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(","); 
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      const allGuilds = await getAllGuilds();
+
+      if (isAdmin) {
+        return new ResponseBase(res).success({ isAdmin, guilds: allGuilds });
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
     }
   });
 

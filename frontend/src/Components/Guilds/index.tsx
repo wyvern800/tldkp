@@ -28,7 +28,7 @@ const Logo = styled.img`
   width: 20%;
 `;
 
-const Guilds = ({ data, loaded }: any): React.ReactNode => {
+const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode => {
   const { isLoaded, user } = useUser();
   const [myDiscordId, setMyDiscordId] = useState<string | undefined>("");
 
@@ -113,7 +113,7 @@ const Guilds = ({ data, loaded }: any): React.ReactNode => {
                             </Tr>
                           </Thead>
                           <Tbody>
-                          {memberDkps
+                          {!isBackoffice && memberDkps
                               ?.filter((player: any) => player.userId === myDiscordId)
                               ?.sort((a: any, b: any) => b.dkp - a.dkp)
                               .map((player: any, index: number) => {
