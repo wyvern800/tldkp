@@ -274,7 +274,7 @@ export const commands = [
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System"
   },
-  {
+  /*{
     name: "clear",
     description: "Cleans messages from a channel (Limited to 100 messages)",
     options: [
@@ -288,7 +288,7 @@ export const commands = [
     commandExecution: api.handleClear,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "General"
-  },
+  },*/
 ];
 
 /**
