@@ -17,7 +17,6 @@ export const createBotClient = () => {
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
       GatewayIntentBits.DirectMessages,
     ],
   });
