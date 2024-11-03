@@ -1,4 +1,5 @@
-import { REST, Routes } from "discord.js";
+import discord from "discord.js";
+const { REST, Routes } = discord;
 import { config } from "dotenv";
 
 config();

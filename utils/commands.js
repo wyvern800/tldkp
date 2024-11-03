@@ -1,9 +1,5 @@
-import {
-  REST,
-  Routes,
-  ApplicationCommandOptionType,
-  PermissionFlagsBits,
-} from "discord.js";
+import discord from "discord.js";
+const { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } = discord;
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
