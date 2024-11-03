@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import {
   Flex,
@@ -32,9 +33,16 @@ import { Link } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
 import { RiSlashCommands } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
+import { BsFillMegaphoneFill } from "react-icons/bs";
+import { changelog } from "../../constants/changelog";
 
 function Navbar() {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isNewModalOpen,
+    onOpen: onNewModalOpen,
+    onClose: onNewModalClose,
+  } = useDisclosure();
 
   const [commands, setCommands] = useState<CommandType[] | null>(null);
   const [categories, setCategories] = useState<string[] | null>(null);
@@ -91,7 +99,12 @@ function Navbar() {
             const commandOptions = command.options;
             return (
               <ListItem key={`${command.name}${index}`}>
-                {command.new && <Tag colorScheme="orange" marginRight="5px">NEW!</Tag>}<Tag marginRight="2">/{command.name}</Tag>
+                {command.new && (
+                  <Tag colorScheme="green" marginRight="5px" variant="outline">
+                    NEW!
+                  </Tag>
+                )}
+                <Tag marginRight="2">/{command.name}</Tag>
                 {commandOptions &&
                   commandOptions.map(
                     (commandOption: CommandOptions, index: number) => {
@@ -169,6 +182,13 @@ function Navbar() {
           </Box>
           <Spacer />
           <Stack direction={["column", "row"]} alignItems="center" gap="5">
+            <Button
+              leftIcon={<BsFillMegaphoneFill />}
+              colorScheme="teal"
+              onClick={() => onNewModalOpen()}
+            >
+              Whats new?
+            </Button>
             <SignedOut>
               <Link to="/sign-in">
                 <Button leftIcon={<FaDiscord />} colorScheme="teal">
@@ -242,6 +262,31 @@ function Navbar() {
               </Stack>
             </>
           )}
+        </Modal>
+
+        <Modal
+          title="What's new?"
+          state={{ isOpen: isNewModalOpen, onClose: onNewModalClose }}
+          isCentered={true}
+          closeOnOverlayClick={true}
+        >
+          <UnorderedList spacing={3}>  
+            {changelog.map((changelog: any, index) => (
+              <ListItem key={index}>
+                <span style={{ textDecoration: 'underline'}}>{changelog.date}:</span>
+                <UnorderedList>
+                  {changelog?.changes?.map((change: any) => {
+                    return (
+                      <ListItem key={`${change}${index}`}>
+                        {change}.
+                        <br />
+                      </ListItem>
+                    );
+                  })}
+                </UnorderedList>
+              </ListItem>
+            ))}
+          </UnorderedList>
         </Modal>
       </Flex>
     </>

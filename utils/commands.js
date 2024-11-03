@@ -276,7 +276,7 @@ export const commands = [
     commandCategory: "DKP System"
   },
   {
-    name: "gen-dkp-code",
+    name: "generate-code",
     description: "Generates a claimable code for earning DKP",
     options: [
       {
@@ -318,7 +318,7 @@ export const commands = [
       {
         name: "note",
         description:
-          "Any note about this token? event name, etc...",
+          "Any note about this token? event name, etc... (Optional)",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
@@ -330,11 +330,11 @@ export const commands = [
   },
   {
     name: "claim",
-    description: "Claim a DKP code",
+    description: "Claim an existing code to earn DKP",
     options: [
       {
         name: "code",
-        description: "The code you want to claim",
+        description: "The code you want to claim to earn",
         type: ApplicationCommandOptionType.String,
         required: true,
       },
