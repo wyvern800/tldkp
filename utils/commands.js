@@ -317,8 +317,8 @@ export const commands = [
       {
         name: "note",
         description:
-          "Any note about this token? event name, etc... (Optional)",
-        type: ApplicationCommandOptionType.Integer,
+          "Any note about this token? event name, etc...",
+        type: ApplicationCommandOptionType.String,
         required: false,
       },
     ],

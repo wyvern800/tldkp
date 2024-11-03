@@ -1220,8 +1220,8 @@ export async function redeemDkpCode(interaction) {
     }
 
     // Check if the code is expired
-    if (isAfter(new Date(), codeData?.expirationDate)) {
-      const msg = `Sorry, but this code has aleady expired.`;
+    if (isAfter(new Date(), codeData?.expirationDate.toDate())) {
+      const msg = `Sorry, but this code has already expired.`;
       new Logger(interaction).log(PREFIX, msg);
       return interaction.reply({ content: msg, ephemeral: true });
     }
