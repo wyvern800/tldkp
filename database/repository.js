@@ -1328,3 +1328,74 @@ export async function updateGuildConfig(guildId, guildConfig) {
   const response = await db.collection("guilds").doc(guildId).update(guildConfig);
   return response;
 }
+
+
+export const setRoleOnJoin = async (interaction) => {
+  const role = interaction.options.getRole("role");
+  const amount = interaction.options.getInteger("amount");
+
+  if (amount < 0) {
+    interaction.reply({ content: "Value must be above zero", ephemeral: true });
+    return;
+  }
+  
+  if (!role && !amount) {
+    interaction.reply({ content: "You must specify at least a role or an amount", ephemeral: true });
+    return;
+  }
+
+  try {
+    const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
+
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
+
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        new Logger(interaction).log(PREFIX, "Guild document not found");
+        return interaction.reply({
+          content: "Guild document not found",
+          ephemeral: true,
+        });
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
+    }
+
+    const prefix = "togglables.dkpSystem";
+
+    await admin
+      .firestore()
+      .collection("guilds")
+      .doc(guildId)
+      .update({
+        ...(amount ? {[`${prefix}.onJoinDKPAmount`]: amount ? amount : 0 } : undefined),
+        ...(role ? {[`${prefix}.roleToAssign`]: role.id } : undefined),
+      });
+
+    // Invalidate the cache
+    cache.del(cacheKey);
+
+    let msg = `Togglable: Now when a member joins, they will:`;
+    if (role) {
+      msg = msg.concat(`\n- Be assigned to: <@&${role.id}>`);
+    }
+    if (amount) {
+      msg = msg.concat(`\n- Receive: **${amount ? amount : 0}** DKP`);
+    }
+     return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    console.log(error)
+    const msg = "Error updating decay";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};

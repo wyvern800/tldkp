@@ -340,6 +340,29 @@ export const commands = [
     commandCategory: "DKP System",
     new: true
   },
+  {
+    name: "set-on-member-join",
+    description:
+      "Assigns a role to new members and optionally awards DKP",
+    options: [
+      {
+        name: "role",
+        description: "The role you want to assign to new members",
+        type: ApplicationCommandOptionType.Role,
+        required: false,
+      },
+      {
+        name: "amount",
+        description: "The amount of DKP you want to give to new members",
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+      }
+    ],
+    commandExecution: api.setRoleOnJoin,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "DKP System",
+    new: true
+  },
   /*{
     name: "clear",
     description: "Cleans messages from a channel (Limited to 100 messages)",

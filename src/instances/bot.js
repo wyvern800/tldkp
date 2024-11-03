@@ -69,8 +69,28 @@ export const createBotClient = () => {
 
     // If the member is not in the DKP array, add them
     if (!memberExists) {
-      guildConfig.memberDkps.push({ userId, dkp: 0 });
-      await api.updateGuildConfig(guildId, guildConfig);
+      try {
+        
+        const dkpToGive = guildConfig?.togglables?.dkpSystem?.onJoinDKPAmount ?? 0;
+        if (guildConfig?.togglables?.dkpSystem?.roleToAssign) {
+          try {
+            const role = member.guild.roles.cache.find((role) => role.id === guildConfig?.togglables?.dkpSystem?.roleToAssign);
+            if (role) {
+              member.roles.add(role);
+            } else {
+              new Logger().error(PREFIX, `Failed to find role to assign to new member ${userId}.`);
+            }
+          } catch (e) {
+            new Logger().error(PREFIX, `Failed to assign role to new member ${userId}.`);
+          }
+        }
+
+        guildConfig.memberDkps.push({ userId, dkp: dkpToGive });
+
+        await api.updateGuildConfig(guildId, guildConfig);
+      } catch (e) {
+        new Logger().error(PREFIX, `Failed to add new member ${userId} to DKP array.`);
+      }
       if (process.env.ENV === 'dev') {
         new Logger().log(PREFIX, `Added new member ${userId} to DKP array.`);
       }
