@@ -1,5 +1,5 @@
 {
-  "watch": ["src", "src/instances", "src/middlewares", "src/utils"],
+  "watch": ["src/**", "src/instances", "src/middlewares", "src/utils/**", "database/**"],
   "ext": "js,json",
   "ignore": ["node_modules"],
   "delay": "1000",

@@ -89,6 +89,42 @@ const decay = async () => {
   return decayTask;
 };
 
+
+const deleteExpiredCodes = async () => {
+  const deleteTask = cron.schedule(
+    process.env.ENV === "dev" ? "*/30 * * * * *" : "0 1 * * *",
+    async () => {
+      const codes = await api.getAllCodes();
+
+      const expiredCodes = codes.filter((code) => {
+        const expirationDate =
+          code.expirationDate instanceof admin.firestore.Timestamp
+            ? code.expirationDate.toDate()
+            : new Date(code.expirationDate);
+        const currentDate = new Date();
+        const daysDifference = (currentDate - expirationDate) / (1000 * 60 * 60 * 24);
+        return daysDifference > 60;
+      });
+
+      for (const code of expiredCodes) {
+        const codeRef = admin.firestore().collection("codes").doc(code.id);
+        await codeRef.delete();
+      }
+
+      new Logger().log(
+        PREFIX,
+        `Deleted ${expiredCodes.length} expired codes at ${new Date()} at America/Sao_Paulo timezone`
+      );
+    },
+    {
+      scheduled: true,
+      timezone: "America/Sao_Paulo",
+    }
+  );
+
+  return deleteTask;
+};
+
 /**
  * Schedules a cron job to run once per day at midnight.
  * The job retrieves all guilds, processes each guild's DKP decay system,
@@ -100,7 +136,7 @@ const decay = async () => {
  * Logs the execution of the decay system for monitoring purposes.
  */
 export async function start() {
-  const tasks = [await decay()];
+  const tasks = [await decay(), await deleteExpiredCodes()];
   tasks.forEach((task) => task.start());
   new Logger().log(
     PREFIX,
