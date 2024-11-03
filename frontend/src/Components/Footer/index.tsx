@@ -56,13 +56,6 @@ function Footer({ complete = true }) {
               >
                 Give us a suggestion / feedback
               </Link>
-              <Link
-                href="https://discord.com/channels/1294519069059584041/1297002082183675905"
-                isExternal
-                textShadow={"2px 2px 5px #0000008a"}
-              >
-                Changelog (temporary)
-              </Link>
             </VStack>
           </Stack>
         </>
