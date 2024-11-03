@@ -193,9 +193,6 @@ function Navbar() {
               <Link to="/sign-in">
                 <Button leftIcon={<FaDiscord />} colorScheme="teal">
                   Login with Discord
-                  <Badge ml="3" colorScheme="black">
-                    New
-                  </Badge>
                 </Button>
               </Link>
             </SignedOut>
@@ -205,6 +202,9 @@ function Navbar() {
               onClick={() => onOpen()}
             >
               Commands
+              <Badge ml="3" colorScheme="black">
+                New
+              </Badge>
             </Button>
 
             <Button
