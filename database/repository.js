@@ -490,6 +490,10 @@ export const updateNickname = async (interaction) => {
           ephemeral: true,
         });
       }
+    } else {
+      // Send a message if the user is not found in the memberDkps array
+      const msg = "You don't have DKP yet, you must have before setting a nickname.";
+      new Logger(interaction).log(PREFIX, msg);
     }
   } catch (error) {
     console.log(error);
