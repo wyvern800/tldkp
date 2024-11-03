@@ -493,7 +493,8 @@ export const updateNickname = async (interaction) => {
       }
     } else {
       // Send a message if the user is not found in the memberDkps array
-      const msg = "You don't have DKP yet, you must have before setting a nickname.";
+      const msg =
+        "You don't have DKP yet, you must have before setting a nickname.";
       new Logger(interaction).log(PREFIX, msg);
     }
   } catch (error) {
@@ -1171,7 +1172,7 @@ export async function generateDkpCode(interaction) {
     expirationDate: admin.firestore.Timestamp.fromDate(expirationDate),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     note,
-    redeemers: []
+    redeemers: [],
   };
 
   try {
@@ -1205,7 +1206,10 @@ export async function redeemDkpCode(interaction) {
 
   try {
     // Query the code document from Firestore
-    const codeSnapshot = await db.collection("codes").where("code", "==", code).get();
+    const codeSnapshot = await db
+      .collection("codes")
+      .where("code", "==", code)
+      .get();
 
     if (codeSnapshot.empty) {
       const msg = `Invalid code.`;
@@ -1217,7 +1221,11 @@ export async function redeemDkpCode(interaction) {
     const codeData = codeDoc.data();
 
     // Check if the user has already redeemed the code
-    if (codeData?.redeemers?.some(redeemer => redeemer.userId === interaction.user.id)) {
+    if (
+      codeData?.redeemers?.some(
+        (redeemer) => redeemer.userId === interaction.user.id
+      )
+    ) {
       const msg = `You have already redeemed this code.`;
       new Logger(interaction).log(PREFIX, msg);
       return interaction.reply({ content: msg, ephemeral: true });
@@ -1239,7 +1247,9 @@ export async function redeemDkpCode(interaction) {
     let newGuildData = guildDataResponse;
 
     // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist
-    let increasedDkp = guildDataResponse.memberDkps ? [...guildDataResponse.memberDkps] : [];
+    let increasedDkp = guildDataResponse.memberDkps
+      ? [...guildDataResponse.memberDkps]
+      : [];
 
     // Update the DKP for the user
     updateDkp(
@@ -1305,4 +1315,16 @@ export async function getAllCodes() {
   }
 
   return codesData;
+}
+
+/**
+ * Upadtes a guild config file
+ * 
+ * @param {string} guildId The guildId
+ * @param {any} guildConfig The document we're updating
+ * @returns 
+ */
+export async function updateGuildConfig(guildId, guildConfig) {
+  const response = await db.collection("guilds").doc(guildId).update(guildConfig);
+  return response;
 }

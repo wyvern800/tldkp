@@ -18,6 +18,7 @@ export const createBotClient = () => {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.GuildMembers
     ],
   });
 
@@ -48,6 +49,32 @@ export const createBotClient = () => {
       .catch(async (error) => {
         await api.logError(guild, `Failed to create guild.`, error);
       });
+  });
+
+  // When a new member joins the guild
+  client.on('guildMemberAdd', async (member) => {
+    const guildId = member.guild.id;
+    const userId = member.id;
+
+    // Fetch the guild configuration
+    const guildConfig = await api.getGuildConfig(guildId);
+
+    // Ensure the guild's DKP array is initialized
+    if (!guildConfig.memberDkps) {
+      guildConfig.memberDkps = [];
+    }
+
+    // Check if the member is already in the DKP array
+    const memberExists = guildConfig.memberDkps.some((dkp) => dkp.userId === userId);
+
+    // If the member is not in the DKP array, add them
+    if (!memberExists) {
+      guildConfig.memberDkps.push({ userId, dkp: 0 });
+      await api.updateGuildConfig(guildId, guildConfig);
+      if (process.env.ENV === 'dev') {
+        new Logger().log(PREFIX, `Added new member ${userId} to DKP array.`);
+      }
+    }
   });
 
   // When interactions happen
