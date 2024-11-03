@@ -7,6 +7,7 @@ import { getMemberById } from "../utils/discord.js";
 import cache from "../utils/cache.js";
 import { config } from "dotenv";
 import { isAfter, add, formatDistance } from "date-fns";
+import { generateClaimCode } from "../utils/index.js";
 
 const PREFIX = "Firebase";
 
@@ -1058,3 +1059,246 @@ export const setMinimumCap = async (interaction) => {
     return interaction.reply({ content: msg, ephemeral: true });
   }
 };
+
+/**
+ * Claim DKP code
+ *
+ * @param { any } interaction The interaction
+ * @returns
+ */
+export async function claimDkpCode(interaction) {
+  const amount = interaction.options.getInteger("amount");
+  const expiration = interaction.options.getNumber("expiration-in-minutes");
+
+  const { memberDkps } = await getGuildConfig(interaction.guild.id);
+  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+
+  const { id } = interaction.user;
+
+  let newGuildData = guildDataResponse;
+
+  if (!expiration && !amount && !id) {
+    const msg = `Something unexpected happened`;
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist
+  let increasedDkp = memberDkps ? [...memberDkps] : [];
+
+  // Validate the amount for positive number
+  if (!isPositiveNumber(amount)) {
+    const errorMsg = "The DKP amount must be a positive number.";
+    return interaction.reply({ content: errorMsg, ephemeral: true });
+  }
+
+  updateDkp(
+    increasedDkp,
+    user.id,
+    choices === "add" ? amount : -amount,
+    user,
+    guildDataResponse?.guildData?.name,
+    guildDataResponse
+  );
+
+  // Update the guild data with the new memberDkps array and the current timestamp
+  newGuildData = {
+    ...guildDataResponse,
+    memberDkps: increasedDkp,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+
+  const answer = {
+    add: "increased to",
+    remove: "subtracted to",
+    set: "set to",
+  };
+
+  const value = newGuildData?.memberDkps?.find(
+    (member) => member.userId === user.id
+  );
+  const msg = `<@${user.id}>'s DKP was ${
+    answer[choices?.toLowerCase() ?? "updated to"]
+  } ${value?.dkp}!`;
+  new Logger(interaction).log(PREFIX, msg);
+  return interaction.reply({ content: msg, ephemeral: true });
+}
+
+/**
+ * Generates and saves a DKP code
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function generateDkpCode(interaction) {
+  const amount = interaction.options.getInteger("amount");
+  const expiration = interaction.options.getNumber("expiration-in-minutes");
+  const note = interaction.options.getString("note");
+
+  if (!amount || !expiration) {
+    const msg = `Amount and expiration are required.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  const guildId = interaction.guild.id;
+  const userId = interaction.user.id;
+
+  // Validate the amount for positive number
+  if (!isPositiveNumber(amount)) {
+    const errorMsg = "The DKP amount must be a positive number.";
+    return interaction.reply({ content: errorMsg, ephemeral: true });
+  }
+
+  // Generate a unique code
+  const code = generateClaimCode();
+
+  // Calculate expiration date
+  const expirationDate = add(new Date(), { minutes: expiration });
+
+  // Create the code document
+  const codeData = {
+    guildId,
+    userId,
+    code,
+    amount,
+    expirationDate: admin.firestore.Timestamp.fromDate(expirationDate),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    note,
+    redeemers: []
+  };
+
+  try {
+    // Save the code document to Firestore
+    await db.collection("codes").add(codeData);
+
+    const msg = `Code generated successfully: ${code} - Expires in ${expiration} minutes.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error generating code";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Redeems a DKP code
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function redeemDkpCode(interaction) {
+  const code = interaction.options.getString("code");
+
+  if (!code) {
+    const msg = `Code is required.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  try {
+    // Query the code document from Firestore
+    const codeSnapshot = await db.collection("codes").where("code", "==", code).get();
+
+    if (codeSnapshot.empty) {
+      const msg = `Invalid code.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    const codeDoc = codeSnapshot.docs[0];
+    const codeData = codeDoc.data();
+
+    // Check if the user has already redeemed the code
+    if (codeData?.redeemers?.some(redeemer => redeemer.userId === interaction.user.id)) {
+      const msg = `You have already redeemed this code.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    // Check if the code is expired
+    if (isAfter(new Date(), codeData?.expirationDate)) {
+      const msg = `Sorry, but this code has aleady expired.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    // Get the guild and user data
+    const guildId = codeData.guildId;
+    const userId = interaction.user.id;
+
+    // Get the guild config
+    const guildDataResponse = await getGuildConfig(guildId);
+    let newGuildData = guildDataResponse;
+
+    // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist
+    let increasedDkp = guildDataResponse.memberDkps ? [...guildDataResponse.memberDkps] : [];
+
+    // Update the DKP for the user
+    updateDkp(
+      increasedDkp,
+      userId,
+      codeData.amount,
+      interaction.user,
+      guildDataResponse?.guildData?.name,
+      guildDataResponse
+    );
+
+    // Update the guild data with the new memberDkps array and the current timestamp
+    newGuildData = {
+      ...guildDataResponse,
+      memberDkps: increasedDkp,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    // Save the updated guild data to Firestore
+    await db.collection("guilds").doc(guildId).update(newGuildData);
+
+    // Mark the code as redeemed
+    let copyRedeemers = [...codeData?.redeemers];
+    copyRedeemers.push({ userId, redeemedAt: new Date() });
+    await db.collection("codes").doc(codeDoc.id).update({
+      redeemers: copyRedeemers,
+    });
+
+    const msg = `Code redeemed successfully! Your DKP has been updated.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    const msg = "Error redeeming code";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Gets all DKP codes
+ *
+ * @returns { any[] } List of codes
+ */
+export async function getAllCodes() {
+  const cacheKey = `codes-all`;
+  let codesData = cache.get(cacheKey);
+
+  if (!codesData) {
+    const snapshot = await db.collection("codes").get();
+
+    if (snapshot.empty) {
+      new Logger().log(PREFIX, `No codes found`);
+      return [];
+    }
+
+    const codes = [];
+    snapshot.forEach((doc) => {
+      codes.push({ id: doc.id, ...doc.data() });
+    });
+
+    codesData = codes;
+    cache.set(cacheKey, codesData);
+  }
+
+  return codesData;
+}
