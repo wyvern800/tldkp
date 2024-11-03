@@ -92,7 +92,8 @@ export const createServer = (client) => {
           name: command.name,
           description: command.description,
           options: command.options,
-          commandCategory: command.commandCategory
+          commandCategory: command.commandCategory,
+          new: command.new,
         }))
       );
     },

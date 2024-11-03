@@ -9,4 +9,5 @@ export interface CommandType {
   description: string;
   options: CommandOptions[]
   commandCategory: string;
+  new: boolean;
 } 

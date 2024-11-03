@@ -91,7 +91,7 @@ function Navbar() {
             const commandOptions = command.options;
             return (
               <ListItem key={`${command.name}${index}`}>
-                <Tag marginRight="2">/{command.name}</Tag>
+                {command.new && <Tag colorScheme="orange" marginRight="5px">NEW!</Tag>}<Tag marginRight="2">/{command.name}</Tag>
                 {commandOptions &&
                   commandOptions.map(
                     (commandOption: CommandOptions, index: number) => {

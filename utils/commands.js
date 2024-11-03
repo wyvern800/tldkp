@@ -39,7 +39,8 @@ export async function loadCommands() {
       ...command,
       commandExecution: undefined,
       permissions: undefined,
-      commandCategory: undefined
+      commandCategory: undefined,
+      new: undefined
     }));
 
     try {
@@ -324,7 +325,8 @@ export const commands = [
     ],
     commandExecution: api.generateDkpCode,
     permissions: [PermissionFlagsBits.Administrator],
-    commandCategory: "DKP System"
+    commandCategory: "DKP System",
+    new: true
   },
   {
     name: "claim",
@@ -339,7 +341,8 @@ export const commands = [
     ],
     commandExecution: api.redeemDkpCode,
     permissions: [PermissionFlagsBits.SendMessages],
-    commandCategory: "DKP System"
+    commandCategory: "DKP System",
+    new: true
   },
   /*{
     name: "clear",
