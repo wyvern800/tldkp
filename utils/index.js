@@ -1,6 +1,10 @@
 import { logError } from "../database/repository.js";
 import { Logger } from "./logger.js";
 
+import { config } from "dotenv";
+
+config();
+
 /**
  * Updates the DKP value for a user in the provided DKP array.
  * 
@@ -79,4 +83,20 @@ export async function setDkp(dkpArray, userId, amount, user, serverName, guildDa
  */
 export function isPositiveNumber(value) {
   return typeof value === "number" && value > 0;
+}
+
+/**
+ * Generates a short fantasy code for claiming dkp
+ * @returns Generates a short fantasy nickname.
+ */
+export function generateClaimCode() {
+  const adjectives = process.env.ADJECTIVES.split(",");
+
+  const nouns = process.env.NOUNS.split(",");
+  
+  // Randomly select an adjective and a noun
+  let randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  let randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+
+  return randomAdjective + randomNoun.trim();
 }

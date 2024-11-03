@@ -274,6 +274,73 @@ export const commands = [
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System"
   },
+  {
+    name: "gen-dkp-code",
+    description: "Generates a claimable code for earning DKP",
+    options: [
+      {
+        name: "amount",
+        description:
+          "The amount of DKP the player will earn from the this code",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+      },
+      {
+        name: "expiration-in-minutes",
+        description:
+          "The expiration time (in minutes) of how long this code will be available for",
+        type: ApplicationCommandOptionType.Number,
+        choices: [
+          {
+            name: "2 minutes",
+            value: 2,
+          },
+          {
+            name: "5 minutes",
+            value: 5,
+          },
+          {
+            name: "10 minutes",
+            value: 10,
+          },
+          {
+            name: "15 minutes",
+            value: 15,
+          },
+          {
+            name: "20 minutes",
+            value: 20,
+          },
+        ],
+        required: true,
+      },
+      {
+        name: "note",
+        description:
+          "Any note about this token? event name, etc...",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+    commandExecution: api.generateDkpCode,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "DKP System"
+  },
+  {
+    name: "claim",
+    description: "Claim a DKP code",
+    options: [
+      {
+        name: "code",
+        description: "The code you want to claim",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+    commandExecution: api.redeemDkpCode,
+    permissions: [PermissionFlagsBits.SendMessages],
+    commandCategory: "DKP System"
+  },
   /*{
     name: "clear",
     description: "Cleans messages from a channel (Limited to 100 messages)",
