@@ -21,7 +21,6 @@ export const createServer = (client) => {
   const port = process.env.PORT || 3000;
 
   // start clerk
-  const { users } = new Clerk().getInstance();
 
   const limiter = rateLimit({
     windowMs: parseInt(process.env.MAX_REQ_TIME, 10),

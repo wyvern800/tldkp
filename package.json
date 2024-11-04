@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/shardManager.js",
     "dev": "concurrently \"npm run dev:bot\" \"npm run dev:client\"",
-    "dev:bot": "nodemon -L --config nodemon.json --verbose",
+    "dev:bot": "nodemon -L --config nodemon.json",
     "dev:client": "npm --prefix frontend run dev",
     "dev:api": "nodemon src/startExpress.js",
     "dev:site": "concurrently \"npm run dev:client\" \"npm run dev:api\"",

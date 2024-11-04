@@ -4,18 +4,18 @@ import { createClerkClient } from '@clerk/clerk-sdk-node';
 config();
 
 class Clerk {
-  clerkClient;
+  static clerkClient = null;
 
-  constructor() {
-    this.clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY, publishableKey: process.env.CLERK_PUBLISHABLE_KEY })
+  static async init() {
+    if (!Clerk.clerkClient) {
+      Clerk.clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY, publishableKey: process.env.CLERK_PUBLISHABLE_KEY });
+      console.log('Clerk initialized');
+    }
+    return Clerk.clerkClient;
   }
 
-  client() {
-    return this.clerkClient;
-  }
-  
-  get getInstance() {
-    return this.client;
+  static async getInstance() {
+    return await Clerk.init();
   }
 }
 
