@@ -628,8 +628,7 @@ export const handleCheck = async (interaction) => {
       const { ign, dkp } = response;
 
       return interaction.reply({
-        content: `Your current DKP is **${dkp}**!
-        ${ign ? `IGN: **${ign}**` : ""}`,
+        content: `Your current DKP is **${dkp}**!\n${ign ? `In-game Nickname: **${ign}**` : ""}`,
         ephemeral: true,
       });
     }
@@ -1384,7 +1383,7 @@ export const setRoleOnJoin = async (interaction) => {
     // Invalidate the cache
     cache.del(cacheKey);
 
-    let msg = `Togglable: Now when a member joins, they will:`;
+    let msg = `Now when a member joins, they will:`;
     if (role) {
       msg = msg.concat(`\n- Be assigned to: <@&${role.id}>`);
     }
