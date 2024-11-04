@@ -18,6 +18,7 @@ export const createBotClient = () => {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.GuildMembers
     ],
   });
 
@@ -48,6 +49,52 @@ export const createBotClient = () => {
       .catch(async (error) => {
         await api.logError(guild, `Failed to create guild.`, error);
       });
+  });
+
+  // When a new member joins the guild
+  client.on('guildMemberAdd', async (member) => {
+    const guildId = member.guild.id;
+    const userId = member.id;
+
+    // Fetch the guild configuration
+    const guildConfig = await api.getGuildConfig(guildId);
+
+    // Ensure the guild's DKP array is initialized
+    if (!guildConfig.memberDkps) {
+      guildConfig.memberDkps = [];
+    }
+
+    // Check if the member is already in the DKP array
+    const memberExists = guildConfig.memberDkps.some((dkp) => dkp.userId === userId);
+
+    // If the member is not in the DKP array, add them
+    if (!memberExists) {
+      try {
+        
+        const dkpToGive = guildConfig?.togglables?.dkpSystem?.onJoinDKPAmount ?? 0;
+        if (guildConfig?.togglables?.dkpSystem?.roleToAssign) {
+          try {
+            const role = member.guild.roles.cache.find((role) => role.id === guildConfig?.togglables?.dkpSystem?.roleToAssign);
+            if (role) {
+              member.roles.add(role);
+            } else {
+              new Logger().error(PREFIX, `Failed to find role to assign to new member ${userId}.`);
+            }
+          } catch (e) {
+            new Logger().error(PREFIX, `Failed to assign role to new member ${userId}.`);
+          }
+        }
+
+        guildConfig.memberDkps.push({ userId, dkp: dkpToGive });
+
+        await api.updateGuildConfig(guildId, guildConfig);
+      } catch (e) {
+        new Logger().error(PREFIX, `Failed to add new member ${userId} to DKP array.`);
+      }
+      if (process.env.ENV === 'dev') {
+        new Logger().log(PREFIX, `Added new member ${userId} to DKP array.`);
+      }
+    }
   });
 
   // When interactions happen

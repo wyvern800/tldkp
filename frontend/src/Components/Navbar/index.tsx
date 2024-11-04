@@ -248,8 +248,8 @@ function Navbar() {
         >
           {commands && categories ? (
             <UnorderedList spacing={3}>
-              {categories.map((category: string) => (
-                <Commands commandsData={commands} category={category} />
+              {categories.map((category: string, index: number) => (
+                <Commands key={`${category}${index}`} commandsData={commands} category={category} />
               ))}
             </UnorderedList>
           ) : (

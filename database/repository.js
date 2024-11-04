@@ -493,7 +493,8 @@ export const updateNickname = async (interaction) => {
       }
     } else {
       // Send a message if the user is not found in the memberDkps array
-      const msg = "You don't have DKP yet, you must have before setting a nickname.";
+      const msg =
+        "You don't have DKP yet, you must have before setting a nickname.";
       new Logger(interaction).log(PREFIX, msg);
     }
   } catch (error) {
@@ -627,8 +628,7 @@ export const handleCheck = async (interaction) => {
       const { ign, dkp } = response;
 
       return interaction.reply({
-        content: `Your current DKP is **${dkp}**!
-        ${ign ? `IGN: **${ign}**` : ""}`,
+        content: `Your current DKP is **${dkp}**!\n${ign ? `In-game Nickname: **${ign}**` : ""}`,
         ephemeral: true,
       });
     }
@@ -1171,7 +1171,7 @@ export async function generateDkpCode(interaction) {
     expirationDate: admin.firestore.Timestamp.fromDate(expirationDate),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     note,
-    redeemers: []
+    redeemers: [],
   };
 
   try {
@@ -1205,7 +1205,10 @@ export async function redeemDkpCode(interaction) {
 
   try {
     // Query the code document from Firestore
-    const codeSnapshot = await db.collection("codes").where("code", "==", code).get();
+    const codeSnapshot = await db
+      .collection("codes")
+      .where("code", "==", code)
+      .get();
 
     if (codeSnapshot.empty) {
       const msg = `Invalid code.`;
@@ -1217,7 +1220,11 @@ export async function redeemDkpCode(interaction) {
     const codeData = codeDoc.data();
 
     // Check if the user has already redeemed the code
-    if (codeData?.redeemers?.some(redeemer => redeemer.userId === interaction.user.id)) {
+    if (
+      codeData?.redeemers?.some(
+        (redeemer) => redeemer.userId === interaction.user.id
+      )
+    ) {
       const msg = `You have already redeemed this code.`;
       new Logger(interaction).log(PREFIX, msg);
       return interaction.reply({ content: msg, ephemeral: true });
@@ -1239,7 +1246,9 @@ export async function redeemDkpCode(interaction) {
     let newGuildData = guildDataResponse;
 
     // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist
-    let increasedDkp = guildDataResponse.memberDkps ? [...guildDataResponse.memberDkps] : [];
+    let increasedDkp = guildDataResponse.memberDkps
+      ? [...guildDataResponse.memberDkps]
+      : [];
 
     // Update the DKP for the user
     updateDkp(
@@ -1306,3 +1315,86 @@ export async function getAllCodes() {
 
   return codesData;
 }
+
+/**
+ * Upadtes a guild config file
+ * 
+ * @param {string} guildId The guildId
+ * @param {any} guildConfig The document we're updating
+ * @returns 
+ */
+export async function updateGuildConfig(guildId, guildConfig) {
+  const response = await db.collection("guilds").doc(guildId).update(guildConfig);
+  return response;
+}
+
+
+export const setRoleOnJoin = async (interaction) => {
+  const role = interaction.options.getRole("role");
+  const amount = interaction.options.getInteger("amount");
+
+  if (amount < 0) {
+    interaction.reply({ content: "Value must be above zero", ephemeral: true });
+    return;
+  }
+  
+  if (!role && !amount) {
+    interaction.reply({ content: "You must specify at least a role or an amount", ephemeral: true });
+    return;
+  }
+
+  try {
+    const guildId = interaction.guild.id;
+    const cacheKey = `guild-${guildId}`;
+    let guildData = cache.get(cacheKey);
+
+    if (!guildData) {
+      // Direct query to Firestore for the specific guild document
+      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+
+      // Fetch the document snapshot
+      const guildSnapshot = await guildRef.get();
+
+      // Ensure the document exists
+      if (!guildSnapshot.exists) {
+        new Logger(interaction).log(PREFIX, "Guild document not found");
+        return interaction.reply({
+          content: "Guild document not found",
+          ephemeral: true,
+        });
+      }
+
+      // Get the data from the document snapshot
+      guildData = guildSnapshot.data();
+      cache.set(cacheKey, guildData);
+    }
+
+    const prefix = "togglables.dkpSystem";
+
+    await admin
+      .firestore()
+      .collection("guilds")
+      .doc(guildId)
+      .update({
+        ...(amount ? {[`${prefix}.onJoinDKPAmount`]: amount ? amount : 0 } : undefined),
+        ...(role ? {[`${prefix}.roleToAssign`]: role.id } : undefined),
+      });
+
+    // Invalidate the cache
+    cache.del(cacheKey);
+
+    let msg = `Now when a member joins, they will:`;
+    if (role) {
+      msg = msg.concat(`\n- Be assigned to: <@&${role.id}>`);
+    }
+    if (amount) {
+      msg = msg.concat(`\n- Receive: **${amount ? amount : 0}** DKP`);
+    }
+     return interaction.reply({ content: msg, ephemeral: true });
+  } catch (error) {
+    console.log(error)
+    const msg = "Error updating decay";
+    new Logger(interaction).log(PREFIX, msg);
+    return interaction.reply({ content: msg, ephemeral: true });
+  }
+};

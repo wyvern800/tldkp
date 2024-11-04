@@ -1,9 +1,5 @@
-import {
-  REST,
-  Routes,
-  ApplicationCommandOptionType,
-  PermissionFlagsBits,
-} from "discord.js";
+import discord from "discord.js";
+const { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } = discord;
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
@@ -341,6 +337,29 @@ export const commands = [
     ],
     commandExecution: api.redeemDkpCode,
     permissions: [PermissionFlagsBits.SendMessages],
+    commandCategory: "DKP System",
+    new: true
+  },
+  {
+    name: "set-on-member-join",
+    description:
+      "Assigns a role to new members and optionally awards DKP",
+    options: [
+      {
+        name: "role",
+        description: "The role you want to assign to new members",
+        type: ApplicationCommandOptionType.Role,
+        required: false,
+      },
+      {
+        name: "amount",
+        description: "The amount of DKP you want to give to new members",
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+      }
+    ],
+    commandExecution: api.setRoleOnJoin,
+    permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System",
     new: true
   },
