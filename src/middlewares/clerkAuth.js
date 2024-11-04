@@ -3,9 +3,10 @@ import ResponseBase from "../../utils/responses.js";
 import Clerk from "../../utils/clerk.js";
 
 export const protectedRouteMiddleware = async (req, res, next) => {
-  const { users } = new Clerk().getInstance();
-
   try {
+    const clerk = await Clerk.getInstance();
+    const { users } = clerk;
+
     const { userId, sessionId } = getAuth(req);
 
     // Check if the user is authenticated

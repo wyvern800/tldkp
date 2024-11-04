@@ -1178,7 +1178,7 @@ export async function generateDkpCode(interaction) {
     // Save the code document to Firestore
     await db.collection("codes").add(codeData);
 
-    const msg = `Code generated successfully: ${code} - Expires in ${expiration} minutes.`;
+    const msg = `Code generated successfully: **${code}**\n- NOTE: It will expire in ${expiration} minutes.`;
     new Logger(interaction).log(PREFIX, msg);
     return interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {

@@ -5,6 +5,7 @@ import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "./constants.js";
 import { servers } from "./servers.js";
+import { isRateLimited } from '../utils/commandLimiter.js'; 
 
 config();
 
@@ -386,6 +387,16 @@ export const commands = [
  * @param { string } commandName The command name
  */
 export async function handleCommands(interaction, commandName) {
+  const userId = interaction.user.id;
+
+  if (isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE)) {
+    interaction.reply({
+      content: "You have exceeded the maximum number of commands per minute. Please try again later.",
+      ephemeral: true,
+    });
+    return;
+  }
+
   const commandToFind = commands?.find(
     (c) => c.name?.toLowerCase() === commandName
   );
