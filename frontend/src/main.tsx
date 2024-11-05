@@ -10,7 +10,6 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import RootLayout from "./layouts/root-layout";
 import DashboardLayout from "./layouts/dashboard-layout";
 import AdminLayout from "./layouts/admin-layout";
-import HudsLayout from "./layouts/huds-layout";
 
 // Import the components
 import IndexPage from "./routes";
@@ -19,6 +18,7 @@ import SignUpPage from "./routes/sign-up";
 import DashboardPage from "./routes/dashboard";
 import AdminPage from "./routes/admin";
 import HudsPage from "./routes/huds";
+import NotFoundPage from "./routes/not-found";
 
 const config = {
   initialColorMode: "dark",
@@ -49,6 +49,7 @@ const router = createBrowserRouter([
         children: [{ path: "/admin", element: <AdminPage /> }],
       },
     ],
+    errorElement:<NotFoundPage />
   },
 ]);
 
