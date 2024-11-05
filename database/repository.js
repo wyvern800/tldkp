@@ -203,13 +203,6 @@ export async function getData(guildId, collection) {
 }
 
 async function getDkpByUserId(interaction, guildId, userId) {
-  const cacheKey = `dkp-${guildId}`;
-  let cachedData = cache.get(cacheKey);
-
-  if (cachedData) {
-    return cachedData;
-  }
-
   const doc = await db.collection("guilds").doc(guildId).get();
 
   // If the document doesn't exist, log an error and return null
@@ -233,9 +226,6 @@ async function getDkpByUserId(interaction, guildId, userId) {
     new Logger(interaction).log(PREFIX, `No DKP found for user ${userId}`);
     return "dkp-not-found";
   }
-
-  // Cache the result
-  cache.set(cacheKey, userDkpData);
 
   // Return the DKP of the user
   return userDkpData;

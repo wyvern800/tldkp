@@ -17,6 +17,7 @@ import SignInPage from "./routes/sign-in";
 import SignUpPage from "./routes/sign-up";
 import DashboardPage from "./routes/dashboard";
 import AdminPage from "./routes/admin";
+import NotFoundPage from "./routes/not-found";
 
 const config = {
   initialColorMode: "light",
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
         children: [{ path: "/admin", element: <AdminPage /> }],
       },
     ],
+    errorElement:<NotFoundPage />
   },
 ]);
 
