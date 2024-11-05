@@ -5,12 +5,12 @@ import { commands } from "../../utils/commands.js";
 import { parseRoutes, getRoutes } from "../middlewares/routeCapturer.js";
 import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import "dotenv/config";
-import Clerk from "../../utils/clerk.js";
 import ResponseBase from "../../utils/responses.js";
 import { getGuildsByOwnerOrUser, getAllGuilds } from "../../database/repository.js";
 import { config } from "dotenv";
 import rateLimit from "express-rate-limit";
 import { protectedRouteMiddleware } from "../../src/middlewares/clerkAuth.js";
+import * as uiRepository from "../../database/repositoryUi.js";
 
 config();
 
@@ -97,6 +97,33 @@ export const createServer = (client) => {
       );
     },
     "Endpoint that shows all the commands from the bot service"
+  );
+
+  apiRouter.get(
+    "/huds",
+    async (req, res) => {
+      const huds = await uiRepository.getAllHUDS();
+      if (huds) {
+        return new ResponseBase(res).success(huds);
+      } else {
+        return new ResponseBase(res).notFound('HUDs not found');
+      }
+    },
+    "Endpoint that shows all the HUDs from the database"
+  );
+
+  apiRouter.post(
+    "/huds",
+    async (req, res) => {
+      const { body } = req;
+      const huds = await uiRepository.createHUD(body);
+      if (huds) {
+        return new ResponseBase(res).success(huds);
+      } else {
+        return new ResponseBase(res).error('Something unexpected happened');
+      }
+    },
+    "Endpoint that creates a HUD on the database"
   );
 
   apiRouter.get(

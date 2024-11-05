@@ -10,6 +10,7 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import RootLayout from "./layouts/root-layout";
 import DashboardLayout from "./layouts/dashboard-layout";
 import AdminLayout from "./layouts/admin-layout";
+import HudsLayout from "./layouts/huds-layout";
 
 // Import the components
 import IndexPage from "./routes";
@@ -17,10 +18,10 @@ import SignInPage from "./routes/sign-in";
 import SignUpPage from "./routes/sign-up";
 import DashboardPage from "./routes/dashboard";
 import AdminPage from "./routes/admin";
+import HudsPage from "./routes/huds";
 
 const config = {
-  initialColorMode: "light",
-  useSystemColorMode: true,
+  initialColorMode: "dark",
 };
 
 const router = createBrowserRouter([
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
       { path: "/thanks/*", element: <></> },
       { path: "/success/*", element: <>Todo</> },
       { path: "/cancel/*", element: <>Todo</> },
+      {
+        element: <HudsPage />,
+        path: "/huds"
+      },
       {
         element: <DashboardLayout />,
         path: "dashboard",

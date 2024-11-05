@@ -7,7 +7,7 @@ import {
   ModalBody,
   ModalCloseButton,
 } from "@chakra-ui/react";
-import { ReactNode, useRef } from "react";
+import React, { ReactNode, useRef } from "react";
 
 type StatePropType = {
   isOpen: boolean;
@@ -21,7 +21,7 @@ type ModalPropTypes = {
     | React.ReactElement
     | React.ReactElement[]
     | string;
-  title: string;
+  title: string | React.ReactNode;
   actions?: React.ReactNode[];
   state: StatePropType;
   isCentered?: boolean;

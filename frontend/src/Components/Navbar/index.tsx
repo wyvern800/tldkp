@@ -35,6 +35,7 @@ import { RiSlashCommands } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 import { BsFillMegaphoneFill } from "react-icons/bs";
 import { changelog } from "../../constants/changelog";
+import { SiMaterialdesignicons } from "react-icons/si";
 
 function Navbar() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -182,6 +183,21 @@ function Navbar() {
           </Box>
           <Spacer />
           <Stack direction={["column", "row"]} alignItems="center" gap="5">
+            <Tooltip
+              hasArrow
+              label="Share and get other player's HUDS"
+              colorScheme="gray.600"
+              placement="auto-start"
+            >
+              <Link to="/huds">
+                <Button leftIcon={<SiMaterialdesignicons />} colorScheme="teal">
+                  HUDS
+                  <Badge ml="3" colorScheme="black">
+                    New
+                  </Badge>
+                </Button>
+              </Link>
+            </Tooltip>
             <Button
               leftIcon={<BsFillMegaphoneFill />}
               colorScheme="teal"
@@ -249,7 +265,11 @@ function Navbar() {
           {commands && categories ? (
             <UnorderedList spacing={3}>
               {categories.map((category: string, index: number) => (
-                <Commands key={`${category}${index}`} commandsData={commands} category={category} />
+                <Commands
+                  key={`${category}${index}`}
+                  commandsData={commands}
+                  category={category}
+                />
               ))}
             </UnorderedList>
           ) : (
@@ -270,10 +290,12 @@ function Navbar() {
           isCentered={true}
           closeOnOverlayClick={true}
         >
-          <UnorderedList spacing={3}>  
+          <UnorderedList spacing={3}>
             {changelog.map((changelog: any, index) => (
               <ListItem key={index}>
-                <span style={{ textDecoration: 'underline'}}>{changelog.date}:</span>
+                <span style={{ textDecoration: "underline" }}>
+                  {changelog.date}:
+                </span>
                 <UnorderedList>
                   {changelog?.changes?.map((change: any) => {
                     return (
