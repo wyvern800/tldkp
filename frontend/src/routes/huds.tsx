@@ -166,6 +166,7 @@ export default function HudsPage() {
 
           {previewing && (
             <Modal
+              size="5xl"
               title={
                 <>
                   <HStack justifyContent="space-between" marginTop="30px">
@@ -175,11 +176,11 @@ export default function HudsPage() {
                         {getDistance(previewing?.createdAt)}
                       </Tag>
                       <Tag size="md" variant="solid" colorScheme="orange">
-                        {previewing?.stars.toLocaleString()}
+                        {previewing?.stars?.toLocaleString()}
                         <StarIcon ml="5px" />
                       </Tag>
                       <Tag size="md" variant="solid" colorScheme="green">
-                        {previewing?.downloads.toLocaleString()}
+                        {previewing?.downloads?.toLocaleString()}
                         <TriangleDownIcon ml="5px" />
                       </Tag>
                     </HStack>
