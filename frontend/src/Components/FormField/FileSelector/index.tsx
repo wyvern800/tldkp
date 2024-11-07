@@ -25,7 +25,6 @@ interface TextPropsType {
   multiple?: boolean;
   accept?: string;
   maxFiles?: number;
-  onSelectValidation?: (file: File) => Promise<boolean>;
   setValueFormState: UseFormSetValue<any>;
 }
 
@@ -41,7 +40,6 @@ function FileSelector({
   multiple = false,
   accept = ".png,.jpg,.jpeg",
   maxFiles = 1,
-  onSelectValidation,
   setValueFormState,
 }: TextPropsType) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,9 +73,6 @@ function FileSelector({
       }
 
       const selectedFile = files[0];
-      if (onSelectValidation && !(await onSelectValidation(selectedFile))) {
-        return;
-      }
       setValue(selectedFile);
       setValueFormState(name, selectedFile);
       console.log(name, selectedFile);

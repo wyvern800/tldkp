@@ -40,7 +40,7 @@ const schema = yup.object().shape({
   description: yup.string().required("Invalid description"),
   screenshots: yup
     .mixed()
-    .test("File", "At lease one file is required", (value: File | any) => value && (value instanceof Blob))
+    .test("File", "At least one screenshot file is required", (value: File | any) => value && (value instanceof Blob))
     .test(
       "Size",
       "File size must be less than 2mb",
@@ -48,7 +48,7 @@ const schema = yup.object().shape({
     ),
   interfaceFile: yup
     .mixed()
-    .test("File", "At lease one file is required", (value: File | any) => value && (value instanceof Blob))
+    .test("File", "HUD file is required", (value: File | any) => value && (value instanceof Blob))
     .test(
       "Size",
       "File size must be less than 2mb",
@@ -63,7 +63,6 @@ const schema = yup.object().shape({
             const json = JSON.parse(event.target?.result as string);
             resolve(azjFormat.isValidSync(json));
           } catch (error) {
-            const errorCopy = error;
             resolve(false);
           }
         };
@@ -84,8 +83,7 @@ export default function DrawerCreateUI({
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
-    setError,
+    setValue
   } = useForm({ resolver: yupResolver(schema) });
 
   const onSubmit = (data: unknown) => console.log(data);
