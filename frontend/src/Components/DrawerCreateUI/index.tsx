@@ -20,6 +20,12 @@ import { azjFormat } from "../../constants/azjFormat";
 
 import { FormField } from "../FormField";
 
+import { useUser } from "@clerk/clerk-react";
+
+import api from "../../services/axiosInstance";
+
+import { useAuth } from "@clerk/clerk-react";
+
 type StatePropType = {
   isOpen: boolean;
   onClose: () => void;
@@ -40,20 +46,30 @@ const schema = yup.object().shape({
   description: yup.string().required("Invalid description"),
   screenshots: yup
     .mixed()
-    .test("File", "At least one screenshot file is required", (value: File | any) => value && (value instanceof Blob))
+    .test("File", "At least one screenshot file is required", (value: File | FileList | any) => {
+      if (!value) return false;
+      if (Array.isArray(value)) {
+        return value.length >= 1;
+      } else {
+        return value;
+      } 
+    })
     .test(
       "Size",
-      "File size must be less than 2mb",
-      (value: File | any) => value && value.size <= 5000000
+      "File size must be less than 10mb",
+      (value: File | FileList | any) => {
+        if (!value) return false;
+        
+        const maxSize = 10000000;
+        if (Array.isArray(value)) {
+          return Array.from(value).every((file: File) => file.size < maxSize);
+        }
+        return value.size <= maxSize;
+      }
     ),
   interfaceFile: yup
     .mixed()
-    .test("File", "HUD file is required", (value: File | any) => value && (value instanceof Blob))
-    .test(
-      "Size",
-      "File size must be less than 2mb",
-      (value: File | any) => value && value.size <= 5000000
-    )
+    .test("File", "HUD file is required", (value: File | any) => value)
     .test("azjFormat", "Invalid HUD file (.azj)", (value: File | any) => {
       if (!value || !(value instanceof Blob)) return false;
       return new Promise((resolve) => {
@@ -77,7 +93,11 @@ export default function DrawerCreateUI({
   state,
   size = "xs",
 }: DrawerExampleProps) {
+  const { isSignedIn , user } = useUser();
+
   const { isOpen, onClose } = state ?? {};
+
+  const { getToken } = useAuth();
 
   const {
     register,
@@ -86,7 +106,47 @@ export default function DrawerCreateUI({
     setValue
   } = useForm({ resolver: yupResolver(schema) });
 
-  const onSubmit = (data: unknown) => console.log(data);
+  if (!isSignedIn) {
+    return <></>;
+  }
+
+  const onSubmit = async (data: any) => { 
+    if (!user) return;
+
+    const discordAccount: any = user.externalAccounts?.find(
+      (account) => account.provider === "discord"
+    );
+
+    const formData = new FormData();
+
+    formData.append("discordId", discordAccount?.providerUserId);
+
+    for (const key in data) {
+      if (key === "screenshots") {
+          if (Array.isArray(data[key])){
+            data?.screenshots?.map((screenshot: any) => {
+              formData.append(`${key}[]`, screenshot);
+            });
+          } else {
+            formData.append(key, data[key]);
+          }
+      } else {
+        formData.append(key, data[key]);
+      }
+    }
+
+    for (const pair of formData.entries()) {
+      console.log(`${pair[0]}: ${pair[1]}`);
+    }
+    
+    await api.post("/huds", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${await getToken()}`,
+      },
+    });
+
+  };
 
   return (
     <>

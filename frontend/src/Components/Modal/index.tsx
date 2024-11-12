@@ -51,7 +51,7 @@ function Modal({
   isCentered,
   closeOnOverlayClick,
   closeOnEsc = false,
-  size,
+  size = "4xl",
 }: ModalPropTypes): ReactNode {
   const { isOpen, onClose } = state ?? {};
 

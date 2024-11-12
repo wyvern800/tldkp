@@ -11,6 +11,11 @@ import { config } from "dotenv";
 import rateLimit from "express-rate-limit";
 import { protectedRouteMiddleware } from "../../src/middlewares/clerkAuth.js";
 import * as uiRepository from "../../database/repositoryUi.js";
+import { validatePostHud } from "../validators/index.js";
+import multer from "multer";
+import { Storage } from '@google-cloud/storage';
+import fs from 'fs';
+
 
 config();
 
@@ -19,6 +24,22 @@ export const createServer = (client) => {
   const app = express();
 
   const port = process.env.PORT || 3000;
+
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, 'temp/');
+    },
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    },
+  });
+  const upload = multer({ storage });
+
+  const gc = new Storage({
+    keyFilename: 'path/to/your/firebase-service-account.json',
+    projectId: 'your-project-id',
+  });
+  const bucket = gc.bucket('your-bucket-name');
 
   // start clerk
 
@@ -49,7 +70,7 @@ export const createServer = (client) => {
   app.use(
     cors({
       origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
-      methods: ["GET", "POST", "OPTIONS"],
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200
     })
@@ -66,7 +87,7 @@ export const createServer = (client) => {
   apiRouter.use(
     cors({
       origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
-      methods: ["GET", "POST"],
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200
     })
@@ -114,14 +135,39 @@ export const createServer = (client) => {
 
   apiRouter.post(
     "/huds",
+    (req, res, next) => {
+      upload.fields([
+        { name: 'screenshots', maxCount: 3 },
+        { name: 'interfaceFile', maxCount: 1 },
+      ])(req, res, (err) => {
+        if (err) {
+          console.error('Error during file upload:', err);
+          return res.status(500).json({ status: 'error', message: 'File upload failed' });
+        }
+        next();
+      });
+    },
     async (req, res) => {
-      const { body } = req;
-      const huds = await uiRepository.createHUD(body);
+      const files = req.files;
+      const formData = req.body;
+
+      console.log(formData);
+      console.log(files)
+
+      return new ResponseBase(res).success(body);
+
+      /*const valid = validatePostHud(body);
+
+      if (!valid) {
+        return new ResponseBase(res).badRequest('Invalid payload');
+      }*/
+
+      /*const huds = await uiRepository.createHUD(body);
       if (huds) {
         return new ResponseBase(res).success(huds);
       } else {
         return new ResponseBase(res).error('Something unexpected happened');
-      }
+      }*/
     },
     "Endpoint that creates a HUD on the database"
   );

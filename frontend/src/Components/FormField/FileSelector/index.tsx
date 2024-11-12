@@ -59,23 +59,25 @@ function FileSelector({
       const imageUrls = imageFiles.map((file) => URL.createObjectURL(file));
       setImagePreviews(imageUrls);
 
+      let selectedFile: any = files;
+
       // If multiple files are selected, limit the number of files to maxFiles
       if (multiple && maxFiles > 1 && files.length > maxFiles) {
-        const selectedFiles = Array.from(files).slice(0, maxFiles).reverse();
-        const dataTransfer = new DataTransfer();
-        selectedFiles.forEach((file) => dataTransfer.items.add(file));
-        fileInputRef.current!.files = dataTransfer.files;
-        setValue(dataTransfer.files);
-        setValueFormState(name, dataTransfer.files);
-
-        console.log(name, selectedFiles);
-        return;
+        selectedFile = Array.from(files).slice(0, maxFiles).reverse();
+        setValue(selectedFile);
+        setValueFormState(name, selectedFile);
+        console.log('maior q 4')
+      } else if (multiple && maxFiles > 1 && files.length === maxFiles) {
+        selectedFile = Array.from(files);
+        setValue(selectedFile);
+        setValueFormState(name, selectedFile);
+        console.log(3)
+      } else if (files.length === 1) {
+        selectedFile = files[0];
+        setValue(files[0]);
+        setValueFormState(name, files[0]);
+        console.log(1)
       }
-
-      const selectedFile = files[0];
-      setValue(selectedFile);
-      setValueFormState(name, selectedFile);
-      console.log(name, selectedFile);
     }
   }
 
