@@ -6,14 +6,25 @@ import { setupRealtimeUpdates } from "../utils/realtimeUpdates.js";
 
 config();
 
-await start();
+let cronStarted = false;
+let realTimeUpdatesStarted = false;
+let expressServer = null;
+
+if (!cronStarted) {
+  await start().then(() => cronStarted = true);
+}
 
 // Start the Discord bot
 const client = createBotClient();
 
 client.login(process.env.DISCORD_TOKEN);
 
-setupRealtimeUpdates();
+if (!realTimeUpdatesStarted) {
+  setupRealtimeUpdates();
+  realTimeUpdatesStarted = true;
+}
 
 // Start the Express server
-createServer(client);
+if (!expressServer) {
+  expressServer = createServer(client);
+}
