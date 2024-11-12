@@ -1,4 +1,3 @@
-import { logError } from "../database/repository.js";
 import { Logger } from "./logger.js";
 
 import { config } from "dotenv";
@@ -36,7 +35,7 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName, guil
         await user.send({ content: message, ephemeral: true });
       } catch (error) {
         const msg = `Could not send DM to user ${userId}`;
-        await logError({ name: serverName }, msg, error);
+        new Logger().error("[Discord.js]", msg, error);
       }
     }
   }

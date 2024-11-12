@@ -424,13 +424,6 @@ export async function handleCommands(interaction, commandName) {
         `Error executing command: ${commandName}`,
         e
       );
-      try {
-        await api?.logError(
-          interaction.guild,
-          `Error executing command: ${commandName}`,
-          e
-        );
-      } catch (err) {}
       return interaction.reply({
         content: "An error occurred while executing the command.",
         ephemeral: true,

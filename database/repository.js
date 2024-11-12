@@ -264,46 +264,6 @@ export async function guildCreate(guild) {
 }
 
 /**
- * Logs an error to firebase
- *
- * @param { any } guild Guild
- * @param { string } message Message
- * @param { any } err Error
- * @returns
- */
-export async function logError(guild, message, err) {
-  // Create the default error object
-  const defaultError = {
-    guildName: guild.name,
-    createdAt: new Date(),
-    error: err?.message || "Unknown error",
-  };
-
-  // Fetch existing errors for the guild
-  const errorsDoc = await getData(guild.id, "errors");
-
-  // Ensure errorsCollection is initialized as an empty array if it doesn't exist
-  const errorsCollection = Array.isArray(errorsDoc?.errors)
-    ? errorsDoc.errors
-    : [];
-
-  // Create a new errors array by adding the default error
-  const newError = {
-    errors: [...errorsCollection, defaultError],
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-
-  // Save the updated error log to Firestore
-  const res = await db.collection("errors").doc(guild.id).set(newError);
-
-  // Log the error in the system
-  new Logger().error(PREFIX, message);
-
-  return res;
-}
-
-/**
  * Handles dkp management
  *
  * @param { any } interaction The interaction
@@ -436,9 +396,9 @@ export const updateNickname = async (interaction) => {
         throw new Error("Invalid updatedAt date.");
       }
 
-      const future = add(updatedAtDate, { hours: 12 });
+      const future = add(updatedAtDate, { hours: 1 });
 
-      // You can only change the nickname if it is not set yet or if 12 hours have passed since updatedAt
+      // You can only change the nickname if it is not set yet or if 1 hour have passed since updatedAt
       if (notSetYet || isAfter(new Date(), future)) {
         // Update the nickname
         copyGuildData.memberDkps[memberIndex].ign = nickname;
@@ -474,7 +434,7 @@ export const updateNickname = async (interaction) => {
         const allowedDateFormatted = formatDistance(future, new Date(), {
           addSuffix: true,
         });
-        const msg = `You can only change your nickname once in 12 hours, you will be able ${allowedDateFormatted}.`;
+        const msg = `You can only change your nickname once in 1 hour, you will be able ${allowedDateFormatted}.`;
         new Logger(interaction).log(PREFIX, msg);
         return interaction.reply({
           content: msg,
@@ -625,9 +585,6 @@ export const handleCheck = async (interaction) => {
   } catch (error) {
     const msg = "Error checking DKP";
     new Logger(interaction).error(PREFIX, msg);
-    try {
-      await logError(interaction.guild, msg, error);
-    } catch (err) {}
     return interaction.reply({
       content: msg,
       ephemeral: true,
@@ -672,9 +629,6 @@ export const checkOther = async (interaction) => {
   } catch (error) {
     const msg = "Error checking DKP";
     new Logger(interaction).error(PREFIX, msg);
-    try {
-      await logError(interaction.guild, msg, error);
-    } catch (err) {}
     return interaction.reply({
       content: msg,
       ephemeral: true,
