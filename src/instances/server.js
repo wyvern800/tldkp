@@ -165,4 +165,6 @@ export const createServer = (client) => {
   app.listen(port, () => {
     console.log(`[Express] HTTP Server running on port ${port}`);
   });
+
+  return app;
 };

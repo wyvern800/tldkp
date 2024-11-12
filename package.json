@@ -26,7 +26,8 @@
     "express-rate-limit": "7.4.1",
     "firebase-admin": "12.6.0",
     "node-cache": "5.1.2",
-    "node-cron": "3.0.3"
+    "node-cron": "3.0.3",
+    "rollbar": "^2.26.4"
   },
   "devDependencies": {
     "concurrently": "^9.0.1",
