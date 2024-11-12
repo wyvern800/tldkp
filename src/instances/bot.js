@@ -3,7 +3,6 @@ import { handleCommands } from "../../utils/commands.js";
 import { loadCommands } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
-import { logError } from "../../database/repository.js";
 
 const PREFIX = "Discord.js";
 
@@ -47,7 +46,7 @@ export const createBotClient = () => {
     await api
       .guildCreate(guild)
       .catch(async (error) => {
-        await api.logError(guild, `Failed to create guild.`, error);
+        new Logger.error(PREFIX, `Failed to create guild.`, error);
       });
   });
 
