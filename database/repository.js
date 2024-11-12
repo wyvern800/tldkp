@@ -436,9 +436,9 @@ export const updateNickname = async (interaction) => {
         throw new Error("Invalid updatedAt date.");
       }
 
-      const future = add(updatedAtDate, { hours: 12 });
+      const future = add(updatedAtDate, { hours: 1 });
 
-      // You can only change the nickname if it is not set yet or if 12 hours have passed since updatedAt
+      // You can only change the nickname if it is not set yet or if 1 hour have passed since updatedAt
       if (notSetYet || isAfter(new Date(), future)) {
         // Update the nickname
         copyGuildData.memberDkps[memberIndex].ign = nickname;
@@ -474,7 +474,7 @@ export const updateNickname = async (interaction) => {
         const allowedDateFormatted = formatDistance(future, new Date(), {
           addSuffix: true,
         });
-        const msg = `You can only change your nickname once in 12 hours, you will be able ${allowedDateFormatted}.`;
+        const msg = `You can only change your nickname once in 1 hour, you will be able ${allowedDateFormatted}.`;
         new Logger(interaction).log(PREFIX, msg);
         return interaction.reply({
           content: msg,
