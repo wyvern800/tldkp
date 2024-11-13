@@ -256,7 +256,7 @@ export const commands = [
       const msg = `There is a section in the website where you can see all the commands available and their usage, and also now you can check all of your member's DKPS at our brand new Dashboard.  
       [Click here to check out!](https://tldkp.online/)
       `;
-      return interaction.reply({
+      return await interaction.reply({
         content: msg,
         ephemeral: true,
       });
@@ -424,7 +424,7 @@ export async function handleCommands(interaction, commandName) {
         `Error executing command: ${commandName}`,
         e
       );
-      return interaction.reply({
+      return await interaction.reply({
         content: "An error occurred while executing the command.",
         ephemeral: true,
       });
