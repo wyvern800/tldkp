@@ -4,7 +4,7 @@ import Clerk from "../../utils/clerk.js";
 
 export const protectedRouteMiddleware = async (req, res, next) => {
   try {
-    const clerk = await Clerk.getInstance();
+    const clerk = Clerk.getInstance();
     const { users } = clerk;
 
     const { userId, sessionId } = getAuth(req);
@@ -16,13 +16,16 @@ export const protectedRouteMiddleware = async (req, res, next) => {
 
     // Retrieve the user and their Discord account
     const user = await users.getUser(userId);
+
     const discordAccount = user.externalAccounts?.find(
       (account) => account.provider === "oauth_discord"
     );
 
     // Check if a Discord account was found
     if (!discordAccount) {
-      return new ResponseBase(res).notAllowed("Sorry this could not be completed");
+      return new ResponseBase(res).notAllowed(
+        "Sorry this could not be completed"
+      );
     }
 
     const externalId = discordAccount.externalId;
