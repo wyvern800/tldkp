@@ -1,7 +1,7 @@
 import { db } from "./firebase.js"; // Import Firestore
 import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
-import { updateDkp, setDkp, isPositiveNumber } from "../utils/index.js";
+import { updateDkp, decreaseDkp, setDkp, isPositiveNumber } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import { getMemberById } from "../utils/discord.js";
 import cache from "../utils/cache.js";
@@ -327,14 +327,25 @@ export async function handleUpdateDkp(interaction) {
         return interaction.reply({ content: errorMsg, ephemeral: true });
       }
 
-      updateDkp(
-        increasedDkp,
-        user.id,
-        choices === "add" ? amount : -amount,
-        user,
-        guildDataResponse?.guildData?.name,
-        guildDataResponse
-      );
+      if (choices === "add") {
+        updateDkp(
+          increasedDkp,
+          user.id,
+          amount,
+          user,
+          guildDataResponse?.guildData?.name,
+          guildDataResponse
+        );
+      } else {
+        decreaseDkp(
+          increasedDkp,
+          user.id,
+          amount,
+          user,
+          guildDataResponse?.guildData?.name,
+          guildDataResponse
+        );
+      }
 
       // Update the guild data with the new memberDkps array and the current timestamp
       newGuildData = {
