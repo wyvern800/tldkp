@@ -1,7 +1,7 @@
 import { db } from "./firebase.js"; // Import Firestore
 import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
-import { updateDkp, setDkp, isPositiveNumber } from "../utils/index.js";
+import { updateDkp, decreaseDkp, setDkp, isPositiveNumber } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import { getMemberById } from "../utils/discord.js";
 import cache from "../utils/cache.js";
@@ -264,46 +264,6 @@ export async function guildCreate(guild) {
 }
 
 /**
- * Logs an error to firebase
- *
- * @param { any } guild Guild
- * @param { string } message Message
- * @param { any } err Error
- * @returns
- */
-export async function logError(guild, message, err) {
-  // Create the default error object
-  const defaultError = {
-    guildName: guild.name,
-    createdAt: new Date(),
-    error: err?.message || "Unknown error",
-  };
-
-  // Fetch existing errors for the guild
-  const errorsDoc = await getData(guild.id, "errors");
-
-  // Ensure errorsCollection is initialized as an empty array if it doesn't exist
-  const errorsCollection = Array.isArray(errorsDoc?.errors)
-    ? errorsDoc.errors
-    : [];
-
-  // Create a new errors array by adding the default error
-  const newError = {
-    errors: [...errorsCollection, defaultError],
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-
-  // Save the updated error log to Firestore
-  const res = await db.collection("errors").doc(guild.id).set(newError);
-
-  // Log the error in the system
-  new Logger().error(PREFIX, message);
-
-  return res;
-}
-
-/**
  * Handles dkp management
  *
  * @param { any } interaction The interaction
@@ -325,7 +285,7 @@ export async function handleUpdateDkp(interaction) {
   if (!user && !choices && !amount && !id) {
     const msg = `Something unexpected happened`;
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 
   switch (choices?.toLowerCase()) {
@@ -336,7 +296,7 @@ export async function handleUpdateDkp(interaction) {
       // Validate the amount for positive number
       if (!isPositiveNumber(amount)) {
         const errorMsg = "The DKP amount must be a positive number.";
-        return interaction.reply({ content: errorMsg, ephemeral: true });
+        return await interaction.reply({ content: errorMsg, ephemeral: true });
       }
 
       setDkp(
@@ -364,17 +324,28 @@ export async function handleUpdateDkp(interaction) {
       // Validate the amount for positive number
       if (!isPositiveNumber(amount)) {
         const errorMsg = "The DKP amount must be a positive number.";
-        return interaction.reply({ content: errorMsg, ephemeral: true });
+        return await interaction.reply({ content: errorMsg, ephemeral: true });
       }
 
-      updateDkp(
-        increasedDkp,
-        user.id,
-        choices === "add" ? amount : -amount,
-        user,
-        guildDataResponse?.guildData?.name,
-        guildDataResponse
-      );
+      if (choices === "add") {
+        updateDkp(
+          increasedDkp,
+          user.id,
+          amount,
+          user,
+          guildDataResponse?.guildData?.name,
+          guildDataResponse
+        );
+      } else {
+        decreaseDkp(
+          increasedDkp,
+          user.id,
+          amount,
+          user,
+          guildDataResponse?.guildData?.name,
+          guildDataResponse
+        );
+      }
 
       // Update the guild data with the new memberDkps array and the current timestamp
       newGuildData = {
@@ -387,7 +358,7 @@ export async function handleUpdateDkp(interaction) {
     default:
       const msg = `Operation not recognized.`;
       new Logger(interaction).log(PREFIX, msg);
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
   }
 
   await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
@@ -405,7 +376,7 @@ export async function handleUpdateDkp(interaction) {
     answer[choices?.toLowerCase() ?? "updated to"]
   } ${value?.dkp}!`;
   new Logger(interaction).log(PREFIX, msg);
-  return interaction.reply({ content: msg, ephemeral: true });
+  return await interaction.reply({ content: msg, ephemeral: true });
 }
 
 export const updateNickname = async (interaction) => {
@@ -436,9 +407,9 @@ export const updateNickname = async (interaction) => {
         throw new Error("Invalid updatedAt date.");
       }
 
-      const future = add(updatedAtDate, { hours: 12 });
+      const future = add(updatedAtDate, { hours: 1 });
 
-      // You can only change the nickname if it is not set yet or if 12 hours have passed since updatedAt
+      // You can only change the nickname if it is not set yet or if 1 hour have passed since updatedAt
       if (notSetYet || isAfter(new Date(), future)) {
         // Update the nickname
         copyGuildData.memberDkps[memberIndex].ign = nickname;
@@ -464,7 +435,7 @@ export const updateNickname = async (interaction) => {
         } catch (err) {
           const msg = "Error setting in-game nickname";
           new Logger(interaction).log(PREFIX, msg);
-          return interaction.reply({
+          return await interaction.reply({
             content: msg,
             ephemeral: true,
           });
@@ -474,9 +445,9 @@ export const updateNickname = async (interaction) => {
         const allowedDateFormatted = formatDistance(future, new Date(), {
           addSuffix: true,
         });
-        const msg = `You can only change your nickname once in 12 hours, you will be able ${allowedDateFormatted}.`;
+        const msg = `You can only change your nickname once in 1 hour, you will be able ${allowedDateFormatted}.`;
         new Logger(interaction).log(PREFIX, msg);
-        return interaction.reply({
+        return await interaction.reply({
           content: msg,
           ephemeral: true,
         });
@@ -491,7 +462,7 @@ export const updateNickname = async (interaction) => {
     console.log(error);
     const msg = "Error updating in-game nickname";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({
+    return await interaction.reply({
       content: msg,
       ephemeral: true,
     });
@@ -605,19 +576,19 @@ export const handleCheck = async (interaction) => {
       user.id
     );
     if (response === "dkp-not-found") {
-      return interaction.reply({
+      return await interaction.reply({
         content: `You don't have DKP yet.`,
         ephemeral: true,
       });
     } else if (response === "guild-not-found") {
-      return interaction.reply({
+      return await interaction.reply({
         content: `Guild not found.`,
         ephemeral: true,
       });
     } else {
       const { ign, dkp } = response;
 
-      return interaction.reply({
+      return await interaction.reply({
         content: `Your current DKP is **${dkp}**!\n${ign ? `In-game Nickname: **${ign}**` : ""}`,
         ephemeral: true,
       });
@@ -625,10 +596,7 @@ export const handleCheck = async (interaction) => {
   } catch (error) {
     const msg = "Error checking DKP";
     new Logger(interaction).error(PREFIX, msg);
-    try {
-      await logError(interaction.guild, msg, error);
-    } catch (err) {}
-    return interaction.reply({
+    return await interaction.reply({
       content: msg,
       ephemeral: true,
     });
@@ -651,19 +619,19 @@ export const checkOther = async (interaction) => {
       user.id
     );
     if (response === "dkp-not-found") {
-      return interaction.reply({
+      return await interaction.reply({
         content: `${user.globalName} doesn't have DKP yet.`,
         ephemeral: true,
       });
     } else if (response === "guild-not-found") {
-      return interaction.reply({
+      return await interaction.reply({
         content: `Guild not found.`,
         ephemeral: true,
       });
     } else {
       const { ign, dkp } = response;
 
-      return interaction.reply({
+      return await interaction.reply({
         content: `${user.globalName}'s current DKP is **${dkp}**!
         ${ign ? `IGN: **${ign}**` : ""}`,
         ephemeral: true,
@@ -672,10 +640,7 @@ export const checkOther = async (interaction) => {
   } catch (error) {
     const msg = "Error checking DKP";
     new Logger(interaction).error(PREFIX, msg);
-    try {
-      await logError(interaction.guild, msg, error);
-    } catch (err) {}
-    return interaction.reply({
+    return await interaction.reply({
       content: msg,
       ephemeral: true,
     });
@@ -751,7 +716,7 @@ export const setGuildNickname = async (interaction) => {
       cache.del(cacheKey);
 
       const msg = "Guild alias updated successfully!";
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
     } else {
       // Calculate the time left until the next allowed update
       const allowedDateFormatted = formatDistance(future, new Date(), {
@@ -760,13 +725,13 @@ export const setGuildNickname = async (interaction) => {
       const msg = `You can only change your guild alias once every 10 days, you will be able to change it ${allowedDateFormatted}.`;
 
       new Logger(interaction).log(PREFIX, msg);
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
     }
   } catch (error) {
     console.log(error);
     const msg = "Error updating guild's name (alias)";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
 
@@ -833,11 +798,11 @@ export const setupAutoDecay = async (interaction) => {
       that if you don't enable the system, the decay will not be executed, also the default minimum cap is 100, which means a person will only
       lose their DKPs only if their cap is above 100, if it reaches 100, it will stop being removed, you can change that with **/decay-change-minimum-cap** command.
     `;
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error while setting up the auto-decaying system";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
 
@@ -869,7 +834,7 @@ export const toggleDkpNotifications = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({
+        return await interaction.reply({
           content: "Guild document not found",
           ephemeral: true,
         });
@@ -896,11 +861,11 @@ export const toggleDkpNotifications = async (interaction) => {
     cache.del(cacheKey);
 
     const msg = `Togglable: direct messages updated to: ${newValue}!`;
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error updating DKP notifications";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
 
@@ -933,7 +898,7 @@ export const toggleDecay = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({
+        return await interaction.reply({
           content: "Guild document not found",
           ephemeral: true,
         });
@@ -953,7 +918,7 @@ export const toggleDecay = async (interaction) => {
     if (!percentage || !interval || !minimumCap) {
       const msg =
         "You must set the decay system first, use **/decay-set-auto** to set the values";
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
     }
 
     await admin
@@ -973,12 +938,12 @@ export const toggleDecay = async (interaction) => {
     const msg = `Togglable: decaying system is now ${
       !enabled ? "enabled" : "disabled"
     }!`;
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     console.log(error);
     const msg = "Error toggling decay";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
 
@@ -1021,7 +986,7 @@ export const setMinimumCap = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({
+        return await interaction.reply({
           content: "Guild document not found",
           ephemeral: true,
         });
@@ -1046,11 +1011,11 @@ export const setMinimumCap = async (interaction) => {
     cache.del(cacheKey);
 
     const msg = `Togglable: decay minimum cap updated successfully to **${minimumCap}**!`;
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error updating decay";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
 
@@ -1074,7 +1039,7 @@ export async function claimDkpCode(interaction) {
   if (!expiration && !amount && !id) {
     const msg = `Something unexpected happened`;
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 
   // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist
@@ -1083,7 +1048,7 @@ export async function claimDkpCode(interaction) {
   // Validate the amount for positive number
   if (!isPositiveNumber(amount)) {
     const errorMsg = "The DKP amount must be a positive number.";
-    return interaction.reply({ content: errorMsg, ephemeral: true });
+    return await interaction.reply({ content: errorMsg, ephemeral: true });
   }
 
   updateDkp(
@@ -1117,7 +1082,7 @@ export async function claimDkpCode(interaction) {
     answer[choices?.toLowerCase() ?? "updated to"]
   } ${value?.dkp}!`;
   new Logger(interaction).log(PREFIX, msg);
-  return interaction.reply({ content: msg, ephemeral: true });
+  return await interaction.reply({ content: msg, ephemeral: true });
 }
 
 /**
@@ -1134,7 +1099,7 @@ export async function generateDkpCode(interaction) {
   if (!amount || !expiration) {
     const msg = `Amount and expiration are required.`;
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 
   const guildId = interaction.guild.id;
@@ -1143,7 +1108,7 @@ export async function generateDkpCode(interaction) {
   // Validate the amount for positive number
   if (!isPositiveNumber(amount)) {
     const errorMsg = "The DKP amount must be a positive number.";
-    return interaction.reply({ content: errorMsg, ephemeral: true });
+    return await interaction.reply({ content: errorMsg, ephemeral: true });
   }
 
   // Generate a unique code
@@ -1170,11 +1135,11 @@ export async function generateDkpCode(interaction) {
 
     const msg = `Code generated successfully: **${code}**\n- NOTE: It will expire in ${expiration} minutes.`;
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error generating code";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 }
 
@@ -1190,7 +1155,7 @@ export async function redeemDkpCode(interaction) {
   if (!code) {
     const msg = `Code is required.`;
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 
   try {
@@ -1203,7 +1168,7 @@ export async function redeemDkpCode(interaction) {
     if (codeSnapshot.empty) {
       const msg = `Invalid code.`;
       new Logger(interaction).log(PREFIX, msg);
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
     }
 
     const codeDoc = codeSnapshot.docs[0];
@@ -1217,14 +1182,14 @@ export async function redeemDkpCode(interaction) {
     ) {
       const msg = `You have already redeemed this code.`;
       new Logger(interaction).log(PREFIX, msg);
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
     }
 
     // Check if the code is expired
     if (isAfter(new Date(), codeData?.expirationDate.toDate())) {
       const msg = `Sorry, but this code has already expired.`;
       new Logger(interaction).log(PREFIX, msg);
-      return interaction.reply({ content: msg, ephemeral: true });
+      return await interaction.reply({ content: msg, ephemeral: true });
     }
 
     // Get the guild and user data
@@ -1267,13 +1232,13 @@ export async function redeemDkpCode(interaction) {
       redeemers: copyRedeemers,
     });
 
-    const msg = `Code redeemed successfully! Your DKP has been updated.`;
+    const msg = `Code of **+${codeData.amount}** was redeemed successfully! Your DKP has been updated.`;
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     const msg = "Error redeeming code";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 }
 
@@ -1348,7 +1313,7 @@ export const setRoleOnJoin = async (interaction) => {
       // Ensure the document exists
       if (!guildSnapshot.exists) {
         new Logger(interaction).log(PREFIX, "Guild document not found");
-        return interaction.reply({
+        return await interaction.reply({
           content: "Guild document not found",
           ephemeral: true,
         });
@@ -1380,11 +1345,11 @@ export const setRoleOnJoin = async (interaction) => {
     if (amount) {
       msg = msg.concat(`\n- Receive: **${amount ? amount : 0}** DKP`);
     }
-     return interaction.reply({ content: msg, ephemeral: true });
+     return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
     console.log(error)
     const msg = "Error updating decay";
     new Logger(interaction).log(PREFIX, msg);
-    return interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   }
 };

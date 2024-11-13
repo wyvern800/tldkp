@@ -1,4 +1,3 @@
-import { logError } from "../database/repository.js";
 import { Logger } from "./logger.js";
 
 import { config } from "dotenv";
@@ -36,11 +35,47 @@ export async function updateDkp(dkpArray, userId, amount, user, serverName, guil
         await user.send({ content: message, ephemeral: true });
       } catch (error) {
         const msg = `Could not send DM to user ${userId}`;
-        await logError({ name: serverName }, msg, error);
+        new Logger().error("[Discord.js]", msg, error);
       }
     }
   }
   
+/**
+ * Updates the DKP value for a user in the provided DKP array.
+ * 
+ * @param {Array} dkpArray - The array of DKP objects.
+ * @param {string} userId - The ID of the user to update.
+ * @param {number} amount - The amount to add or set for the user's DKP.
+ */
+export async function decreaseDkp(dkpArray, userId, amount, user, serverName, guildDataResponse) {
+  const userIndex = dkpArray.findIndex((memberDkp) => memberDkp?.userId === userId);
+
+  if (userIndex !== -1) {
+    // Calculate the new DKP value only once
+    const currentDkp = dkpArray[userIndex].dkp;
+    const newDkpValue = currentDkp - amount;
+
+    // If the new DKP value is less than 0, set it to 0
+    dkpArray[userIndex].dkp = newDkpValue < 0 ? 0 : newDkpValue;
+  } else {
+    // Create a new DKP object and add it to the array
+    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount };
+    dkpArray.push(newDKPObject);
+  }
+
+  // Send a private message to the user about the DKP update
+  const dmNotifications = guildDataResponse?.togglables?.dkpSystem?.dmNotifications;
+  if ((dmNotifications && dmNotifications === true) || dmNotifications === undefined || dmNotifications === null) {
+    const message = `Your DKP has been decreased to **${dkpArray[userIndex]?.dkp ?? (amount < 0 ? 0 : amount)}** in the server **${serverName}**.`;
+    try {
+      await user.send({ content: message, ephemeral: true });
+    } catch (error) {
+      const msg = `Could not send DM to user ${userId}`;
+      new Logger().error("[Discord.js]", msg, error);
+    }
+  }
+}
+
 
 /**
  * Sets the DKP value for a user in the provided DKP array and sends a private message.

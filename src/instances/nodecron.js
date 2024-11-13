@@ -40,7 +40,7 @@ const decay = async () => {
 
           if (
             lastUpdated &&
-            enabled &&
+            enabled === true &&
             (isEqual(new Date(), futureDate) || isAfter(new Date(), futureDate))
           ) {
             const togglables = "togglables.decaySystem";
