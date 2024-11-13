@@ -3,32 +3,33 @@ import path from "path";
 import cors from "cors";
 import { commands } from "../../utils/commands.js";
 import { parseRoutes, getRoutes } from "../middlewares/routeCapturer.js";
-import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
+import { clerkMiddleware } from "@clerk/express";
 import "dotenv/config";
 import Clerk from "../../utils/clerk.js";
 import ResponseBase from "../../utils/responses.js";
-import { getGuildsByOwnerOrUser, getAllGuilds } from "../../database/repository.js";
-import { config } from "dotenv";
+import {
+  getGuildsByOwnerOrUser,
+  getAllGuilds,
+} from "../../database/repository.js";
+import 'dotenv/config';
 import rateLimit from "express-rate-limit";
 import { protectedRouteMiddleware } from "../../src/middlewares/clerkAuth.js";
 
-config();
-
 export const createServer = (client) => {
-
   const app = express();
+
+  const clerkClient = Clerk.getInstance();
 
   const port = process.env.PORT || 3000;
 
-  // start clerk
-
   const limiter = rateLimit({
     windowMs: parseInt(process.env.MAX_REQ_TIME, 10),
-    max: parseInt(process.env.LIMIT_REQUESTS, 10)
+    max: parseInt(process.env.LIMIT_REQUESTS, 10),
   });
 
   // test
-  app.set('trust proxy', parseInt(process.env.TRUST_PROXY, 10))
+  app.set("trust proxy", parseInt(process.env.TRUST_PROXY, 10));
+
   /*app.get('/ip', (request, response) => {
     const clientIp = request.headers['true-client-ip'] || request.headers['x-forwarded-for'] || request.ip;
     console.log('Client IP:', clientIp);
@@ -45,13 +46,13 @@ export const createServer = (client) => {
     console.log(debugInfo);
     res.json(debugInfo); // Send the debug info as JSON
   });*/
-  
+
   app.use(
     cors({
-      origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
-      optionsSuccessStatus: 200
+      optionsSuccessStatus: 200,
     })
   );
 
@@ -65,10 +66,10 @@ export const createServer = (client) => {
 
   apiRouter.use(
     cors({
-      origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST"],
       allowedHeaders: ["Content-Type", "Authorization"],
-      optionsSuccessStatus: 200
+      optionsSuccessStatus: 200,
     })
   );
 
@@ -118,28 +119,28 @@ export const createServer = (client) => {
 
   apiRouter.use(limiter);
 
-  // Clerk middleware
-  apiRouter.use(ClerkExpressWithAuth());
+  // clerkMiddleware is required to be set in the middleware chain before req.auth is used
+  apiRouter.use(clerkMiddleware({ clerkClient }))
 
   // Protected route middleware
   apiRouter.use(protectedRouteMiddleware);
 
   apiRouter.get("/dashboard", async (req, res) => {
-      const { userDiscordId } = req;
+    const { userDiscordId } = req;
 
-      // Gets the data
-      if (userDiscordId) {
-        await getGuildsByOwnerOrUser(userDiscordId).then(guild => {
-          return new ResponseBase(res).success(guild);
-        });
-      }
+    // Gets the data
+    if (userDiscordId) {
+      await getGuildsByOwnerOrUser(userDiscordId).then((guild) => {
+        return new ResponseBase(res).success(guild);
+      });
+    }
   });
 
-  apiRouter.get('/admin', async (req, res) => {
+  apiRouter.get("/admin", async (req, res) => {
     const { userDiscordId } = req;
 
     if (userDiscordId) {
-      const adminDiscordIds = process.env.ADMINS?.split(","); 
+      const adminDiscordIds = process.env.ADMINS?.split(",");
       const isAdmin = adminDiscordIds.includes(userDiscordId);
 
       const allGuilds = await getAllGuilds();
