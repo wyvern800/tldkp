@@ -14,6 +14,7 @@ import {
 import 'dotenv/config';
 import rateLimit from "express-rate-limit";
 import { protectedRouteMiddleware } from "../../src/middlewares/clerkAuth.js";
+import { getPermissionVerbose } from "../../utils/commands.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -94,6 +95,7 @@ export const createServer = (client) => {
           options: command.options,
           commandCategory: command.commandCategory,
           new: command.new,
+          permissions: command?.permissions?.length ? command.permissions.map(permission => getPermissionVerbose(permission)) : []
         }))
       );
     },

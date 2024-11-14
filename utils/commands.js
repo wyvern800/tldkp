@@ -107,7 +107,7 @@ export const commands = [
       },
     ],
     commandExecution: api.handleUpdateDkp,
-    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.ModerateMembers],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System"
   },
   {
@@ -129,7 +129,7 @@ export const commands = [
       },
     ],
     commandExecution: api.checkOther,
-    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.ModerateMembers],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System"
   },
   {
@@ -321,7 +321,7 @@ export const commands = [
       },
     ],
     commandExecution: api.generateDkpCode,
-    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.ModerateMembers],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System",
     new: true
   },
@@ -386,14 +386,14 @@ export const commands = [
  * @param { PermissionFlagsBits } permission The permission
  * @returns Verbose way
  */
-const getPermissionVerbose = (permission) => {
+export const getPermissionVerbose = (permission) => {
   switch (permission) {
     case PermissionFlagsBits.Administrator:
       return "Administrator";
     case PermissionFlagsBits.UseApplicationCommands:
       return "Use Application Commands";
-    case PermissionFlagsBits.ModerateMembers:
-      return "Moderate Members";  
+    case PermissionFlagsBits.CreateEvents:
+      return "Create Events";  
     default:
       return "Unknown";
   }
