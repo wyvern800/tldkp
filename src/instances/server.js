@@ -10,15 +10,14 @@ import {
   getGuildsByOwnerOrUser,
   getAllGuilds,
 } from "../../database/repository.js";
-import 'dotenv/config';
+import "dotenv/config";
 import rateLimit from "express-rate-limit";
 import { protectedRouteMiddleware } from "../../src/middlewares/clerkAuth.js";
 import * as uiRepository from "../../database/repositoryUi.js";
 import { validatePostHud } from "../validators/index.js";
 import multer from "multer";
-import { Storage } from '@google-cloud/storage';
-import fs from 'fs';
-
+import Clerk from "../../utils/clerk.js";
+import { uploadFile } from "../../utils/index.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -27,24 +26,11 @@ export const createServer = (client) => {
 
   const port = process.env.PORT || 3000;
 
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, 'temp/');
-    },
-    filename: (req, file, cb) => {
-      cb(null, `${Date.now()}-${file.originalname}`);
-    },
-  });
+  const storage = multer.memoryStorage();
   const upload = multer({ storage });
 
-  const gc = new Storage({
-    keyFilename: 'path/to/your/firebase-service-account.json',
-    projectId: 'your-project-id',
-  });
-  
-  const bucket = gc.bucket('your-bucket-name');
+  // Initialize the storage bucket
 
-  // start clerk
 
   const limiter = rateLimit({
     windowMs: parseInt(process.env.MAX_REQ_TIME, 10),
@@ -53,6 +39,8 @@ export const createServer = (client) => {
 
   // test
   app.set("trust proxy", parseInt(process.env.TRUST_PROXY, 10));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   /*app.get('/ip', (request, response) => {
     const clientIp = request.headers['true-client-ip'] || request.headers['x-forwarded-for'] || request.ip;
@@ -73,7 +61,7 @@ export const createServer = (client) => {
 
   app.use(
     cors({
-      origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200,
@@ -87,10 +75,11 @@ export const createServer = (client) => {
   // Create a router for your /api routes
   const apiRouter = express.Router();
   apiRouter.use(express.json());
+  apiRouter.use(express.urlencoded({ extended: true }));
 
   apiRouter.use(
     cors({
-      origin: process.env.ENV === 'dev' ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200,
@@ -127,53 +116,19 @@ export const createServer = (client) => {
   apiRouter.get(
     "/huds",
     async (req, res) => {
-      const huds = await uiRepository.getAllHUDS();
-      if (huds) {
-        return new ResponseBase(res).success(huds);
-      } else {
-        return new ResponseBase(res).notFound('HUDs not found');
+      const { limit = 10, cursor = null } = req.query;
+      const parsedLimit = parseInt(limit, 10);
+      const parsedCursor = parseInt(cursor, 10);
+
+      try {
+        const hudsData = await uiRepository.getAllHUDS(parsedLimit, parsedCursor); 
+        return new ResponseBase(res).success(hudsData);
+      } catch (err) {
+        console.log(err)
+        return new ResponseBase(res).notFound("HUDs not found");
       }
     },
     "Endpoint that shows all the HUDs from the database"
-  );
-
-  apiRouter.post(
-    "/huds",
-    (req, res, next) => {
-      upload.fields([
-        { name: 'screenshots', maxCount: 3 },
-        { name: 'interfaceFile', maxCount: 1 },
-      ])(req, res, (err) => {
-        if (err) {
-          console.error('Error during file upload:', err);
-          return res.status(500).json({ status: 'error', message: 'File upload failed' });
-        }
-        next();
-      });
-    },
-    async (req, res) => {
-      const files = req.files;
-      const formData = req.body;
-
-      console.log(formData);
-      console.log(files)
-
-      return new ResponseBase(res).success(body);
-
-      /*const valid = validatePostHud(body);
-
-      if (!valid) {
-        return new ResponseBase(res).badRequest('Invalid payload');
-      }*/
-
-      /*const huds = await uiRepository.createHUD(body);
-      if (huds) {
-        return new ResponseBase(res).success(huds);
-      } else {
-        return new ResponseBase(res).error('Something unexpected happened');
-      }*/
-    },
-    "Endpoint that creates a HUD on the database"
   );
 
   apiRouter.get(
@@ -196,10 +151,95 @@ export const createServer = (client) => {
   apiRouter.use(limiter);
 
   // clerkMiddleware is required to be set in the middleware chain before req.auth is used
-  apiRouter.use(clerkMiddleware({ clerkClient }))
+  apiRouter.use(clerkMiddleware({ clerkClient }));
 
   // Protected route middleware
   apiRouter.use(protectedRouteMiddleware);
+
+  // File upload middleware
+  apiRouter.use(
+    "/huds",
+    upload.fields([
+      { name: "screenshots[]", minCount: 1, maxCount: 3 },
+      { name: "interfaceFile", minCount: 1, maxCount: 1 },
+    ])
+  );
+  apiRouter.post("/huds", async (req, res) => {
+    const { userDiscordId } = req;
+    const { title, description } = req.body;
+
+    if (userDiscordId) {
+      const { interfaceFile } = req.files;
+      let screenshots = req.files["screenshots[]"];
+
+      const formData = req.body;
+
+      if (!title || !description) {
+        return new ResponseBase().error("Title or description missing");
+      }
+
+      if (!interfaceFile || !interfaceFile[0]) {
+        return new ResponseBase().error("No interface file uploaded");
+      }
+
+      if (!screenshots?.length) {
+        return new ResponseBase().error("No screenshots uploaded");
+      }
+
+      const fileBuffer = interfaceFile[0]?.buffer;
+      const fileContent = fileBuffer.toString("utf-16le");
+
+      let body;
+      try {
+        // Remove BOM if present
+        const cleanedContent = fileContent.replace(/^\uFEFF/, "");
+        body = JSON.parse(cleanedContent);
+      } catch (error) {
+        return new ResponseBase(res).badRequest(
+          "Invalid JSON in interfaceFile"
+        );
+      }
+
+      const valid = validatePostHud(body);
+
+      if (!valid) {
+        return new ResponseBase(res).badRequest("Invalid interfaceFile");
+      }
+
+      const screenshotsUploaded = await Promise.all(
+        screenshots.map(async (screenshot) => await uploadFile("screenshots", screenshot))
+      ).then((values) => values);
+
+      const interfaceFileUploaded = await uploadFile("huds", interfaceFile[0]).then((value) => value);
+
+      if (screenshotsUploaded.length !== screenshots.length) {
+        return new ResponseBase(res).error("Error uploading screenshots");
+      }
+
+      if (!interfaceFileUploaded) {
+        return new ResponseBase(res).error("Error uploading interfaceFile");
+      }
+
+      const newHUD = {
+        screenshots: screenshotsUploaded,
+        interfaceFile: interfaceFileUploaded,
+        stars: 0,
+        downloads: 0,
+        title,
+        description,
+        userId: userDiscordId,
+      };
+
+      const huds = await uiRepository.createHUD(newHUD);
+      if (huds) {
+        return new ResponseBase(res).success(formData);
+      } else {
+        return new ResponseBase(res).error("Something unexpected happened");
+      }
+    } else {
+      return res.status(400).json({ error: "userDiscordId missing" });
+    }
+  });
 
   apiRouter.get("/dashboard", async (req, res) => {
     const { userDiscordId } = req;

@@ -15,10 +15,10 @@ export async function createHUD(uiData) {
     description: uiData?.description,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    screenshots: [],
-    interfaceFile: null,
+    screenshots: uiData?.screenshots,
+    interfaceFile: uiData?.interfaceFile,
     stars: 0,
-    downloads: 0
+    downloads: 0,
   };
 
   const res = await db.collection("huds").doc().set(defaultConfig);
@@ -26,27 +26,24 @@ export async function createHUD(uiData) {
   return res;
 }
 
+export async function getAllHUDS(limit = 10, startAfter = null) {
+  let query = db.collection("huds").orderBy("createdAt", "asc").limit(limit);
 
-export async function getAllHUDS() {
-  const cacheKey = `huds-all`;
-  let hudsData = cache.get(cacheKey);
-
-  if (!hudsData) {
-    const snapshot = await db.collection("huds").get();
-
-    if (snapshot.empty) {
-      new Logger().log(PREFIX, `No huds found`);
-      return [];
-    }
-
-    const huds = [];
-    snapshot.forEach((doc) => {
-      huds.push({ id: doc.id, ...doc.data() });
-    });
-
-    hudsData = huds;
-    cache.set(cacheKey, hudsData);
+  if (startAfter) {
+    query = query.startAfter(startAfter);
   }
 
-  return hudsData;
+  const snapshot = await query.get();
+
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No huds found`);
+    return [];
+  }
+
+  const huds = [];
+  snapshot.forEach((doc) => {
+    huds.push({ id: doc.id, ...doc.data() });
+  });
+
+  return huds;
 }

@@ -16,7 +16,6 @@ import {
 } from "@chakra-ui/react";
 import { IoChevronForward } from "react-icons/io5";
 import { useEffect, useState } from "react";
-import api from "../services/axiosInstance";
 import Modal from "../Components/Modal";
 import { formatDistance } from "date-fns";
 import { convertFirestoreTimestamp } from "../utils";
@@ -29,9 +28,10 @@ import {
 import { SignedIn } from "@clerk/clerk-react";
 import DrawerCreateUI from "../Components/DrawerCreateUI";
 import Carousel from "../Components/Carousel";
+import api from "../services/axiosInstance";
 
 export default function HudsPage() {
-  const [data, setData] = useState<any>([]);
+  const [data, setData] = useState<any[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [previewing, setPreviewing] = useState<any>(false);
   const {
@@ -40,15 +40,46 @@ export default function HudsPage() {
     onClose: onNewModalClose,
   } = useDisclosure();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [startAfter, setStartAfter] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [response, setResponse] = useState(null);
+  const [currentLimit, setCurrentLimit] = useState(4);
+
+  const fetchHUDs = async (limit = 4, startAfter = null) => {
+    setLoading(true);
+    const res = await api.get(`/huds`, {
+      params: {
+        limit,
+        startAfter,
+      },
+    });
+    const newHuds = res.data.data;
+    setData(prevHuds => {
+      const newUniqueHuds = newHuds.filter((hud: any) => !prevHuds.some(prevHud => prevHud.id === hud.id));
+      const newVal = [...prevHuds, ...newUniqueHuds];
+      if (newHuds.length < limit) {
+        setHasMore(false);
+      }
+      return newVal;
+    });
+    setStartAfter(newHuds.length > 0 ? newHuds[newHuds.length - 1].id : startAfter);
+    setHasMore(newHuds.length <= limit);
+    setLoading(false);
+    setLoaded(true);
+  };
 
   useEffect(() => {
-    const fetch = async () => {
-      const res = await api.get(`/huds`, {});
-      setData(res?.data?.data);
-      setLoaded(true);
-    };
-    fetch();
-  }, []);
+    fetchHUDs();
+  }, [response]);
+
+  const loadMoreHUDs = () => {
+    if (hasMore && !loading ) {
+      const next  = currentLimit + 4;
+      setCurrentLimit(next);
+      fetchHUDs(next, startAfter);
+    }
+  };
 
   function getDistance(date: string) {
     return formatDistance(convertFirestoreTimestamp(date), new Date(), {
@@ -162,6 +193,12 @@ export default function HudsPage() {
                 );
               })}
             </SimpleGrid>
+            
+            {hasMore && (
+              <Button isLoading={loading} disabled={loading} size="lg" onClick={loadMoreHUDs} mt="25px" mb="20px" loadingText='Loading' colorScheme='teal' variant='outline' >
+                Load More
+              </Button>
+            )}
           </main>
 
           {previewing && (
@@ -237,7 +274,7 @@ export default function HudsPage() {
             </Modal>
           )}
 
-          <DrawerCreateUI title="Upload your HUD" state={{ isOpen, onClose }} />
+          <DrawerCreateUI title="Upload your HUD" state={{ isOpen, onClose }} setResponse={setResponse} />
         </>
       </div>
     )

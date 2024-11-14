@@ -31,6 +31,7 @@ export function setupRealtimeUpdates() {
           `guilds-all`,
           `guilds-${docData.guildData?.ownerId}`,
           `dkp-${docId}`,
+          `huds-all`
         ];
 
         // Invalidate all relevant cache keys

@@ -66,17 +66,18 @@ function FileSelector({
         selectedFile = Array.from(files).slice(0, maxFiles).reverse();
         setValue(selectedFile);
         setValueFormState(name, selectedFile);
-        console.log('maior q 4')
       } else if (multiple && maxFiles > 1 && files.length === maxFiles) {
         selectedFile = Array.from(files);
         setValue(selectedFile);
         setValueFormState(name, selectedFile);
-        console.log(3)
+      } else if (files.length === 2) {
+        selectedFile = Array.from(files);
+        setValue(selectedFile);
+        setValueFormState(name, selectedFile);
       } else if (files.length === 1) {
         selectedFile = files[0];
         setValue(files[0]);
         setValueFormState(name, files[0]);
-        console.log(1)
       }
     }
   }
