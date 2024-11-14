@@ -19,6 +19,8 @@ import {
   TagLeftIcon,
   TagLabel,
   Badge,
+  Text,
+  Icon
 } from "@chakra-ui/react";
 import { CiAt } from "react-icons/ci";
 import { VscSymbolParameter } from "react-icons/vsc";
@@ -27,7 +29,7 @@ import icon from "../../assets/tl.webp";
 import api from "../../services/axiosInstance";
 import { CommandType, CommandOptions } from "../../types/CommandType";
 import { TiSortNumerically } from "react-icons/ti";
-import { MdDashboard } from "react-icons/md";
+import { MdDashboard, MdSubdirectoryArrowRight } from "react-icons/md";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
@@ -93,6 +95,7 @@ function Navbar() {
     return (
       <>
         <Heading>{category}</Heading>
+        <UnorderedList spacing="3">
         {commandsData
           ?.filter((command) => command.commandCategory === category)
           .map((command: CommandType, index) => {
@@ -135,9 +138,30 @@ function Navbar() {
                     }
                   )}
                 {command.description}
+                {command?.permissions?.length && (
+                  <>
+                    <HStack alignItems={"center"} mt="2">
+                      <Heading as='h6' size='xs' colorScheme="white" fontSize="xs">
+                        <Icon as={MdSubdirectoryArrowRight} /> Required Permissions:
+                      </Heading>
+                      {command?.permissions?.map(
+                        (permission: string, index: number) => (
+                          <Text
+                            key={`${permission}${index}`}
+                            colorScheme="white"
+                            fontSize="xs"
+                          >
+                            {permission}{index !== command?.permissions?.length - 1 ? ', ' : ''}
+                          </Text>
+                        )
+                      )}
+                    </HStack>
+                  </>
+                )}
               </ListItem>
             );
           })}
+        </UnorderedList>
       </>
     );
   };
@@ -247,9 +271,13 @@ function Navbar() {
           closeOnOverlayClick={true}
         >
           {commands && categories ? (
-            <UnorderedList spacing={3}>
+            <UnorderedList spacing={5}>
               {categories.map((category: string, index: number) => (
-                <Commands key={`${category}${index}`} commandsData={commands} category={category} />
+                <Commands
+                  key={`${category}${index}`}
+                  commandsData={commands}
+                  category={category}
+                />
               ))}
             </UnorderedList>
           ) : (
@@ -270,10 +298,12 @@ function Navbar() {
           isCentered={true}
           closeOnOverlayClick={true}
         >
-          <UnorderedList spacing={3}>  
+          <UnorderedList spacing={3}>
             {changelog.map((changelog: any, index) => (
               <ListItem key={index}>
-                <span style={{ textDecoration: 'underline'}}>{changelog.date}:</span>
+                <span style={{ textDecoration: "underline" }}>
+                  {changelog.date}:
+                </span>
                 <UnorderedList>
                   {changelog?.changes?.map((change: any) => {
                     return (
