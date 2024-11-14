@@ -151,7 +151,7 @@ function Navbar() {
                             colorScheme="white"
                             fontSize="xs"
                           >
-                            {permission}{index !== command?.permissions?.length - 1 ? ', ' : ''}
+                            {permission}{index !== (command?.permissions?.length ?? 0) - 1 ? ', ' : ''}
                           </Text>
                         )
                       )}
