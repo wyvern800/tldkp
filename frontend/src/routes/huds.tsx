@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,6 +15,7 @@ import {
   Text,
   Heading,
   useDisclosure,
+  useToast,
 } from "@chakra-ui/react";
 import { IoChevronForward } from "react-icons/io5";
 import { useEffect, useState } from "react";
@@ -30,6 +32,8 @@ import { SignedIn } from "@clerk/clerk-react";
 import DrawerCreateUI from "../Components/DrawerCreateUI";
 import Carousel from "../Components/Carousel";
 import api from "../services/axiosInstance";
+import { Icon } from "@chakra-ui/react";
+import { LinkIcon } from "@chakra-ui/icons";
 
 export default function HudsPage() {
   const [data, setData] = useState<any[]>([]);
@@ -46,6 +50,19 @@ export default function HudsPage() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
   const [currentLimit, setCurrentLimit] = useState(4);
+  const { hudId } = useParams<{ hudId: string }>();
+  const toast = useToast();
+
+  // Open specific HUD
+  useEffect(() => {
+    if (hudId && !loading && data) {
+      const theHud = data.find((hud) => hud.id === hudId);
+      if (theHud) {
+        setPreviewing(theHud);
+        onNewModalOpen();
+      }
+    }
+  }, [data, hudId]);
 
   const fetchHUDs = async (limit = 4, startAfter = null) => {
     setLoading(true);
@@ -231,7 +248,36 @@ export default function HudsPage() {
               title={
                 <>
                   <HStack justifyContent="space-between" marginTop="30px">
-                    <span>{previewing?.title}</span>
+                    <span>
+                      {previewing?.title}{" "}
+                      <Icon
+                        _hover={{ cursor: "pointer" }}
+                        boxSize={4}
+                        as={LinkIcon}
+                        onClick={() => {
+                          try {
+                            const currentUrl = window.location.href;
+                            const url = new URL(currentUrl);
+                            const prefix = url.host;
+                            navigator.clipboard.writeText(`${prefix}/huds/${previewing?.id}`);
+
+                            toast({
+                              title: "Link copied to clipboard",
+                              description:
+                                "You can now share this with your friends =)",
+                              status: "info",
+                              duration: 2000,
+                              isClosable: true,
+                            });
+                          } catch (error) {
+                            console.error(
+                              "Failed to copy to clipboard: ",
+                              error
+                            );
+                          }
+                        }}
+                      />
+                    </span>
                     <HStack gap="8px">
                       <Tag size="md" variant="solid" colorScheme="teal">
                         {getDistance(previewing?.createdAt)}
@@ -278,9 +324,10 @@ export default function HudsPage() {
                   })}
                 />
               )}
-              Remember to download this .azj file, rename it to be more user-friendly and place it under
-              your <Kbd>Documents\TL\UserHUD</Kbd> folder, then ingame you can
-              open the HUD editor and load it.
+              Remember to download this .azj file, rename it to be more
+              user-friendly and place it under your{" "}
+              <Kbd>Documents\TL\UserHUD</Kbd> folder, then ingame you can open
+              the HUD editor and load it.
               <Flex alignItems="center" justifyContent="center">
                 <Button
                   rightIcon={<DownloadIcon />}

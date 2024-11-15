@@ -39,6 +39,10 @@ const router = createBrowserRouter([
         path: "/huds"
       },
       {
+        element: <HudsPage />,
+        path: "/huds/:hudId"
+      },
+      {
         element: <DashboardLayout />,
         path: "dashboard",
         children: [{ path: "/dashboard", element: <DashboardPage /> }],
