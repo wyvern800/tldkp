@@ -23,4 +23,11 @@ export const changelog = [
       "We've corrected the display of people's discord data on the webapp"
     ]
   },
+  {
+    version: 'v1.0.2',
+    date: '2024-11-15',
+    changes: [
+      "Released this 'little-big' feature here, where people will be able to share their UI's with the community. I'll be pushing this today, so people can test it out. I decided to have this, since I didn't see any app with this functionality yet, will come this week",
+    ]
+  },
 ];
