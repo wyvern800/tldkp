@@ -259,7 +259,8 @@ export default function HudsPage() {
                             const currentUrl = window.location.href;
                             const url = new URL(currentUrl);
                             const prefix = url.host;
-                            navigator.clipboard.writeText(`${prefix}/huds/${previewing?.id}`);
+                            const method = url.protocol === "https:" ? "https://" : "http://";
+                            navigator.clipboard.writeText(`${method}${prefix}/huds/${previewing?.id}`);
                             toast({
                               title: "Link copied to clipboard",
                               description:
