@@ -7,7 +7,7 @@ import {
   ModalBody,
   ModalCloseButton,
 } from "@chakra-ui/react";
-import { ReactNode, useRef } from "react";
+import React, { ReactNode, useRef } from "react";
 
 type StatePropType = {
   isOpen: boolean;
@@ -21,12 +21,27 @@ type ModalPropTypes = {
     | React.ReactElement
     | React.ReactElement[]
     | string;
-  title: string;
+  title: string | React.ReactNode;
   actions?: React.ReactNode[];
   state: StatePropType;
   isCentered?: boolean;
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
+  size?:
+    | "xs"
+    | "sm"
+    | "md"
+    | "lg"
+    | "xl"
+    | "full"
+    | "3xl"
+    | "4xl"
+    | "5xl"
+    | "6xl"
+    | "7xl"
+    | "8xl"
+    | "9xl"
+    | "10xl";
 };
 
 function Modal({
@@ -35,7 +50,8 @@ function Modal({
   state,
   isCentered,
   closeOnOverlayClick,
-  closeOnEsc = false
+  closeOnEsc = false,
+  size = "4xl",
 }: ModalPropTypes): ReactNode {
   const { isOpen, onClose } = state ?? {};
 
@@ -51,7 +67,7 @@ function Modal({
         closeOnOverlayClick={closeOnOverlayClick}
         onClose={onClose}
         isCentered={isCentered}
-        size="3xl"
+        size={size}
         closeOnEsc={closeOnEsc}
       >
         <ModalOverlay
