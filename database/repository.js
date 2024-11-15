@@ -127,13 +127,29 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
             _guilds.map(async (guild) => {
               const { id, ownerId } = guild?.guildData;
               const guildData = discordBot?.guilds?.cache.get(id);
-              const owner = await guildData?.members?.fetch(ownerId) ?? {};
-              const avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 32 });
+              let owner = {};
+              let avatarURL = "";
 
+              // try and grab data
+              try {
+                owner = await guildData?.members?.fetch(ownerId);
+                avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 32 });
+              } catch (error) {
+                new Logger().log(PREFIX, `Owner not found for guild ${id}`);
+              }
+              
               const memberDkps = await Promise.all(
                 guild?.memberDkps.map(async (memberDkp) => {
-                  const memberData = await guildData?.members?.fetch(memberDkp?.userId) ?? {};
-                  const avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
+                  let memberData = {};
+                  let avatarURL = "";
+
+                  // try and grab data
+                  try {
+                    memberData = await guildData?.members?.fetch(memberDkp.userId);
+                    avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
+                  } catch (error) {
+                    new Logger().log(PREFIX, `Member not found for guild ${id}`);
+                  }
 
                   return {
                     ...memberDkp,
