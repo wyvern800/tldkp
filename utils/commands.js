@@ -107,14 +107,14 @@ export const commands = [
       },
     ],
     commandExecution: api.handleUpdateDkp,
-    permissions: [PermissionFlagsBits.Administrator],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System"
   },
   {
     name: "check",
     description: "Shows informations about your DKP",
     commandExecution: api.handleCheck,
-    permissions: [PermissionFlagsBits.SendMessages],
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "DKP System"
   },
   {
@@ -129,7 +129,7 @@ export const commands = [
       },
     ],
     commandExecution: api.checkOther,
-    permissions: [PermissionFlagsBits.Administrator],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System"
   },
   {
@@ -144,7 +144,7 @@ export const commands = [
       },
     ],
     commandExecution: api.updateNickname,
-    permissions: [PermissionFlagsBits.SendMessages],
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "General"
   },
   {
@@ -246,7 +246,7 @@ export const commands = [
       },
     ],
     commandExecution: api.changeLanguage,
-    permissions: [PermissionFlagsBits.SendMessages],
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "General"
   },
   {
@@ -261,7 +261,7 @@ export const commands = [
         ephemeral: true,
       });
     },
-    permissions: [PermissionFlagsBits.SendMessages],
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "General"
   },
   {
@@ -321,7 +321,7 @@ export const commands = [
       },
     ],
     commandExecution: api.generateDkpCode,
-    permissions: [PermissionFlagsBits.Administrator],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System",
     new: true
   },
@@ -337,7 +337,7 @@ export const commands = [
       },
     ],
     commandExecution: api.redeemDkpCode,
-    permissions: [PermissionFlagsBits.SendMessages],
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "DKP System",
     new: true
   },
@@ -382,6 +382,24 @@ export const commands = [
 ];
 
 /**
+ * Get permission in a verbose way
+ * @param { PermissionFlagsBits } permission The permission
+ * @returns Verbose way
+ */
+export const getPermissionVerbose = (permission) => {
+  switch (permission) {
+    case PermissionFlagsBits.Administrator:
+      return "Administrator";
+    case PermissionFlagsBits.UseApplicationCommands:
+      return "Use Application Commands";
+    case PermissionFlagsBits.CreateEvents:
+      return "Create Events";  
+    default:
+      return "Unknown";
+  }
+}
+
+/**
  * Handles the commands
  *
  * @param { string } commandName The command name
@@ -411,8 +429,9 @@ export async function handleCommands(interaction, commandName) {
 
   // Check if user can use this command
   if (!isInteractionPermitted(interaction, commandToFind.permissions)) {
+    const missingPermissions = commandToFind.permissions?.map((permission) => getPermissionVerbose(permission)).join(", ");
     interaction.reply({
-      content: "You don't have permission to use this command.",
+      content: `You don't have permission to use this command.\nYou're missing the permissions: **${missingPermissions}**`,
       ephemeral: true,
     });
   } else {

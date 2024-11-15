@@ -18,6 +18,7 @@ import { validatePostHud } from "../validators/index.js";
 import multer from "multer";
 import Clerk from "../../utils/clerk.js";
 import { uploadFile } from "../../utils/index.js";
+import { getPermissionVerbose } from "../../utils/commands.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -107,6 +108,7 @@ export const createServer = (client) => {
           options: command.options,
           commandCategory: command.commandCategory,
           new: command.new,
+          permissions: command?.permissions?.length ? command.permissions.map(permission => getPermissionVerbose(permission)) : []
         }))
       );
     },
@@ -246,7 +248,7 @@ export const createServer = (client) => {
 
     // Gets the data
     if (userDiscordId) {
-      await getGuildsByOwnerOrUser(userDiscordId).then((guild) => {
+      await getGuildsByOwnerOrUser(userDiscordId, client).then((guild) => {
         return new ResponseBase(res).success(guild);
       });
     }

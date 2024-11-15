@@ -1,7 +1,12 @@
 import { db } from "./firebase.js"; // Import Firestore
 import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
-import { updateDkp, decreaseDkp, setDkp, isPositiveNumber } from "../utils/index.js";
+import {
+  updateDkp,
+  decreaseDkp,
+  setDkp,
+  isPositiveNumber,
+} from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import { getMemberById } from "../utils/discord.js";
 import cache from "../utils/cache.js";
@@ -68,7 +73,7 @@ export async function getAllGuilds() {
   return guildsData;
 }
 
-export async function getGuildsByOwnerOrUser(userOrOwnerId) {
+export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
   const cacheKey = `guilds-${userOrOwnerId}`;
   let cachedData = cache.get(cacheKey);
 
@@ -110,7 +115,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
       if (filteredMembers.length > 0) {
         memberGuilds.push({
           ...data,
-          memberDkps: members, // Only include relevant members
+          memberDkps: members,
         });
       }
     });
@@ -121,17 +126,37 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
           return Promise.all(
             _guilds.map(async (guild) => {
               const { id, ownerId } = guild?.guildData;
-              const owner = await getMemberById(id, ownerId);
+              const guildData = discordBot?.guilds?.cache.get(id);
+              let owner = {};
+              let avatarURL = "";
 
+              // try and grab data
+              try {
+                owner = await guildData?.members?.fetch(ownerId);
+                avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 32 });
+              } catch (error) {
+                new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
+              }
+              
               const memberDkps = await Promise.all(
-                guild?.memberDkps.map(async (member) => {
-                  const memberDiscord = await getMemberById(id, member?.userId);
+                guild?.memberDkps.map(async (memberDkp) => {
+                  let memberData = {};
+                  let avatarURL = "";
+
+                  // try and grab data
+                  try {
+                    memberData = await guildData?.members?.fetch(memberDkp.userId);
+                    avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
+                  } catch (error) {
+                    new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
+                  }
 
                   return {
-                    ...member,
+                    ...memberDkp,
                     discordData: {
-                      displayName: memberDiscord?.user?.global_name ?? "",
-                      preferredColor: memberDiscord?.user?.accent_color,
+                      displayName: memberData?.user?.globalName ?? "",
+                      preferredColor: memberData?.user?.accentColor ?? "",
+                      avatarURL
                     },
                   };
                 })
@@ -142,8 +167,9 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId) {
                 guildData: {
                   ...guild?.guildData,
                   ownerDiscordData: {
-                    displayName: owner?.user?.global_name ?? "",
-                    preferredColor: owner?.user?.accent_color,
+                    displayName: owner?.user?.globalName ?? "",
+                    preferredColor: owner?.user?.accentColor ?? "",
+                    avatarURL
                   },
                 },
                 memberDkps,
@@ -589,7 +615,9 @@ export const handleCheck = async (interaction) => {
       const { ign, dkp } = response;
 
       return await interaction.reply({
-        content: `Your current DKP is **${dkp}**!\n${ign ? `In-game Nickname: **${ign}**` : ""}`,
+        content: `Your current DKP is **${dkp}**!\n${
+          ign ? `In-game Nickname: **${ign}**` : ""
+        }`,
         ephemeral: true,
       });
     }
@@ -1273,16 +1301,18 @@ export async function getAllCodes() {
 
 /**
  * Upadtes a guild config file
- * 
+ *
  * @param {string} guildId The guildId
  * @param {any} guildConfig The document we're updating
- * @returns 
+ * @returns
  */
 export async function updateGuildConfig(guildId, guildConfig) {
-  const response = await db.collection("guilds").doc(guildId).update(guildConfig);
+  const response = await db
+    .collection("guilds")
+    .doc(guildId)
+    .update(guildConfig);
   return response;
 }
-
 
 export const setRoleOnJoin = async (interaction) => {
   const role = interaction.options.getRole("role");
@@ -1292,9 +1322,12 @@ export const setRoleOnJoin = async (interaction) => {
     interaction.reply({ content: "Value must be above zero", ephemeral: true });
     return;
   }
-  
+
   if (!role && !amount) {
-    interaction.reply({ content: "You must specify at least a role or an amount", ephemeral: true });
+    interaction.reply({
+      content: "You must specify at least a role or an amount",
+      ephemeral: true,
+    });
     return;
   }
 
@@ -1331,8 +1364,10 @@ export const setRoleOnJoin = async (interaction) => {
       .collection("guilds")
       .doc(guildId)
       .update({
-        ...(amount ? {[`${prefix}.onJoinDKPAmount`]: amount ? amount : 0 } : undefined),
-        ...(role ? {[`${prefix}.roleToAssign`]: role.id } : undefined),
+        ...(amount
+          ? { [`${prefix}.onJoinDKPAmount`]: amount ? amount : 0 }
+          : undefined),
+        ...(role ? { [`${prefix}.roleToAssign`]: role.id } : undefined),
       });
 
     // Invalidate the cache
@@ -1345,9 +1380,9 @@ export const setRoleOnJoin = async (interaction) => {
     if (amount) {
       msg = msg.concat(`\n- Receive: **${amount ? amount : 0}** DKP`);
     }
-     return await interaction.reply({ content: msg, ephemeral: true });
+    return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
-    console.log(error)
+    console.log(error);
     const msg = "Error updating decay";
     new Logger(interaction).log(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });

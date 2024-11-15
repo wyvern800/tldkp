@@ -10,4 +10,5 @@ export interface CommandType {
   options: CommandOptions[]
   commandCategory: string;
   new: boolean;
+  permissions?: string[];
 } 
