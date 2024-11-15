@@ -260,7 +260,6 @@ export default function HudsPage() {
                             const url = new URL(currentUrl);
                             const prefix = url.host;
                             navigator.clipboard.writeText(`${prefix}/huds/${previewing?.id}`);
-
                             toast({
                               title: "Link copied to clipboard",
                               description:
