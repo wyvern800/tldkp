@@ -19,9 +19,7 @@ const PREFIX = "Discord.js/SlashCommands";
  * @returns { boolean } Wheter if its allowed or not
  */
 export function isInteractionPermitted(interaction, permissions) {
-  return permissions?.every((permission) =>
-    interaction?.member?.permissions.has(permission)
-  );
+  return permissions?.some((permission) => interaction?.member?.permissions.has(permission));
 }
 
 /**

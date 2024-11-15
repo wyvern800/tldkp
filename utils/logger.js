@@ -34,6 +34,17 @@ export class Logger {
   }
 
   /**
+   * Logs a message in a prettier way (without logging to Rollbar)
+   * 
+   * @param {string} prefix Prefix of the logging message
+   * @param {string} message The log message
+   */
+  logLocal(prefix, message) {
+    const msg = `[${this.guildName ? `${this.guildName}/` : ''}${prefix}] ${message}`;
+    console.log(msg);
+  }
+
+  /**
    * Logs an error message in a prettier way
    * 
    * @param {string} prefix Prefix of the logging message
