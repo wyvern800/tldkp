@@ -202,8 +202,8 @@ export default function DrawerCreateUI({
       })
       .then((res) => {
         toast({
-          title: "HUD created",
-          description: "Your HUD has been successfully created!",
+          title: "Your HUD has been successfully uploaded!",
+          description: "Now you must wait before it gets approved, so people can download",
           status: "success",
           duration: 4000,
           isClosable: true,

@@ -12,6 +12,7 @@ import {
   Flex,
   Kbd,
   Text,
+  Heading,
   useDisclosure,
 } from "@chakra-ui/react";
 import { IoChevronForward } from "react-icons/io5";
@@ -55,15 +56,19 @@ export default function HudsPage() {
       },
     });
     const newHuds = res.data.data;
-    setData(prevHuds => {
-      const newUniqueHuds = newHuds.filter((hud: any) => !prevHuds.some(prevHud => prevHud.id === hud.id));
+    setData((prevHuds) => {
+      const newUniqueHuds = newHuds.filter(
+        (hud: any) => !prevHuds.some((prevHud) => prevHud.id === hud.id)
+      );
       const newVal = [...prevHuds, ...newUniqueHuds];
       if (newHuds.length < limit) {
         setHasMore(false);
       }
       return newVal;
     });
-    setStartAfter(newHuds.length > 0 ? newHuds[newHuds.length - 1].id : startAfter);
+    setStartAfter(
+      newHuds.length > 0 ? newHuds[newHuds.length - 1].id : startAfter
+    );
     setHasMore(newHuds.length <= limit);
     setLoading(false);
     setLoaded(true);
@@ -74,8 +79,8 @@ export default function HudsPage() {
   }, [response]);
 
   const loadMoreHUDs = () => {
-    if (hasMore && !loading ) {
-      const next  = currentLimit + 4;
+    if (hasMore && !loading) {
+      const next = currentLimit + 4;
       setCurrentLimit(next);
       fetchHUDs(next, startAfter);
     }
@@ -169,35 +174,54 @@ export default function HudsPage() {
                 <b> You can share by clicking the button above.</b>
               </SignedIn>
             </Text>
-            <SimpleGrid
-              columns={2}
-              spacing={10}
-              flexDirection={["column", "row"]}
-              minChildWidth="320px"
-            >
-              {data?.map((hud: unknown | any) => {
-                return (
-                  <Image
-                    key={hud?.id}
-                    objectFit="cover"
-                    src={hud?.screenshots[0]}
-                    alt={hud?.name}
-                    borderRadius="15px"
-                    border={"2px solid transparent"}
-                    _hover={{ cursor: "pointer", border: "2px solid teal" }}
-                    onClick={() => {
-                      setPreviewing(hud);
-                      onNewModalOpen();
-                    }}
-                  />
-                );
-              })}
-            </SimpleGrid>
-            
-            {hasMore && (
-              <Button isLoading={loading} disabled={loading} size="lg" onClick={loadMoreHUDs} mt="25px" mb="20px" loadingText='Loading' colorScheme='teal' variant='outline' >
-                Load More
-              </Button>
+            <Heading size={"xs"} mt="3" mb="3">
+              (Note: The uploaded HUDS must be allowed to appear in this list)
+            </Heading>
+            {loaded ? (
+              <>
+                <SimpleGrid
+                  columns={2}
+                  spacing={10}
+                  flexDirection={["column", "row"]}
+                  minChildWidth="320px"
+                >
+                  {data?.map((hud: unknown | any) => {
+                    return (
+                      <Image
+                        key={hud?.id}
+                        objectFit="cover"
+                        src={hud?.screenshots[0]}
+                        alt={hud?.name}
+                        borderRadius="15px"
+                        border={"2px solid transparent"}
+                        _hover={{ cursor: "pointer", border: "2px solid teal" }}
+                        onClick={() => {
+                          setPreviewing(hud);
+                          onNewModalOpen();
+                        }}
+                      />
+                    );
+                  })}
+                </SimpleGrid>
+
+                {hasMore && (
+                  <Button
+                    isLoading={loading}
+                    disabled={loading}
+                    size="lg"
+                    onClick={loadMoreHUDs}
+                    mt="25px"
+                    mb="20px"
+                    loadingText="Loading"
+                    colorScheme="teal"
+                    variant="outline"
+                  >
+                    Load More
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Text>No data here</Text>
             )}
           </main>
 
@@ -212,14 +236,14 @@ export default function HudsPage() {
                       <Tag size="md" variant="solid" colorScheme="teal">
                         {getDistance(previewing?.createdAt)}
                       </Tag>
-                      <Tag size="md" variant="solid" colorScheme="orange">
+                      {/*<Tag size="md" variant="solid" colorScheme="orange">
                         {previewing?.stars?.toLocaleString()}
                         <StarIcon ml="5px" />
                       </Tag>
                       <Tag size="md" variant="solid" colorScheme="green">
                         {previewing?.downloads?.toLocaleString()}
                         <TriangleDownIcon ml="5px" />
-                      </Tag>
+                      </Tag>*/}
                     </HStack>
                   </HStack>
                 </>
@@ -254,7 +278,7 @@ export default function HudsPage() {
                   })}
                 />
               )}
-              Remember to download this .azj (azulejo) file, and place it under
+              Remember to download this .azj file, rename it to be more user-friendly and place it under
               your <Kbd>Documents\TL\UserHUD</Kbd> folder, then ingame you can
               open the HUD editor and load it.
               <Flex alignItems="center" justifyContent="center">
@@ -274,7 +298,11 @@ export default function HudsPage() {
             </Modal>
           )}
 
-          <DrawerCreateUI title="Upload your HUD" state={{ isOpen, onClose }} setResponse={setResponse} />
+          <DrawerCreateUI
+            title="Upload your HUD"
+            state={{ isOpen, onClose }}
+            setResponse={setResponse}
+          />
         </>
       </div>
     )

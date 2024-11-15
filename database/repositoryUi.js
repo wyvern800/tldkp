@@ -8,6 +8,10 @@ const PREFIX = "Firebase";
 
 config();
 
+/**
+ * Create a new HUD
+ * @param { any } uiData Data of the HUD
+ */
 export async function createHUD(uiData) {
   const defaultConfig = {
     userId: uiData?.userId,
@@ -19,13 +23,20 @@ export async function createHUD(uiData) {
     interfaceFile: uiData?.interfaceFile,
     stars: 0,
     downloads: 0,
+    allowed: false
   };
 
   const res = await db.collection("huds").doc().set(defaultConfig);
-  new Logger().log(PREFIX, `Ui added ${uiData.title}`);
+  new Logger().log(PREFIX, `HUD successfully uploaded: ${uiData.title}`);
   return res;
 }
 
+/**
+ * Gets all huds
+ * @param { number } limit Limit
+ * @param {*} startAfter Start cursor
+ * @returns 
+ */
 export async function getAllHUDS(limit = 10, startAfter = null) {
   let query = db.collection("huds").orderBy("createdAt", "asc").limit(limit);
 
@@ -33,7 +44,7 @@ export async function getAllHUDS(limit = 10, startAfter = null) {
     query = query.startAfter(startAfter);
   }
 
-  const snapshot = await query.get();
+  const snapshot = await query.where("allowed", "==", true).get();
 
   if (snapshot.empty) {
     new Logger().log(PREFIX, `No huds found`);
