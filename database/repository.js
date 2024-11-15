@@ -126,14 +126,14 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
           return Promise.all(
             _guilds.map(async (guild) => {
               const { id, ownerId } = guild?.guildData;
-              const guildData = discordBot.guilds.cache.get(id);
-              const owner = await guildData?.members.fetch(ownerId);
+              const guildData = discordBot?.guilds?.cache.get(id);
+              const owner = await guildData?.members?.fetch(ownerId);
               const avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 512 });
 
               const memberDkps = await Promise.all(
                 guild?.memberDkps.map(async (memberDkp) => {
-                  const memberData = await guildData?.members.fetch(memberDkp?.userId);
-                  const avatarURL = memberData.user.displayAvatarURL({ dynamic: true, size: 32 });
+                  const memberData = await guildData?.members?.fetch(memberDkp?.userId);
+                  const avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
 
                   return {
                     ...memberDkp,
