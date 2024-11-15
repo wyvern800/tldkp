@@ -135,7 +135,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
                 owner = await guildData?.members?.fetch(ownerId);
                 avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 32 });
               } catch (error) {
-                new Logger().log(PREFIX, `Owner not found for guild ${id}`);
+                new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
               }
               
               const memberDkps = await Promise.all(
@@ -148,7 +148,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
                     memberData = await guildData?.members?.fetch(memberDkp.userId);
                     avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
                   } catch (error) {
-                    new Logger().log(PREFIX, `Member not found for guild ${id}`);
+                    new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
                   }
 
                   return {
