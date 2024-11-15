@@ -213,13 +213,6 @@ function Navbar() {
             >
               Whats new?
             </Button>
-            <SignedOut>
-              <Link to="/sign-in">
-                <Button leftIcon={<FaDiscord />} colorScheme="teal">
-                  Login with Discord
-                </Button>
-              </Link>
-            </SignedOut>
             <Button
               leftIcon={<RiSlashCommands />}
               colorScheme="teal"
@@ -240,6 +233,14 @@ function Navbar() {
             >
               Add to my server
             </Button>
+
+            <SignedOut>
+              <Link to="/sign-in">
+                <Button leftIcon={<FaDiscord />} colorScheme="teal">
+                  Login with Discord
+                </Button>
+              </Link>
+            </SignedOut>
 
             {/*<Icon
               _hover={{ cursor: "pointer", opacity: 0.7 }}
