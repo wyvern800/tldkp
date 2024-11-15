@@ -1,6 +1,7 @@
-import discord from "discord.js";
-const { REST, Routes } = discord;
+import discord, { Routes } from "discord.js";
+const { REST } = discord;
 import { config } from "dotenv";
+import { Logger } from "../utils/logger.js";
 
 config();
 
@@ -18,6 +19,6 @@ export async function getMemberById(guildId, memberId) {
       Routes.guildMember(guildId, memberId)
     );
   } catch (error) {
-    // new Logger().log("Discord.js", "Member couuld not be found");
+    new Logger().log("Discord.js", "Member couuld not be found");
   }
 }

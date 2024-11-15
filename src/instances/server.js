@@ -132,7 +132,7 @@ export const createServer = (client) => {
 
     // Gets the data
     if (userDiscordId) {
-      await getGuildsByOwnerOrUser(userDiscordId).then((guild) => {
+      await getGuildsByOwnerOrUser(userDiscordId, client).then((guild) => {
         return new ResponseBase(res).success(guild);
       });
     }

@@ -16,7 +16,7 @@ import {
   Tag,
   HStack,
   Spacer,
-  Text,
+  Text
 } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
 import styled from "styled-components";
@@ -121,8 +121,8 @@ const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode =>
                                   player?.discordData ?? {};
                                 const { userId, dkp, ign } = player;
                                 return (
-                                  <Tr key={`${userId}${index}`} color="#81E6D9" bgColor={"#26c0ab24"}>
-                                    <Td><strong>{displayName}</strong></Td>
+                                  <Tr key={`${userId}${index}`} color="#81E6D9" bgColor={"#26c0ab24"}>                                   
+                                    <Td><HStack display="flex" alignItems={"center"}><Logo style={{ width: "25px", borderRadius: "50px" }} src={player?.discordData?.avatarURL ?? ""} /> <strong>{displayName}</strong></HStack></Td>
                                     <Td><strong>{ign ?? ""}</strong></Td>
                                     <Td isNumeric><strong>{dkp}</strong></Td>
                                   </Tr>
@@ -137,7 +137,7 @@ const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode =>
                                 const { userId, dkp, ign } = player;
                                 return (
                                   <Tr key={`${userId}${index}`}>
-                                    <Td>{displayName}</Td>
+                                    <Td><HStack display="flex" alignItems={"center"}><Logo style={{ width: "25px", borderRadius: "50px" }} src={player?.discordData?.avatarURL ?? ""} /> <span>{displayName}</span></HStack></Td>
                                     <Td>{ign ?? ""}</Td>
                                     <Td isNumeric>{dkp}</Td>
                                   </Tr>

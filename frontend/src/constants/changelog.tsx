@@ -20,6 +20,7 @@ export const changelog = [
       "We've added rollbar to monitor the app, so if any major error happens, we should act faster",
       "We've fixed the error of wrongly decaying the DKP, now it's working as expected",
       "/claim command now shows better info about the claimed DKP code",
+      "We've corrected the display of people's discord data on the webapp"
     ]
   },
 ];
