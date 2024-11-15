@@ -69,6 +69,22 @@ class ResponseBase {
         date: new Date(),
       });
   }
+
+  /**
+   * Gets an error response
+   * @param {any} data Error data
+   * @returns Response
+   */
+  badRequest(data) {
+    return this.#response
+      .status(400)
+      .json({
+        status: 400,
+        data: data ?? "Bad request",
+        status: 400,
+        date: new Date(),
+      });
+  }
 }
 
 export default ResponseBase;

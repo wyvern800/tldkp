@@ -37,6 +37,7 @@ import { RiSlashCommands } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 import { BsFillMegaphoneFill } from "react-icons/bs";
 import { changelog } from "../../constants/changelog";
+import { SiMaterialdesignicons } from "react-icons/si";
 
 function Navbar() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -206,6 +207,21 @@ function Navbar() {
           </Box>
           <Spacer />
           <Stack direction={["column", "row"]} alignItems="center" gap="5">
+            <Tooltip
+              hasArrow
+              label="Share and get other player's HUDS"
+              colorScheme="gray.600"
+              placement="auto-start"
+            >
+              <Link to="/huds">
+                <Button leftIcon={<SiMaterialdesignicons />} colorScheme="teal">
+                  HUDS
+                  <Badge ml="3" colorScheme="black">
+                    New
+                  </Badge>
+                </Button>
+              </Link>
+            </Tooltip>
             <Button
               leftIcon={<BsFillMegaphoneFill />}
               colorScheme="teal"

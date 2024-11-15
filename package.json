@@ -17,6 +17,8 @@
     "@clerk/backend": "1.16.1",
     "@clerk/express": "1.3.11",
     "@clerk/shared": "2.12.1",
+    "@google-cloud/storage": "^7.14.0",
+    "ajv": "^8.17.1",
     "axios": "1.7.7",
     "cors": "2.8.5",
     "date-fns": "4.1.0",
@@ -25,9 +27,13 @@
     "express": "4.21.0",
     "express-rate-limit": "7.4.1",
     "firebase-admin": "12.6.0",
+    "multer": "^1.4.5-lts.1",
+    "next-themes": "^0.4.3",
     "node-cache": "5.1.2",
     "node-cron": "3.0.3",
-    "rollbar": "^2.26.4"
+    "react-icons": "^5.3.0",
+    "rollbar": "^2.26.4",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "concurrently": "^9.0.1",
