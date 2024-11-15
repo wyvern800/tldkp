@@ -22,8 +22,8 @@ import { formatDistance } from "date-fns";
 import { convertFirestoreTimestamp } from "../utils";
 import {
   DownloadIcon,
-  TriangleDownIcon,
-  StarIcon,
+  //TriangleDownIcon,
+  //StarIcon,
   ArrowUpIcon,
 } from "@chakra-ui/icons";
 import { SignedIn } from "@clerk/clerk-react";
