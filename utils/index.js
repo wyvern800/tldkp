@@ -2,6 +2,8 @@ import { Logger } from "./logger.js";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "dotenv";
 import { admin } from "../database/firebase.js";
+import { items } from "../database/allItems.js";
+import { EmbedBuilder } from "discord.js";
 
 config();
 
@@ -225,4 +227,50 @@ export async function uploadFile(directory, file) {
       })
       .end(file.buffer);
   });
+}
+
+/**
+ * Create or modify auction embed
+ *
+ * @param {{ embedBuilder, data }} params Parameters
+ */
+export function createOrModifyAuctionEmbed({ embedBuilder = null, data }) {
+  let newEmbed = !embedBuilder
+    ? new EmbedBuilder()
+    : EmbedBuilder.from(embedBuilder);
+  return newEmbed
+    .setTitle(`An auction for ${data?.itemName?.trim()} is now running!`)
+    .setDescription(
+      `With the minimum price starting at: **${data?.startingPrice?.toString()} DKP**!`
+    )
+    .addFields(
+      { name: "Item", value: data?.itemName?.trim() },
+      {
+        name: "Starting price",
+        value: data?.startingPrice?.toString(),
+        inline: true,
+      },
+      { name: "Max price", value: data?.maxPrice?.toString(), inline: true },
+      { name: "Gap between bids:", value: data?.gapBetweenBids, inline: true }
+    )
+    .addFields(
+      { name: "Starting at:", value: data?.startingAt, inline: true },
+      {
+        name: "Auction valid until:",
+        value: data?.auctionMaxTime,
+        inline: true,
+      }
+    )
+    .setFooter({
+      text: `Highest bid (Winning): ${
+        data.highestBidder
+          ? `${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP`
+          : "Nobody"
+      }`,
+      iconURL: "https://i.imgur.com/pvlqPKu.png",
+    })
+    .setColor(data?.modalColor ?? 0x0099ff)
+    .setThumbnail(
+      items.find((item) => item.name.trim() === data?.itemName.trim())?.image
+    );
 }

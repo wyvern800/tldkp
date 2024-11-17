@@ -11,7 +11,10 @@ import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import cache from "../utils/cache.js";
 import { config } from "dotenv";
 import { isAfter, add, formatDistance } from "date-fns";
-import { generateClaimCode } from "../utils/index.js";
+import {
+  generateClaimCode,
+  createOrModifyAuctionEmbed,
+} from "../utils/index.js";
 import {
   TextInputBuilder,
   TextInputStyle,
@@ -19,9 +22,9 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder
+  EmbedBuilder,
 } from "discord.js";
-import items from "../database/items.json" assert { type: "json" };
+import { items } from "../database/allItems.js";
 
 const PREFIX = "Firebase";
 
@@ -1430,9 +1433,9 @@ export const setRoleOnJoin = async (interaction) => {
  */
 export const handleAuctionAutocomplete = async (interaction) => {
   const focusedValue = interaction.options.getFocused();
-  const choices = items.map((item) => item.name);
+  const choices = items.map((item) => item.name?.trim());
   const filtered = choices.filter((choice) =>
-    choice.toLowerCase().includes(focusedValue.toLowerCase())
+    choice.toLowerCase().trim().includes(focusedValue.toLowerCase().trim())
   );
 
   await interaction.respond(
@@ -1440,6 +1443,11 @@ export const handleAuctionAutocomplete = async (interaction) => {
   );
 };
 
+/**
+ * Handle the modal submission for creating an auction
+ *
+ * @param {any} interaction Handle the modal submission for creating an auction
+ */
 export const handleSubmitModalCreateAuction = async (interaction) => {
   const [, itemName] = interaction.customId.split("#").slice(1);
   try {
@@ -1472,11 +1480,22 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
     }
 
     const parsedMaxPrice = parseFloat(maxPrice);
-    if (maxPrice && isNaN(maxPrice) && parsedMaxPrice < parsedStartingPrice && parsedMaxPrice <= 0) {
-      errors.push("Max price must be a number, greater than 0, and greater than the starting price'.");
+    if (
+      maxPrice &&
+      isNaN(maxPrice) &&
+      parsedMaxPrice < parsedStartingPrice &&
+      parsedMaxPrice <= 0
+    ) {
+      errors.push(
+        "Max price must be a number, greater than 0, and greater than the starting price'."
+      );
     }
 
-    if (gapBetweenBids && isNaN(gapBetweenBids) && parsedMaxPrice < parsedStartingPrice ) {
+    if (
+      gapBetweenBids &&
+      isNaN(gapBetweenBids) &&
+      parsedMaxPrice < parsedStartingPrice
+    ) {
       errors.push("Gap between bids must be a number and greater 0'.");
     }
 
@@ -1488,14 +1507,29 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
 
     const dateRegexAuctionMaxTime = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
     if (!dateRegexAuctionMaxTime.test(auctionMaxTime)) {
-      errors.push("Auction max time must be in the format dd/mm/yyyy-hh:mm:ss.");
+      errors.push(
+        "Auction max time must be in the format dd/mm/yyyy-hh:mm:ss."
+      );
     }
 
     // Validate startingAt is a future date
-    const parsedStartingAt = new Date(startingAt.split('/').reverse().join('-').replace('-', 'T'));
-    const parsedAuctionMaxTime = new Date(auctionMaxTime.split('/').reverse().join('-').replace('-', 'T'));
+    const parsedStartingAt = new Date(
+      startingAt.replace(
+        /(\d{2})\/(\d{2})\/(\d{4})-(\d{2}):(\d{2}):(\d{2})/,
+        "$3-$2-$1T$4:$5:$6"
+      )
+    );
+    const parsedAuctionMaxTime = new Date(
+      auctionMaxTime.replace(
+        /(\d{2})\/(\d{2})\/(\d{4})-(\d{2}):(\d{2}):(\d{2})/,
+        "$3-$2-$1T$4:$5:$6"
+      )
+    );
 
-    if (isNaN(parsedStartingAt.getTime()) || isNaN(parsedAuctionMaxTime.getTime())) {
+    if (
+      isNaN(parsedStartingAt.getTime()) ||
+      isNaN(parsedAuctionMaxTime.getTime())
+    ) {
       errors.push("Invalid date format for startingAt or auctionMaxTime.");
     } else if (parsedStartingAt <= new Date()) {
       errors.push("Starting time must be a future date.");
@@ -1503,30 +1537,29 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
       errors.push("Starting time must be before the auction max time.");
     }
 
-    const number = parseFloat(startingPrice); // Convert to a number
-    await interaction.editReply({
-      content: `You entered the number: ${number}`,
-    });
-
     if (errors.length > 0) {
       return await interaction.editReply({
-      content: errors.join("\n -"),
+        content: "- " + errors.join("\n -"),
+      });
+    } else {
+      await interaction.editReply({
+        content: `All done, everything is set up! Now its time to see them battling =)`,
+        ephemeral: true,
       });
     }
 
-    const auctionEmbed = new EmbedBuilder()
-      .setTitle("New Auction Created")
-      .addFields(
-        { name: "Item Name", value: itemName },
-        { name: "Starting Price", value: startingPrice.toString() },
-        { name: "Max Price", value: maxPrice.toString() },
-        { name: "Starting At", value: startingAt },
-        { name: "Auction Max Time", value: auctionMaxTime },
-        { name: "Gap Between Bids", value: gapBetweenBids }
-      )
-      .setTimestamp();
+    const embedBuilder = createOrModifyAuctionEmbed({
+      data: {
+        itemName,
+        startingPrice,
+        maxPrice,
+        gapBetweenBids,
+        startingAt,
+        auctionMaxTime,
+      },
+    });
 
-    await interaction.followUp({ embeds: [auctionEmbed] });
+    await interaction.followUp({ embeds: [embedBuilder] });
   } catch (error) {
     console.error("Error handling modal submission:", error);
     if (!interaction.replied) {
