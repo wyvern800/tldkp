@@ -1,5 +1,5 @@
 import discord from "discord.js";
-const { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } = discord;
+const { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits, InteractionType } = discord;
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
@@ -362,6 +362,27 @@ export const commands = [
     commandCategory: "DKP System",
     new: true
   },
+  {
+    name: "auction-create",
+    description:
+      "Creates an auction for an item",
+    options: [
+      {
+        name: "item",
+        type: ApplicationCommandOptionType.String,
+        description: "The name of the item",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+    commandExecution: api.createAuction,
+    handleAutocomplete: api.handleAuctionAutocomplete,
+    handleSubmitModal: api.handleSubmitModalCreateAuction,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "DKP System",
+    new: true
+  },
+
   /*{
     name: "clear",
     description: "Cleans messages from a channel (Limited to 100 messages)",
@@ -398,6 +419,20 @@ export const getPermissionVerbose = (permission) => {
 }
 
 /**
+ * Answer correct based on the kind of the interaction
+ * 
+ * @param {any} interaction The interaction
+ * @param {any} answer The answer
+ */
+const anwerInteraction = async (interaction, answer) => {
+  if (interaction.isCommand() || interaction.type === InteractionType.ModalSubmit) {
+    return await interaction.reply(answer);
+  } else {
+    return await interaction.respond(answer);
+  } 
+}
+
+/**
  * Handles the commands
  *
  * @param { string } commandName The command name
@@ -405,11 +440,20 @@ export const getPermissionVerbose = (permission) => {
 export async function handleCommands(interaction, commandName) {
   const userId = interaction.user.id;
 
-  if (isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE)) {
-    interaction.reply({
-      content: "You have exceeded the maximum number of commands per minute. Please try again later.",
-      ephemeral: true,
-    });
+  if (interaction.isCommand() && isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE)) {
+    try {
+      await anwerInteraction(interaction, {
+        content: "You have exceeded the maximum number of commands per minute. Please try again later.",
+        ephemeral: true,
+      });
+    } catch (error) {
+      console.log(error)
+      new Logger(interaction).logLocal(
+        `${PREFIX}`,
+        `Error sending message to user about rate limit`,
+        error
+      );
+    }
     return;
   }
 
@@ -428,23 +472,103 @@ export async function handleCommands(interaction, commandName) {
   // Check if user can use this command
   if (!isInteractionPermitted(interaction, commandToFind.permissions)) {
     const missingPermissions = commandToFind.permissions?.map((permission) => getPermissionVerbose(permission)).join(", ");
-    interaction.reply({
-      content: `You don't have permission to use this command.\nYou're missing the permissions: **${missingPermissions}**`,
-      ephemeral: true,
-    });
+    try {
+      await anwerInteraction(interaction, {
+        content: `You don't have permission to use this command.\nYou're missing the permissions: **${missingPermissions}**`,
+        ephemeral: true,
+      });
+    } catch (error) {
+      new Logger(interaction).logLocal(
+        `${PREFIX}`,
+        `Error sending message to user about missing permissions`,
+        error
+      );
+    }
   } else {
     try {
-      return commandToFind.commandExecution(interaction);
+        return commandToFind.commandExecution(interaction);
     } catch (e) {
       new Logger(interaction).error(
         `${PREFIX}`,
         `Error executing command: ${commandName}`,
         e
       );
-      return await interaction.reply({
+      let toRespond = anwerInteraction(interaction, {
         content: "An error occurred while executing the command.",
         ephemeral: true,
       });
+      return await toRespond;
     }
+  }
+}
+
+/**
+ * Handles the submit of a modal
+ * @param {any} interaction  The interaction
+ * @param {*} commandName The commandName we're ggint the interaction from
+ */
+export const handleAutoComplete = async (interaction, commandName) => {
+  const commandToFind = commands?.find(
+    (c) => c.name?.toLowerCase() === commandName
+  );
+
+  if (!commandToFind) {
+    new Logger(interaction).log(
+      `${PREFIX}/SlashCommand`,
+      `Command not found: ${commandName}`
+    );
+    return;
+  }
+
+  try {
+    return commandToFind.handleAutocomplete(interaction);
+  } catch (e) {
+    new Logger(interaction).error(
+      `${PREFIX}`,
+      `Error parsing autocompletion for command: ${commandName}`,
+      e
+    );
+    let toRespond = anwerInteraction(interaction, {
+      content: "An error occurred while executing the command.",
+      ephemeral: true,
+    });
+    return await toRespond;
+  }
+}
+
+/**
+ * Handles the submit of a modal
+ * @param {any} interaction  The interaction
+ */
+export const handleSubmitModal = async (interaction) => {
+  const [command,] = interaction.customId.split("#");
+  console.log(1)
+  console.log(command)
+  
+  const commandToFind = commands?.find(
+    (c) => c.name?.toLowerCase() === command
+  );
+
+  if (!commandToFind) {
+    new Logger(interaction).log(
+      `${PREFIX}/SlashCommand`,
+      `Command not found: ${command}`
+    );
+    return;
+  }
+
+  try {
+    return commandToFind.handleSubmitModal(interaction);
+  } catch (e) {
+    new Logger(interaction).error(
+      `${PREFIX}`,
+      `Error sumitting modal for command: ${command}`,
+      e
+    );
+    let toRespond = anwerInteraction(interaction, {
+      content: "An error occurred while executing the command.",
+      ephemeral: true,
+    });
+    return await toRespond;
   }
 }

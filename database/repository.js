@@ -8,11 +8,20 @@ import {
   isPositiveNumber,
 } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
-import { getMemberById } from "../utils/discord.js";
 import cache from "../utils/cache.js";
 import { config } from "dotenv";
 import { isAfter, add, formatDistance } from "date-fns";
 import { generateClaimCode } from "../utils/index.js";
+import {
+  TextInputBuilder,
+  TextInputStyle,
+  ModalBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder
+} from "discord.js";
+import items from "../database/items.json" assert { type: "json" };
 
 const PREFIX = "Firebase";
 
@@ -133,11 +142,17 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
               // try and grab data
               try {
                 owner = await guildData?.members?.fetch(ownerId);
-                avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 32 });
+                avatarURL = owner?.user.displayAvatarURL({
+                  dynamic: true,
+                  size: 32,
+                });
               } catch (error) {
-                new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
+                new Logger().logLocal(
+                  PREFIX,
+                  `Owner not found for guild ${id}`
+                );
               }
-              
+
               const memberDkps = await Promise.all(
                 guild?.memberDkps.map(async (memberDkp) => {
                   let memberData = {};
@@ -145,10 +160,18 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
 
                   // try and grab data
                   try {
-                    memberData = await guildData?.members?.fetch(memberDkp.userId);
-                    avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
+                    memberData = await guildData?.members?.fetch(
+                      memberDkp.userId
+                    );
+                    avatarURL = memberData?.user?.displayAvatarURL({
+                      dynamic: true,
+                      size: 32,
+                    });
                   } catch (error) {
-                    new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
+                    new Logger().logLocal(
+                      PREFIX,
+                      `Member not found for guild ${id}`
+                    );
                   }
 
                   return {
@@ -156,7 +179,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
                     discordData: {
                       displayName: memberData?.user?.globalName ?? "",
                       preferredColor: memberData?.user?.accentColor ?? "",
-                      avatarURL
+                      avatarURL,
                     },
                   };
                 })
@@ -169,7 +192,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
                   ownerDiscordData: {
                     displayName: owner?.user?.globalName ?? "",
                     preferredColor: owner?.user?.accentColor ?? "",
-                    avatarURL
+                    avatarURL,
                   },
                 },
                 memberDkps,
@@ -1142,8 +1165,19 @@ export async function generateDkpCode(interaction) {
   // Generate a unique code
   const code = generateClaimCode();
 
+  let expirationDate = null;
+  const errorToReturn = "Something unexpected happened, please generate again";
+
   // Calculate expiration date
-  const expirationDate = add(new Date(), { minutes: expiration });
+  try {
+    expirationDate = add(new Date(), { minutes: expiration });
+  } catch (e) {
+    return await interaction.reply({ content: errorToReturn, ephemeral: true });
+  }
+
+  if (!expirationDate) {
+    return await interaction.reply({ content: errorToReturn, ephemeral: true });
+  }
 
   // Create the code document
   const codeData = {
@@ -1386,5 +1420,237 @@ export const setRoleOnJoin = async (interaction) => {
     const msg = "Error updating decay";
     new Logger(interaction).log(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
+  }
+};
+
+/**
+ * Handle the autocompletion of the item name for the auction
+ *
+ * @param {any} interaction The interaction
+ */
+export const handleAuctionAutocomplete = async (interaction) => {
+  const focusedValue = interaction.options.getFocused();
+  const choices = items.map((item) => item.name);
+  const filtered = choices.filter((choice) =>
+    choice.toLowerCase().includes(focusedValue.toLowerCase())
+  );
+
+  await interaction.respond(
+    filtered.slice(0, 25).map((choice) => ({ name: choice, value: choice }))
+  );
+};
+
+export const handleSubmitModalCreateAuction = async (interaction) => {
+  const [, itemName] = interaction.customId.split("#").slice(1);
+  try {
+    // Defer the interaction response immediately
+    await interaction.deferReply({ ephemeral: true });
+
+    const [command] = interaction.customId.split("#");
+    const startingPrice = interaction.fields.getTextInputValue(
+      `${command}#startingPrice`
+    );
+    const maxPrice = interaction.fields.getTextInputValue(
+      `${command}#maxPrice`
+    );
+    const startingAt = interaction.fields.getTextInputValue(
+      `${command}#startingAt`
+    );
+    const auctionMaxTime = interaction.fields.getTextInputValue(
+      `${command}#auctionMaxTime`
+    );
+    const gapBetweenBids = interaction.fields.getTextInputValue(
+      `${command}#gapBetweenBids`
+    );
+
+    let errors = [];
+
+    // Validate if it's a number
+    const parsedStartingPrice = parseFloat(startingPrice);
+    if (isNaN(startingPrice) && parsedStartingPrice <= 0) {
+      errors.push("Starting price must be a number and greater than 0.");
+    }
+
+    const parsedMaxPrice = parseFloat(maxPrice);
+    if (maxPrice && isNaN(maxPrice) && parsedMaxPrice < parsedStartingPrice && parsedMaxPrice <= 0) {
+      errors.push("Max price must be a number, greater than 0, and greater than the starting price'.");
+    }
+
+    if (gapBetweenBids && isNaN(gapBetweenBids) && parsedMaxPrice < parsedStartingPrice ) {
+      errors.push("Gap between bids must be a number and greater 0'.");
+    }
+
+    // Validate startingAt format
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
+    if (!dateRegex.test(startingAt)) {
+      errors.push("Starting time must be in the format dd/mm/yyyy-hh:mm:ss.");
+    }
+
+    const dateRegexAuctionMaxTime = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
+    if (!dateRegexAuctionMaxTime.test(auctionMaxTime)) {
+      errors.push("Auction max time must be in the format dd/mm/yyyy-hh:mm:ss.");
+    }
+
+    // Validate startingAt is a future date
+    const parsedStartingAt = new Date(startingAt.split('/').reverse().join('-').replace('-', 'T'));
+    const parsedAuctionMaxTime = new Date(auctionMaxTime.split('/').reverse().join('-').replace('-', 'T'));
+
+    if (isNaN(parsedStartingAt.getTime()) || isNaN(parsedAuctionMaxTime.getTime())) {
+      errors.push("Invalid date format for startingAt or auctionMaxTime.");
+    } else if (parsedStartingAt <= new Date()) {
+      errors.push("Starting time must be a future date.");
+    } else if (parsedStartingAt >= parsedAuctionMaxTime) {
+      errors.push("Starting time must be before the auction max time.");
+    }
+
+    const number = parseFloat(startingPrice); // Convert to a number
+    await interaction.editReply({
+      content: `You entered the number: ${number}`,
+    });
+
+    if (errors.length > 0) {
+      return await interaction.editReply({
+      content: errors.join("\n -"),
+      });
+    }
+
+    const auctionEmbed = new EmbedBuilder()
+      .setTitle("New Auction Created")
+      .addFields(
+        { name: "Item Name", value: itemName },
+        { name: "Starting Price", value: startingPrice.toString() },
+        { name: "Max Price", value: maxPrice.toString() },
+        { name: "Starting At", value: startingAt },
+        { name: "Auction Max Time", value: auctionMaxTime },
+        { name: "Gap Between Bids", value: gapBetweenBids }
+      )
+      .setTimestamp();
+
+    await interaction.followUp({ embeds: [auctionEmbed] });
+  } catch (error) {
+    console.error("Error handling modal submission:", error);
+    if (!interaction.replied) {
+      await interaction.reply({
+        content: "An unexpected error occurred.",
+        ephemeral: true,
+      });
+    }
+  }
+};
+
+/**
+ *
+ *
+ * @param {any} interaction The interaction
+ */
+export const createAuction = async (interaction) => {
+  const itemName = interaction.options.getString("item");
+
+  if (!itemName) {
+    await interaction.reply({
+      content: "You must select an item to create an auction!",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const yes = new ButtonBuilder()
+    .setCustomId("confirm")
+    .setLabel("Confirm")
+    .setStyle(ButtonStyle.Success);
+
+  const no = new ButtonBuilder()
+    .setCustomId("cancel")
+    .setLabel("Cancel")
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder().addComponents([yes, no]);
+
+  await interaction.reply({
+    content: `Are you sure you want to select: **${itemName.trim()}**?`,
+    ephemeral: true,
+    components: [row],
+  });
+
+  const collectorFilter = (i) => i.user.id === interaction.user.id;
+
+  try {
+    const confirmation = await interaction.channel.awaitMessageComponent({
+      filter: collectorFilter,
+      time: 60_000,
+    });
+
+    if (confirmation.customId === "confirm") {
+      const modal = new ModalBuilder()
+        .setCustomId(`auction-create#modal#${itemName}`)
+        .setTitle("Enter Auction Details");
+
+      const startingPrice = new TextInputBuilder()
+        .setCustomId("auction-create#startingPrice")
+        .setLabel("Bid starting price:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Enter a number here")
+        .setRequired(true);
+
+      const maxPrice = new TextInputBuilder()
+        .setCustomId("auction-create#maxPrice")
+        .setLabel("Bid max price:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Enter a number here")
+        .setRequired(false);
+
+      const startingAt = new TextInputBuilder()
+        .setCustomId("auction-create#startingAt")
+        .setLabel("Starting time:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Type in format (dd/mm/yyyy:hh:mm:ss)")
+        .setRequired(true);
+
+      const auctionMaxTime = new TextInputBuilder()
+        .setCustomId("auction-create#auctionMaxTime")
+        .setLabel("Auction max time:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Type in format (dd/mm/yyyy:hh:mm:ss)")
+        .setRequired(true);
+
+      const gapBetweenBids = new TextInputBuilder()
+        .setCustomId("auction-create#gapBetweenBids")
+        .setLabel("Gap between bids:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(
+          "For example: 5 (only bids that have a difference of 5 or more will be accepted)"
+        )
+        .setRequired(true);
+
+      const actionRow = new ActionRowBuilder().addComponents(startingPrice);
+      const actionRow1 = new ActionRowBuilder().addComponents(maxPrice);
+      const actionRow2 = new ActionRowBuilder().addComponents(startingAt);
+      const actionRow3 = new ActionRowBuilder().addComponents(auctionMaxTime);
+      const actionRow4 = new ActionRowBuilder().addComponents(gapBetweenBids);
+
+      modal.addComponents([
+        actionRow,
+        actionRow1,
+        actionRow2,
+        actionRow3,
+        actionRow4,
+      ]);
+
+      // Show the modal via the confirmation interaction
+      await confirmation.showModal(modal);
+    } else if (confirmation.customId === "cancel") {
+      await confirmation.update({
+        content: "Action cancelled",
+        ephemeral: true,
+        components: [],
+      });
+    }
+  } catch (e) {
+    console.log(e);
+    await interaction.editReply({
+      content: "Confirmation not received within 1 minute, cancelling",
+      ephemeral: true,
+      components: [],
+    });
   }
 };

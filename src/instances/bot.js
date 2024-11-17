@@ -1,5 +1,5 @@
-import { Client, GatewayIntentBits, PermissionFlagsBits } from "discord.js";
-import { handleCommands } from "../../utils/commands.js";
+import { Client, GatewayIntentBits, InteractionType } from "discord.js";
+import { handleCommands, handleAutoComplete, handleSubmitModal } from "../../utils/commands.js";
 import { loadCommands } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
@@ -17,7 +17,8 @@ export const createBotClient = () => {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.DirectMessages,
-      GatewayIntentBits.GuildMembers
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessageReactions
     ],
   });
 
@@ -98,10 +99,14 @@ export const createBotClient = () => {
 
   // When interactions happen
   client.on("interactionCreate", async (interaction) => {
+    const { commandName } = interaction;
     if (interaction.isCommand()) {
-      const { commandName } = interaction;
-
       await handleCommands(interaction, commandName?.toLowerCase());
+    } else if (interaction.type === InteractionType.ModalSubmit){
+      const [command,] = interaction.customId.split("#");
+      await handleSubmitModal(interaction, command?.toLowerCase());
+    } else if (interaction.isAutocomplete()) {
+      await handleAutoComplete(interaction, commandName?.toLowerCase());
     }
   });
 
