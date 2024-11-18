@@ -24,15 +24,22 @@ export const createBotClient = () => {
 
   // When bot is started
   client.once("ready", async () => {
-    await loadCommands(client)
+    await Promise.all([
+      loadCommands(client)
       .then(() => new Logger().log(PREFIX, `Logged in as ${client.user.tag}!`))
-      .catch(() => new Logger().error(PREFIX, `Failed to load commands`))
-      .finally(() =>
-        new Logger().log(
-          PREFIX,
-          `Bot is in ${client.guilds.cache.size} guild(s).`
-        )
-      );
+      .catch(() => new Logger().error(PREFIX, `Failed to load commands`)),
+        api.loadAllAuctions(client)
+      .then((auctions) => new Logger().log(PREFIX, `Loaded ${auctions} auctions.`))
+      .catch((e) => {
+         console.log(e);
+         new Logger().error(PREFIX, `Failed to load auctions`) 
+        })
+    ]).finally(() =>
+      new Logger().log(
+      PREFIX,
+      `Bot is in ${client.guilds.cache.size} guild(s).`
+      )
+    );
   });
 
   // When the bot joins a new guild

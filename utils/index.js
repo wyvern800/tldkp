@@ -3,7 +3,12 @@ import { v4 as uuidv4 } from "uuid";
 import { config } from "dotenv";
 import { admin } from "../database/firebase.js";
 import { items } from "../database/allItems.js";
-import { EmbedBuilder } from "discord.js";
+import {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from "discord.js";
 
 config();
 
@@ -232,45 +237,133 @@ export async function uploadFile(directory, file) {
 /**
  * Create or modify auction embed
  *
- * @param {{ embedBuilder, data }} params Parameters
+ * @param { highestBidder: {  name: string, bid: number }, modalColor: string } data Data
+ * 
  */
-export function createOrModifyAuctionEmbed({ embedBuilder = null, data }) {
-  let newEmbed = !embedBuilder
-    ? new EmbedBuilder()
-    : EmbedBuilder.from(embedBuilder);
-  return newEmbed
-    .setTitle(`An auction for ${data?.itemName?.trim()} is now running!`)
-    .setDescription(
-      `With the minimum price starting at: **${data?.startingPrice?.toString()} DKP**!`
-    )
-    .addFields(
-      { name: "Item", value: data?.itemName?.trim() },
-      {
-        name: "Starting price",
-        value: data?.startingPrice?.toString(),
-        inline: true,
-      },
-      { name: "Max price", value: data?.maxPrice?.toString(), inline: true },
-      { name: "Gap between bids:", value: data?.gapBetweenBids, inline: true }
-    )
-    .addFields(
-      { name: "Starting at:", value: data?.startingAt, inline: true },
-      {
-        name: "Auction valid until:",
-        value: data?.auctionMaxTime,
-        inline: true,
-      }
-    )
-    .setFooter({
-      text: `Highest bid (Winning): ${
-        data.highestBidder
-          ? `${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP`
-          : "Nobody"
-      }`,
+export function createOrModifyAuctionEmbed(data) {
+  console.log("createOrModifyAuctionEmbed")
+  let newEmbed = new EmbedBuilder();
+
+  // Create buttons
+  let components = null;
+
+  const bidComponent = new ButtonBuilder()
+    .setCustomId("bid")
+    .setLabel("Bid")
+    .setEmoji("🤑")
+    .setStyle(ButtonStyle.Secondary);
+  const startAuctionComponent = new ButtonBuilder()
+    .setCustomId("start_auction")
+    .setLabel("Start Auction now!")
+    .setEmoji("💸")
+    .setStyle(ButtonStyle.Success);
+  const stopAuctionComponent = new ButtonBuilder()
+    .setCustomId("stop_auction")
+    .setLabel("Cancel auction now")
+    .setEmoji("✖️")
+    .setStyle(ButtonStyle.Danger);
+
+  // The buttons
+  if (data?.auctionStatus === "scheduled") {
+    components = [startAuctionComponent];
+  } else if (data?.auctionStatus === "started") {
+    components = [bidComponent, stopAuctionComponent];
+  } else {
+    components = null;
+  }
+
+  let row = null;
+
+  if (components?.length) {
+    row = new ActionRowBuilder().addComponents(components);
+  }
+
+  let theEmbed = newEmbed
+  .setTitle(
+    `An auction for ${data?.itemName?.trim()} ${data?.auctionPrefix} ${
+      data?.auctionStatus
+    }!`
+  )
+  .setDescription(
+    `With the minimum price starting at: **${data?.startingPrice?.toString()} DKP**!`
+  )
+  .addFields(
+    { name: "Item", value: data?.itemName?.trim() },
+    {
+      name: "Starting price",
+      value: `${data?.startingPrice?.toString()} DKP`,
+      inline: true,
+    },
+    {
+      name: "Max price",
+      value: `${data?.maxPrice?.toString()} DKP`,
+      inline: true,
+    },
+    {
+      name: "Gap between bids:",
+      value: `${data?.gapBetweenBids} DKP`,
+      inline: true,
+    }
+  )
+  .addFields(
+    { name: "Starting at:", value: data?.startingAt, inline: true },
+    {
+      name: "Auction valid until:",
+      value: data?.auctionMaxTime,
+      inline: true,
+    },
+    {
+      name: "How to bid?",
+      value: `[Click to Learn](https://discordjs.guide/ 'Click here to learn how to bid')`,
+      inline: true,
+    }
+  )
+  /*.addFields({
+    name: "Auction ID (Used to interact with: /auction-start and /auction-cancel)",
+    value: `${data?.auctionId}`,
+    inline: true,
+  })*/
+  .setColor(data?.modalColor ?? 0x0099ff)
+  .setThumbnail(
+    items.find((item) => item.name.trim() === data?.itemName.trim())?.image
+  );
+
+  // Only show bidders if the auction is not scheduled or cancelled
+  if (data?.auctionStatus !== "scheduled" && data?.auctionStatus !== "cancelled") {
+    const hasBidder = data?.highestBidder;
+    let textBidder = `Highest bid (Winning): Nobody has bid yet!`;
+    if (hasBidder) {
+      textBidder = `Highest bid (Winning): ${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP`;
+    }
+    newEmbed.setFooter({
+      text: textBidder,
       iconURL: "https://i.imgur.com/pvlqPKu.png",
-    })
-    .setColor(data?.modalColor ?? 0x0099ff)
-    .setThumbnail(
-      items.find((item) => item.name.trim() === data?.itemName.trim())?.image
-    );
+    });
+  }
+
+  const toReturn = {
+    embed: theEmbed,
+    components: (row === null ? null : [row]),
+  }
+
+  //console.log(toReturn);
+
+  return toReturn;
+}
+
+
+export function convertFirestoreTimestamp(timestamp) {
+  // Convert Firestore _seconds and _nanoseconds to milliseconds
+  const date = new Date(timestamp._seconds * 1000 + timestamp._nanoseconds / 1000000);
+  return date;
+}
+
+export function convertDateStringToDateObject(time) {
+  const parsed = new Date(
+    time.replace(
+      /(\d{2})\/(\d{2})\/(\d{4})-(\d{2}):(\d{2}):(\d{2})/,
+      "$3-$2-$1T$4:$5:$6"
+    )
+  );
+  return parsed;
 }

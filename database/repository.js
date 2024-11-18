@@ -6,14 +6,16 @@ import {
   decreaseDkp,
   setDkp,
   isPositiveNumber,
+  convertDateStringToDateObject,
 } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import cache from "../utils/cache.js";
 import { config } from "dotenv";
-import { isAfter, add, formatDistance } from "date-fns";
+import { isAfter, add, formatDistance, isBefore, isEqual } from "date-fns";
 import {
   generateClaimCode,
   createOrModifyAuctionEmbed,
+  convertFirestoreTimestamp,
 } from "../utils/index.js";
 import {
   TextInputBuilder,
@@ -22,7 +24,6 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
 } from "discord.js";
 import { items } from "../database/allItems.js";
 
@@ -53,6 +54,68 @@ export async function getGuildConfig(guildId) {
   }
 
   return guildData;
+}
+
+/**
+ * Gets the guild config
+ *
+ * @param { string } guildId The guild id
+ * @returns { any } Data
+ */
+export async function getAuctionData(auctionId) {
+  const cacheKey = `auction-${auctionId}`;
+  let auctionData = cache.get(cacheKey);
+
+  if (!auctionData) {
+    const auctionSnapshot = await db
+      .collection("auctions")
+      .doc(auctionId)
+      .get();
+
+    if (!auctionSnapshot.exists) {
+      new Logger().log(PREFIX, `No auction found with id ${auctionId}`);
+      return null;
+    }
+
+    auctionData = auctionSnapshot.data();
+    cache.set(cacheKey, auctionData);
+  }
+
+  return auctionData;
+}
+
+/**
+ *
+ * @param {any} discordBot The discord bot
+ * @returns {Promise<void>}
+ */
+export async function loadAllAuctions(discordBot) {
+  const auctionsSnapshot = await db.collection("auctions").get();
+
+  if (auctionsSnapshot.empty) {
+    new Logger().log(PREFIX, `No auctions found`);
+    return;
+  }
+
+  const auctions = [];
+  auctionsSnapshot.forEach((doc) => {
+    auctions.push({ id: doc.id, ...doc.data() });
+  });
+
+  for (const auction of auctions) {
+    try {
+      let channel = await discordBot.channels.fetch(auction.data.channelId);
+      let message = await channel.messages.fetch(auction.data.messageId);
+
+      if (channel && message) {
+        updateAuction({ _message: message, auction });
+      }
+    } catch (e) {
+      console.log(e);
+      new Logger().logLocal(PREFIX, `Error loading auction ${auction.id}`, e);
+    }
+  }
+  return auctions?.length;
 }
 
 /**
@@ -313,6 +376,21 @@ export async function guildCreate(guild) {
   const res = await db.collection("guilds").doc(guild.id).set(defaultConfig);
   new Logger().log(PREFIX, `Config added for guild ${guild.id}`);
   return res;
+}
+
+/**
+ * Create the auction
+ *
+ * @param { string } guildId The guild id
+ * @returns { any } Response
+ */
+async function auctionCreate(auctionData) {
+  const res = await db.collection("auctions").add(auctionData);
+  if (res) {
+    return auctionData;
+  } else {
+    return false;
+  }
 }
 
 /**
@@ -1444,6 +1522,260 @@ export const handleAuctionAutocomplete = async (interaction) => {
 };
 
 /**
+ * Parses the status of the auction
+ *
+ * @param { string } auctionStatus
+ * @returns Parse the status
+ */
+export const statusParser = (_auctionStatus) => {
+  let auctionPrefix = "";
+  let auctionStatus = "";
+  let modalColor = 0x000000;
+
+  switch (_auctionStatus) {
+    case "started":
+      auctionPrefix = "has been";
+      auctionStatus = "started";
+      modalColor = 0x00ff99;
+      break;
+    case "cancelled":
+      auctionPrefix = "has been";
+      auctionStatus = "cancelled";
+      modalColor = 0xff0000;
+      break;
+    case "scheduled":
+      auctionPrefix = "has been";
+      auctionStatus = "scheduled";
+      modalColor = 0xffff00;
+      break;
+    default:
+      auctionPrefix = "has been";
+      auctionStatus = "finished";
+      modalColor = 0x00ff00;
+      break;
+  }
+
+  return {
+    prefix: auctionPrefix,
+    status: auctionStatus,
+    modal: modalColor,
+  };
+};
+
+export const updateAuction = ({ _message = null, auction }) => {
+  const message = _message;
+
+  const firestoreAuctionMaxTime =
+    auction?.auctionMaxTime instanceof admin.firestore.Timestamp
+      ? convertFirestoreTimestamp(auction?.auctionMaxTime)
+      : auction?.auctionMaxTime;
+  const firestoreStarting =
+    auction?.startingAt instanceof admin.firestore.Timestamp
+      ? convertFirestoreTimestamp(auction?.startingAt)
+      : auction?.startingAt;
+
+  const formattedStarting = firestoreStarting
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+    .replace(",", "")
+    .replace(" ", "-");
+
+  const formattedMaxTime = firestoreAuctionMaxTime
+    .toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+    .replace(",", "")
+    .replace(" ", "-");
+
+  const dynamicAuctionStatus = () => {
+    const now = new Date();
+
+    if (isBefore(now, firestoreStarting)) {
+      return "scheduled";
+    } else if (
+      isEqual(now, firestoreAuctionMaxTime) ||
+      isAfter(now, firestoreAuctionMaxTime)
+    ) {
+      return "finalized";
+    } else if (
+      isAfter(now, firestoreStarting) &&
+      isBefore(now, firestoreAuctionMaxTime)
+    ) {
+      return "started";
+    } else {
+      return "cancelled";
+    }
+  };
+
+  let theEmbed;
+  let theComponents;
+
+  const { prefix, status, modal } = statusParser(dynamicAuctionStatus());
+  const { embed, components } = createOrModifyAuctionEmbed({
+    itemName: auction.itemName,
+    startingPrice: `${auction.startingPrice}`,
+    maxPrice: `${auction.maxPrice}`,
+    gapBetweenBids: `${auction.gapBetweenBids}`,
+    startingAt: `${formattedStarting}`,
+    auctionMaxTime: `${formattedMaxTime}`,
+    auctionPrefix: prefix,
+    auctionStatus: status,
+    modalColor: modal,
+  });
+  theEmbed = embed;
+  theComponents = components;
+
+  (async () => {
+    try {
+      await message.edit({
+        embeds: [theEmbed],
+        components: theComponents ? theComponents : [],
+      });
+    } catch (error) {
+      console.error("Error editing message:", error);
+      await i.reply({
+        content: "An error occurred while editing the message.",
+        ephemeral: true,
+      });
+    }
+  })();
+
+  // Create an interaction collector
+  const filter = (i) =>
+    ["bid", "start_auction", "stop_auction"].includes(i.customId);
+  const collector = message.createMessageComponentCollector({
+    filter,
+    time: firestoreAuctionMaxTime?.getTime() - Date.now(),
+  });
+
+  collector.on("collect", async (i) => {
+    if (i.customId === "bid") {
+      console.log(`${i.user.tag} bid`);
+    } else if (i.customId === "start_auction") {
+      const userId = i?.user?.id;
+
+      const isUserOwner = auction.ownerDiscordId === userId;
+
+      console.log("isOwner", isUserOwner);
+
+      if (!isUserOwner) {
+        await i.reply({
+          content: "You are not the owner of this auction, and can't do that.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      let embed, components;
+      try {
+        const { prefix, status, modal } = statusParser("started");
+
+        ({ embed, components } = createOrModifyAuctionEmbed({
+          itemName: auction.itemName,
+          startingPrice: `${auction.startingPrice}`,
+          maxPrice: `${auction.maxPrice}`,
+          gapBetweenBids: `${auction.gapBetweenBids}`,
+          startingAt: `${formattedStarting}`,
+          auctionMaxTime: `${formattedMaxTime}`,
+          auctionPrefix: prefix,
+          auctionStatus: status,
+          modalColor: modal,
+        }));
+      } catch (error) {
+        console.error("Error in createOrModifyAuctionEmbed:", error);
+        await i.reply({
+          content: "An error occurred while modifying the auction embed.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      try {
+        await message.edit({
+          embeds: [embed],
+          components: components ? components : [],
+        });
+        console.log(`${i.user.tag} start.`);
+      } catch (error) {
+        console.error("Error editing message:", error);
+        await i.reply({
+          content: "An error occurred while editing the message.",
+          ephemeral: true,
+        });
+      }
+    } else if (i.customId === "stop_auction") {
+      // STOP_AUCTION
+      const userId = i?.user?.id;
+
+      const isUserOwner = auction.ownerDiscordId === userId;
+
+      console.log("isOwner", isUserOwner);
+
+      if (!isUserOwner) {
+        await i.reply({
+          content: "You are not the owner of this auction, and can't do that.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      let embed, components;
+      try {
+        const { prefix, status, modal } = statusParser("cancelled");
+
+        ({ embed, components } = createOrModifyAuctionEmbed({
+          itemName: auction.itemName,
+          startingPrice: `${auction.startingPrice}`,
+          maxPrice: `${auction.maxPrice}`,
+          gapBetweenBids: `${auction.gapBetweenBids}`,
+          startingAt: `${formattedStarting}`,
+          auctionMaxTime: `${formattedMaxTime}`,
+          auctionPrefix: prefix,
+          auctionStatus: status,
+          modalColor: modal,
+        }));
+      } catch (error) {
+        console.error("Error in createOrModifyAuctionEmbed:", error);
+        await i.reply({
+          content: "An error occurred while modifying the auction embed.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      try {
+        await message.edit({
+          embeds: [embed],
+          components: components ? components : [],
+        });
+        console.log(`${i.user.tag} start.`);
+      } catch (error) {
+        console.error("Error editing message:", error);
+        await i.reply({
+          content: "An error occurred while editing the message.",
+          ephemeral: true,
+        });
+      }
+    }
+  });
+
+  collector.on("end", (collected) => {
+    console.log(`Collected ${collected.size} interactions.`);
+  });
+};
+
+/**
  * Handle the modal submission for creating an auction
  *
  * @param {any} interaction Handle the modal submission for creating an auction
@@ -1513,18 +1845,8 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
     }
 
     // Validate startingAt is a future date
-    const parsedStartingAt = new Date(
-      startingAt.replace(
-        /(\d{2})\/(\d{2})\/(\d{4})-(\d{2}):(\d{2}):(\d{2})/,
-        "$3-$2-$1T$4:$5:$6"
-      )
-    );
-    const parsedAuctionMaxTime = new Date(
-      auctionMaxTime.replace(
-        /(\d{2})\/(\d{2})\/(\d{4})-(\d{2}):(\d{2}):(\d{2})/,
-        "$3-$2-$1T$4:$5:$6"
-      )
-    );
+    const parsedStartingAt = convertDateStringToDateObject(startingAt);
+    const parsedAuctionMaxTime = convertDateStringToDateObject(auctionMaxTime);
 
     if (
       isNaN(parsedStartingAt.getTime()) ||
@@ -1548,18 +1870,82 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
       });
     }
 
-    const embedBuilder = createOrModifyAuctionEmbed({
+    /**
+     * TODO: bids = [{ userId: string, bidValue: number, createdAt: Date }]
+     */
+    const { modal, prefix, status } = statusParser("scheduled");
+    const auctionDTO = {
+      itemName,
+      auctionMaxTime: parsedAuctionMaxTime,
+      gapBetweenBids: parseFloat(gapBetweenBids),
+      maxPrice: parseFloat(maxPrice),
+      startingAt: parsedStartingAt,
+      startingPrice: parseFloat(startingPrice),
+      auctionStatus: status,
+      ownerDiscordId: interaction.user.id,
       data: {
+        guildId: interaction.guild.id,
+      },
+      bids: [],
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    try {
+      let { embed, components } = createOrModifyAuctionEmbed({
+        auctionId: "ff",
         itemName,
         startingPrice,
         maxPrice,
         gapBetweenBids,
         startingAt,
         auctionMaxTime,
-      },
-    });
+        auctionPrefix: prefix,
+        auctionStatus: status,
+        modalColor: modal,
+      });
 
-    await interaction.followUp({ embeds: [embedBuilder] });
+      try {
+        // Send the embed with buttons
+        const followUpMessage = await interaction.followUp({
+          embeds: [embed],
+          components: components ? components : undefined,
+        });
+
+        const parsedAuctionDTO = {
+          ...auctionDTO,
+          data: {
+            ...auctionDTO.data,
+            channelId: followUpMessage.channel.id,
+            messageId: followUpMessage.id,
+          },
+        };
+
+        await auctionCreate(parsedAuctionDTO).then(async (auction) => {
+          try {
+            updateAuction({ _message: followUpMessage, auction });
+          } catch (err) {
+            new Logger().log(PREFIX, `Error creating auction: ${err}`);
+            await interaction.followUp({
+              content: "An unexpected error occurred.",
+              ephemeral: true,
+            });
+          }
+        });
+      } catch (err) {
+        new Logger().log(PREFIX, `Error creating auction: ${err}`);
+        await interaction.followUp({
+          content: "An unexpected error occurred.",
+          ephemeral: true,
+        });
+      }
+    } catch (err) {
+      new Logger().log(PREFIX, `Error creating auction: ${err}`);
+      await interaction.followUp({
+        content: "An unexpected error occurred.",
+        ephemeral: true,
+      });
+    }
   } catch (error) {
     console.error("Error handling modal submission:", error);
     if (!interaction.replied) {
@@ -1651,23 +2037,25 @@ export const createAuction = async (interaction) => {
         .setLabel("Gap between bids:")
         .setStyle(TextInputStyle.Short)
         .setPlaceholder(
-          "For example: 5 (only bids that have a difference of 5 or more will be accepted)"
+          "Only bids that have a difference of X or more will be accepted"
         )
         .setRequired(true);
 
-      const actionRow = new ActionRowBuilder().addComponents(startingPrice);
-      const actionRow1 = new ActionRowBuilder().addComponents(maxPrice);
-      const actionRow2 = new ActionRowBuilder().addComponents(startingAt);
-      const actionRow3 = new ActionRowBuilder().addComponents(auctionMaxTime);
-      const actionRow4 = new ActionRowBuilder().addComponents(gapBetweenBids);
+      const actionRows = [
+        new ActionRowBuilder().addComponents(startingPrice),
+        new ActionRowBuilder().addComponents(maxPrice),
+        new ActionRowBuilder().addComponents(startingAt),
+        new ActionRowBuilder().addComponents(auctionMaxTime),
+        new ActionRowBuilder().addComponents(gapBetweenBids),
+      ];
 
-      modal.addComponents([
-        actionRow,
-        actionRow1,
-        actionRow2,
-        actionRow3,
-        actionRow4,
-      ]);
+      modal.addComponents(actionRows);
+
+      await interaction.editReply({
+        content: `Item selection confirmed: **${itemName}**`,
+        ephemeral: true,
+        components: [],
+      });
 
       // Show the modal via the confirmation interaction
       await confirmation.showModal(modal);
@@ -1686,4 +2074,49 @@ export const createAuction = async (interaction) => {
       components: [],
     });
   }
+};
+
+export const handleStartAuction = async (interaction) => {
+  const auctionId = interaction.options.getString("auction-id");
+
+  const auction = await getAuctionData(auctionId);
+
+  const message = await interaction.fetchReply();
+  console.log(message);
+
+  // Ensure the message has embeds before accessing them
+  if (!message.embeds || message.embeds.length === 0) {
+    await interaction.reply({
+      content: "No embeds found in the message",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Update the embed here
+  const embed = message.embeds[0];
+
+  if (!auction) {
+    await interaction.reply({
+      content: "Auction not found",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const embedBuilder = createOrModifyAuctionEmbed({
+    embedBuilder: embed,
+    data: {
+      auctionId: auctionId,
+      itemName: auction.itemName,
+      startingPrice: auction.startingPrice,
+      maxPrice: auction.maxPrice,
+      gapBetweenBids: auction.gapBetweenBids,
+      startingAt: auction.startingAt,
+      auctionMaxTime: auction.auctionMaxTime,
+      auctionStatus: "has started",
+    },
+  });
+
+  await message.edit({ embeds: [embedBuilder] });
 };

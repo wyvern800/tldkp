@@ -15,7 +15,7 @@ if (!cronStarted) {
 }
 
 // Start the Discord bot
-const client = createBotClient();
+export const client = createBotClient();
 
 client.login(process.env.DISCORD_TOKEN);
 

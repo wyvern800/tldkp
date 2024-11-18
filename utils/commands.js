@@ -378,10 +378,27 @@ export const commands = [
     commandExecution: api.createAuction,
     handleAutocomplete: api.handleAuctionAutocomplete,
     handleSubmitModal: api.handleSubmitModalCreateAuction,
-    permissions: [PermissionFlagsBits.Administrator],
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System",
     new: true
   },
+  {
+    name: "auction-start",
+    description:
+      "Starts an auction",
+    options: [
+      {
+        name: "auction-id",
+        type: ApplicationCommandOptionType.String,
+        description: "The ID of the auction",
+        required: true,
+      }
+    ],
+    commandExecution: api.handleStartAuction,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System",
+    new: true
+  }
 
   /*{
     name: "clear",
@@ -542,8 +559,6 @@ export const handleAutoComplete = async (interaction, commandName) => {
  */
 export const handleSubmitModal = async (interaction) => {
   const [command,] = interaction.customId.split("#");
-  console.log(1)
-  console.log(command)
   
   const commandToFind = commands?.find(
     (c) => c.name?.toLowerCase() === command
