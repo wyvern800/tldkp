@@ -241,7 +241,6 @@ export async function uploadFile(directory, file) {
  * 
  */
 export function createOrModifyAuctionEmbed(data) {
-  console.log("createOrModifyAuctionEmbed")
   let newEmbed = new EmbedBuilder();
 
   // Create buttons
@@ -306,10 +305,10 @@ export function createOrModifyAuctionEmbed(data) {
     }
   )
   .addFields(
-    { name: "Starting at:", value: data?.startingAt, inline: true },
+    { name: "Starting at:", value: `${data?.startingAt} **(UTC-3)**`, inline: true },
     {
       name: "Auction valid until:",
-      value: data?.auctionMaxTime,
+      value: `${data?.auctionMaxTime} **(UTC-3)**`,
       inline: true,
     },
     {
@@ -318,11 +317,6 @@ export function createOrModifyAuctionEmbed(data) {
       inline: true,
     }
   )
-  /*.addFields({
-    name: "Auction ID (Used to interact with: /auction-start and /auction-cancel)",
-    value: `${data?.auctionId}`,
-    inline: true,
-  })*/
   .setColor(data?.modalColor ?? 0x0099ff)
   .setThumbnail(
     items.find((item) => item.name.trim() === data?.itemName.trim())?.image
@@ -345,8 +339,6 @@ export function createOrModifyAuctionEmbed(data) {
     embed: theEmbed,
     components: (row === null ? null : [row]),
   }
-
-  //console.log(toReturn);
 
   return toReturn;
 }

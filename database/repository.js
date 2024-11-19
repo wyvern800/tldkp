@@ -393,6 +393,31 @@ async function auctionCreate(auctionData) {
   }
 }
 
+export async function updateAuctionConfig(messageId, auction) {
+  const querySnapshot = await db
+    .collection("auctions")
+    .where("data.messageId", "==", messageId)
+    .get();
+
+  querySnapshot.forEach((doc) => {
+    const existingData = doc.data();
+    const updatedData = {};
+
+    // Compare existing data with new data and update only changed fields
+    for (const key in auction) {
+      if (auction[key] !== existingData[key]) {
+        updatedData[key] = auction[key];
+      }
+    }
+
+    if (Object.keys(updatedData).length > 0) {
+      doc.ref.update(updatedData);
+    }
+  });
+
+  return querySnapshot;
+}
+
 /**
  * Handles dkp management
  *
@@ -1601,27 +1626,32 @@ export const updateAuction = ({ _message = null, auction }) => {
   const dynamicAuctionStatus = () => {
     const now = new Date();
 
-    if (isBefore(now, firestoreStarting)) {
-      return "scheduled";
-    } else if (
-      isEqual(now, firestoreAuctionMaxTime) ||
-      isAfter(now, firestoreAuctionMaxTime)
-    ) {
-      return "finalized";
-    } else if (
-      isAfter(now, firestoreStarting) &&
-      isBefore(now, firestoreAuctionMaxTime)
-    ) {
-      return "started";
-    } else {
-      return "cancelled";
-    }
+    const isScheduled = isBefore(now, firestoreStarting);
+    const isFinalized = 
+      (isEqual(firestoreStarting, firestoreAuctionMaxTime) || 
+      isEqual(now, firestoreAuctionMaxTime) || 
+      isAfter(now, firestoreAuctionMaxTime)) && 
+      ((auction?.cancelled && auction?.cancelled === false) || !auction?.cancelled);
+    const isStarted = 
+      isAfter(now, firestoreStarting) && 
+      isBefore(now, firestoreAuctionMaxTime);
+
+      if (isFinalized) {
+        return "finalized";
+      } else if (isScheduled) {
+        return "scheduled";
+      } else if (isStarted) {
+        return "started";
+      } else {
+        return "cancelled";
+      }
   };
 
   let theEmbed;
   let theComponents;
 
   const { prefix, status, modal } = statusParser(dynamicAuctionStatus());
+
   const { embed, components } = createOrModifyAuctionEmbed({
     itemName: auction.itemName,
     startingPrice: `${auction.startingPrice}`,
@@ -1692,6 +1722,26 @@ export const updateAuction = ({ _message = null, auction }) => {
           auctionStatus: status,
           modalColor: modal,
         }));
+
+        const auctionDTO = {
+          ...auction,
+          startingAt: new Date(),
+          auctionStatus: 'started',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        try {
+          await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
+        } catch (error) {
+          console.log(error)
+          new Logger().error(PREFIX, "An error occurred while updating the auction.");
+          await i.reply({
+            content: "An error occurred while updating the auction.",
+            ephemeral: true,
+          });
+          return;
+        } 
+
       } catch (error) {
         console.error("Error in createOrModifyAuctionEmbed:", error);
         await i.reply({
@@ -1720,8 +1770,6 @@ export const updateAuction = ({ _message = null, auction }) => {
 
       const isUserOwner = auction.ownerDiscordId === userId;
 
-      console.log("isOwner", isUserOwner);
-
       if (!isUserOwner) {
         await i.reply({
           content: "You are not the owner of this auction, and can't do that.",
@@ -1745,8 +1793,29 @@ export const updateAuction = ({ _message = null, auction }) => {
           auctionStatus: status,
           modalColor: modal,
         }));
+
+        const auctionDTO = {
+          ...auction,
+          startingAt: new Date(),
+          auctionMaxTime: new Date(),
+          auctionStatus: 'cancelled',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelled: true
+        };
+
+        try {
+          await updateAuctionConfig(auction.data.messageId, auctionDTO);
+        } catch (error) {
+          new Logger().error(PREFIX, "An error occurred while updating the auction.");
+          await i.reply({
+            content: "An error occurred while updating the auction.",
+            ephemeral: true,
+          });
+          return;
+        }  
+
       } catch (error) {
-        console.error("Error in createOrModifyAuctionEmbed:", error);
+        new Logger().error(PREFIX, "An error occurred while modifying the auction embed. error:"+error);
         await i.reply({
           content: "An error occurred while modifying the auction embed.",
           ephemeral: true,
