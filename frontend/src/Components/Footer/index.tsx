@@ -47,6 +47,13 @@ function Footer({ complete = true }) {
               >
                 Give us a donation <ExternalLinkIcon mx="2px" />
               </Link>
+
+              <Link
+                href="/knowledge-base"
+                textShadow={"2px 2px 5px #0000008a"}
+              >
+                Have any questions or need help?
+              </Link>
             </VStack>
             <VStack direction={["column", "row"]}>
               <Link
