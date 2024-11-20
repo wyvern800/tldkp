@@ -7,7 +7,7 @@ import {
   setDkp,
   isPositiveNumber,
   convertDateStringToDateObject,
-  convertDateObjectToDateString
+  convertDateObjectToDateString,
 } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import cache from "../utils/cache.js";
@@ -27,12 +27,14 @@ import {
   ButtonStyle,
 } from "discord.js";
 import { items } from "../database/allItems.js";
+import { client } from "../src/index.js";
 
 const PREFIX = "Firebase";
 
 config();
 
 let auctionLocks = new Map();
+export const auctionsMap = new Map();
 
 /**
  * Gets the guild config
@@ -90,11 +92,7 @@ export async function getAuctionData(auctionId) {
 export async function getAuctionDataByThreadId(threadId) {
   const auctionSnapshot = db.collection("auctions");
 
-  const auctionQuery = auctionSnapshot.where(
-    "data.threadId",
-    "==",
-    threadId
-  );
+  const auctionQuery = auctionSnapshot.where("data.threadId", "==", threadId);
 
   const querySnapshot = await auctionQuery.get();
 
@@ -113,69 +111,75 @@ export async function getAuctionDataByThreadId(threadId) {
 
 /**
  * Processes the bid
- * 
+ *
  * @param {any} interaction  The interaction
  * @param {any} auction The auction
  * @returns Processes the bid
  */
 export async function processBid(interaction, auction) {
-  if (!interaction.isCommand()) return;
+  if (!interaction.isCommand()) {
+    return;
+  }
 
   const { commandName } = interaction;
 
-  if (commandName === 'bid') {
+  if (commandName === "bid") {
     const threadId = interaction.channel.id;
 
-    console.log(interaction.channel.id);
-    console.log(threadId);
-
-    console.log(interaction)
-
     if (threadId !== auction?.data?.threadId) {
+      return await interaction.reply({
+        content:
+          "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
+        ephemeral: true,
+      });
+    }
+
+    const bidAmount = interaction.options.getNumber("dkp");
+
+    if (isNaN(bidAmount)) {
       if (!interaction.replied) {
         return await interaction.reply({
-          content: "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
+          content: "Please provide a valid bid amount.",
           ephemeral: true,
         });
       }
       return;
     }
 
-    const bidAmount = interaction.options.getNumber('dkp');
-
-    if (isNaN(bidAmount)) {
-      if (!interaction.replied) {
-        return await interaction.reply({ content: 'Please provide a valid bid amount.', ephemeral: true });
-      }
-      return;
-    }
-
     // Acquire the lock for the specific auction
     while (auctionLocks.get(threadId)) {
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for 100ms before checking again
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for 100ms before checking again
     }
     auctionLocks.set(threadId, true);
 
     try {
       const allDkps = await getGuildConfig(interaction.guild.id);
       const updatedAuction = await getAuctionDataByThreadId(threadId);
-      const userDkp = allDkps?.memberDkps.find(memberDkp => memberDkp.userId === interaction.user.id);
+      const userDkp = allDkps?.memberDkps.find(
+        (memberDkp) => memberDkp.userId === interaction.user.id
+      );
       const bids = updatedAuction?.bids ?? [];
 
       // Check if the user has DKP
       if (userDkp?.dkp < bidAmount) {
         if (!interaction.replied) {
-          await interaction.reply({ content: `You don't have enough DKP to bid ${bidAmount}!`, ephemeral: true });
+          await interaction.reply({
+            content: `You don't have enough DKP to bid ${bidAmount}!`,
+            ephemeral: true,
+          });
         }
         return;
       }
 
-      const highestBid = Math.max(...(bids?.map(bid => bid.bid) || []), 0);
+      const highestBid = Math.max(...(bids?.map((bid) => bid.bid) || []), 0);
 
       // Check if the bid is higher than the starting price
       if (bidAmount < updatedAuction?.startingPrice) {
         if (!interaction.replied) {
-          await interaction.reply({ content: `Your bid must be at least ${updatedAuction?.startingPrice} DKP.`, ephemeral: true });
+          await interaction.reply({
+            content: `Your bid must be at least ${updatedAuction?.startingPrice} DKP.`,
+            ephemeral: true,
+          });
         }
         return;
       }
@@ -183,23 +187,33 @@ export async function processBid(interaction, auction) {
       // Check if the bid is higher than the highest bid
       if (bidAmount <= highestBid) {
         if (!interaction.replied) {
-          await interaction.reply({ content: `Your bid must be higher than the current highest bid of ${highestBid} DKP.`, ephemeral: true });
+          await interaction.reply({
+            content: `Your bid must be higher than the current highest bid of ${highestBid} DKP.`,
+            ephemeral: true,
+          });
         }
         return;
       }
 
       // Check if the auction has ended
-      const auctionEndTime = updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
-        ? updatedAuction.auctionMaxTime.toDate()
-        : updatedAuction?.auctionMaxTime;
+      const auctionEndTime =
+        updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
+          ? updatedAuction.auctionMaxTime.toDate()
+          : updatedAuction?.auctionMaxTime;
       if (auctionEndTime && isAfter(new Date(), auctionEndTime)) {
         if (!interaction.replied) {
-          await interaction.reply({ content: `The auction has ended.`, ephemeral: true });
+          await interaction.reply({
+            content: `The auction has ended.`,
+            ephemeral: true,
+          });
         }
         return;
       }
 
-      const copyBids = [...bids, { userId: interaction.user.id, bid: bidAmount }];
+      const copyBids = [
+        ...bids,
+        { userId: interaction.user.id, bid: bidAmount },
+      ];
 
       const auctionDTO = {
         ...auction,
@@ -212,12 +226,24 @@ export async function processBid(interaction, auction) {
 
         // Process the bid
         if (!interaction.replied) {
-          await interaction.reply({ content: `<@${interaction.user.id}> ${userDkp?.ign ? `(${userDkp?.ign})`: ''} has just bidded ${bidAmount}!` });
+          await interaction.reply({
+            content: `<@${interaction.user.id}> ${
+              userDkp?.ign ? `(${userDkp?.ign})` : ""
+            } has just bidded ${bidAmount}!`,
+          });
         }
       } catch (err) {
-        new Logger().logLocal(PREFIX, `Error updating auction ${auction.id}`, err);
-        if (!interaction.replied) {
-          await interaction.reply({ content: `Failed to process bid of ${bidAmount} DKP.`, ephemeral: true });
+        console.log(err)
+        new Logger().logLocal(
+          PREFIX,
+          `Error updating auction`,
+          err
+        );
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: `Failed to process bid of ${bidAmount} DKP.`,
+            ephemeral: true,
+          });
         }
       }
     } finally {
@@ -244,29 +270,54 @@ export async function loadAllAuctions(discordBot) {
     auctions.push({ id: doc.id, ...doc.data() });
   });
 
-  for (const auction of auctions) {
-    try {
-      let channel = await discordBot.channels.fetch(auction.data.channelId);
-      let message = await channel.messages.fetch(auction.data.messageId);
-      
+  try {
+    for (const auction of auctions) {
+      try {
+        let channel = await discordBot.channels.fetch(auction.data.channelId);
+        let message = await channel.messages.fetch(auction.data.messageId);
 
-      if (channel && message) {
-        
-        updateAuction({ _message: message, auction });
+        if (channel && message) {
+          updateAuction({ _message: message, auction });
 
-        // Auction thread
-        if (auction.data?.threadId) {
-          const thread = await discordBot.channels.fetch(auction.data?.threadId);
+          // Auction thread
+          if (auction.data?.threadId) {
+            const thread = await discordBot.channels.fetch(
+              auction.data?.threadId
+            );
+            auctionsMap.set(auction.data?.threadId, auction);
 
-          thread.client.on('interactionCreate', async (interaction) => await processBid(interaction, auction));
+            thread.client.on("interactionCreate", async (interaction) => {
+              const { commandName } = interaction;
+
+              // Avoid this command to be used in threads
+              if (commandName === 'bid' && interaction?.channel?.type === 0) {
+                try {
+                  await interaction.reply({
+                    content:
+                      "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
+                    ephemeral: true,
+                  });
+                } catch (e) {
+                  new Logger().logLocal(PREFIX, `Error replying to interaction: bid`, e);
+                }
+                return;
+              }
+
+              const auction = auctionsMap.get(interaction.channel.id);
+              if (auction) {
+                await processBid(interaction, auction);
+              }
+            });
+          }
         }
+      } catch (e) {
+        new Logger().logLocal(PREFIX, `Error loading auction ${auction.id} (deleted?)`, e);
       }
-    } catch (e) {
-      console.log(e);
-      new Logger().logLocal(PREFIX, `Error loading auction ${auction.id}`, e);
     }
+  } catch (err) {
+    new Logger().logLocal(PREFIX, `Error loading auctions`, e);
   }
-  return auctions?.length;
+  return auctionsMap?.size ?? 'no';
 }
 
 /**
@@ -686,93 +737,6 @@ export async function handleUpdateDkp(interaction) {
 }
 
 export const updateNickname = async (interaction) => {
-  const user = interaction.user;
-  const nickname = interaction.options.getString("nickname");
-
-  try {
-    const guildData = await getGuildConfig(interaction.guild.id);
-    let copyGuildData = { ...guildData };
-    const { memberDkps } = guildData;
-
-    let memberIndex = memberDkps.findIndex(
-      (member) => member.userId === user.id
-    );
-
-    if (memberIndex !== -1) {
-      const { updatedAt } = memberDkps[memberIndex]; // Assuming this is a Firestore Timestamp
-      const notSetYet = !updatedAt; // Check if updatedAt is set
-
-      // Ensure updatedAt is a valid Timestamp
-      const updatedAtDate =
-        updatedAt instanceof admin.firestore.Timestamp
-          ? updatedAt.toDate() // Convert Timestamp to Date
-          : new Date();
-
-      // Check if the date is valid
-      if (isNaN(updatedAtDate.getTime())) {
-        throw new Error("Invalid updatedAt date.");
-      }
-
-      const future = add(updatedAtDate, { hours: 1 });
-
-      // You can only change the nickname if it is not set yet or if 1 hour have passed since updatedAt
-      if (notSetYet || isAfter(new Date(), future)) {
-        // Update the nickname
-        copyGuildData.memberDkps[memberIndex].ign = nickname;
-        copyGuildData.memberDkps[memberIndex].updatedAt = new Date();
-
-        try {
-          const nickname = interaction.options.getString("nickname");
-
-          try {
-            await db
-              .collection("guilds")
-              .doc(interaction.guild.id)
-              .update(copyGuildData);
-            const msg = `Your in-game nickname was changed to: ${nickname}!`;
-            new Logger(interaction).log(PREFIX, msg);
-            interaction.reply({ content: msg, ephemeral: true });
-          } catch (err) {
-            console.log(err);
-            const msg = `Failed to update your in-game nickname.`;
-            new Logger(interaction).error(PREFIX, msg, err);
-            interaction.reply({ content: msg, ephemeral: true });
-          }
-        } catch (err) {
-          const msg = "Error setting in-game nickname";
-          new Logger(interaction).log(PREFIX, msg);
-          return await interaction.reply({
-            content: msg,
-            ephemeral: true,
-          });
-        }
-      } else {
-        // Send a message if nickname change is not allowed
-        const allowedDateFormatted = formatDistance(future, new Date(), {
-          addSuffix: true,
-        });
-        const msg = `You can only change your nickname once in 1 hour, you will be able ${allowedDateFormatted}.`;
-        new Logger(interaction).log(PREFIX, msg);
-        return await interaction.reply({
-          content: msg,
-          ephemeral: true,
-        });
-      }
-    } else {
-      // Send a message if the user is not found in the memberDkps array
-      const msg =
-        "You don't have DKP yet, you must have before setting a nickname.";
-      new Logger(interaction).log(PREFIX, msg);
-    }
-  } catch (error) {
-    console.log(error);
-    const msg = "Error updating in-game nickname";
-    new Logger(interaction).log(PREFIX, msg);
-    return await interaction.reply({
-      content: msg,
-      ephemeral: true,
-    });
-  }
 };
 
 /**
@@ -1778,22 +1742,23 @@ export const updateAuction = ({ _message = null, auction }) => {
     const now = new Date();
 
     const isScheduled = isBefore(now, firestoreStarting);
-    const isFinalized = 
-      (isEqual(firestoreStarting, firestoreAuctionMaxTime) || 
-      isEqual(now, firestoreAuctionMaxTime) || 
-      isAfter(now, firestoreAuctionMaxTime)) && 
-      ((auction?.cancelled && auction?.cancelled === false) || !auction?.cancelled);
+    const isFinalized =
+      (isEqual(firestoreStarting, firestoreAuctionMaxTime) ||
+        isEqual(now, firestoreAuctionMaxTime) ||
+        isAfter(now, firestoreAuctionMaxTime)) &&
+      ((auction?.cancelled && auction?.cancelled === false) ||
+        !auction?.cancelled);
     const isStarted = isAfter(now, firestoreStarting);
 
-      if (isFinalized) {
-        return "finalized";
-      } else if (isScheduled) {
-        return "scheduled";
-      } else if (isStarted) {
-        return "started";
-      } else {
-        return "cancelled";
-      }
+    if (isFinalized) {
+      return "finalized";
+    } else if (isScheduled) {
+      return "scheduled";
+    } else if (isStarted) {
+      return "started";
+    } else {
+      return "cancelled";
+    }
   };
 
   let theEmbed;
@@ -1801,10 +1766,11 @@ export const updateAuction = ({ _message = null, auction }) => {
 
   const { prefix, status, modal } = statusParser(dynamicAuctionStatus());
 
-  console.log(status)
+  console.log(status);
 
   const { embed, components } = createOrModifyAuctionEmbed({
     itemName: auction.itemName,
+    itemNote: auction.itemNote,
     startingPrice: `${auction.startingPrice}`,
     maxPrice: `${auction.maxPrice}`,
     gapBetweenBids: `${auction.gapBetweenBids}`,
@@ -1824,17 +1790,22 @@ export const updateAuction = ({ _message = null, auction }) => {
   };
 
   // Trigger the status on database
-  (async () => { try {
-    await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
-  } catch (error) {
-    console.log(error)
-    new Logger().error(PREFIX, "An error occurred while updating the auction.");
-    await i.reply({
-      content: "An error occurred while updating the auction.",
-      ephemeral: true,
-    });
-    return;
-  } })();
+  (async () => {
+    try {
+      await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
+    } catch (error) {
+      console.log(error);
+      new Logger().error(
+        PREFIX,
+        "An error occurred while updating the auction."
+      );
+      await i.reply({
+        content: "An error occurred while updating the auction.",
+        ephemeral: true,
+      });
+      return;
+    }
+  })();
 
   (async () => {
     try {
@@ -1860,9 +1831,7 @@ export const updateAuction = ({ _message = null, auction }) => {
   });
 
   collector.on("collect", async (i) => {
-    if (i.customId === "bid") {
-      console.log(`${i.user.tag} bid`);
-    } else if (i.customId === "start_auction") {
+   if (i.customId === "start_auction") {
       const userId = i?.user?.id;
 
       const isUserOwner = auction.ownerDiscordId === userId;
@@ -1878,35 +1847,72 @@ export const updateAuction = ({ _message = null, auction }) => {
       // create the thread only if it doesn't exist
       let thread = await message.startThread({
         name: `Auction: ${auction?.itemName}'s bids`,
-        reason: 'All bids are going to be here!',
+        reason: "All bids are going to be here!",
       });
 
+      // set the thread permissions
       try {
-        await thread.permissionOverwrites.create(thread.guild.roles.everyone, {
-          SEND_MESSAGES: false,
-        });
-        await thread.permissionOverwrites.create(thread.client.user, {
-          SEND_MESSAGES: true,
-        });
+        await thread.permissionOverwrites.edit(thread.guild.roles.everyone, { 'SendMessages': false, 'AttachFiles': false, });
+        await thread.permissionOverwrites.edit(thread.client.user, { 'SendMessages': true });
       } catch (err) {
-        new Logger().logLocal(PREFIX, "An error occurred while setting the thread permissions.");
+        console.log(err);
+        new Logger().logLocal(
+          PREFIX,
+          "An error occurred while setting the thread permissions."
+        );
         await i.reply({
           content: "An error occurred while setting the thread permissions.",
           ephemeral: true,
         });
       }
-
+    
+      // send the message to the thread
       try {
-        thread.send(`Auction started for **${auction?.itemName}**!\n\n- Starting price: **${auction?.startingPrice} DKP**\n\n@everyone can start bidding by typing: **/bid ${auction?.startingPrice}**, goodluck!`);
+        thread.send(
+          `Auction started for **${auction?.itemName}**!\n\n- Starting price: **${auction?.startingPrice} DKP**\n\n@everyone can start bidding by typing: **/bid ${auction?.startingPrice}**, goodluck!`
+        );
       } catch (error) {
-        new Logger().logLocal(PREFIX, "An error occurred while sending a message to the thread.");
+        new Logger().logLocal(
+          PREFIX,
+          "An error occurred while sending a message to the thread."
+        );
         await i.reply({
           content: "An error occurred while sending a message to the thread.",
           ephemeral: true,
         });
       }
 
-      thread.client.on('interactionCreate', async (interaction) => await processBid(interaction, auction));
+      // set the auction thread id on the map
+      auctionsMap.set(thread.id, {... auction, data: {
+        ...auction.data,
+        threadId: thread.id,
+        messageId: _message?.id
+      }});
+
+      thread.client.on(
+        "interactionCreate",
+        async (interaction) => {
+          const { commandName } = interaction;
+
+          if (commandName === 'bid' && interaction?.channel?.type === 0) {
+            try {
+              await interaction.reply({
+                content:
+                  "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
+                ephemeral: true,
+              });
+            } catch (e) {
+              console.log(e)
+            }
+            return;
+          }
+
+          const theAuction = auctionsMap.get(interaction.channel.id);
+            if (theAuction) {    
+              await processBid(interaction, theAuction);
+            }
+        }
+      );
 
       let embed, components;
       try {
@@ -1933,22 +1939,24 @@ export const updateAuction = ({ _message = null, auction }) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           data: {
             ...auction.data,
-            threadId: thread.id
-          }
+            threadId: thread.id,
+          },
         };
 
         try {
           await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
         } catch (error) {
-          console.log(error)
-          new Logger().error(PREFIX, "An error occurred while updating the auction.");
+          console.log(error);
+          new Logger().error(
+            PREFIX,
+            "An error occurred while updating the auction."
+          );
           await i.reply({
             content: "An error occurred while updating the auction.",
             ephemeral: true,
           });
           return;
-        } 
-
+        }
       } catch (error) {
         console.error("Error in createOrModifyAuctionEmbed:", error);
         await i.reply({
@@ -2011,22 +2019,27 @@ export const updateAuction = ({ _message = null, auction }) => {
           auctionMaxTime: new Date(),
           auctionStatus: status,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          cancelled: true
+          cancelled: true,
         };
 
         try {
           await updateAuctionConfig(auction.data.messageId, auctionDTO);
         } catch (error) {
-          new Logger().error(PREFIX, "An error occurred while updating the auction.");
+          new Logger().error(
+            PREFIX,
+            "An error occurred while updating the auction."
+          );
           await i.reply({
             content: "An error occurred while updating the auction.",
             ephemeral: true,
           });
           return;
-        }  
-
+        }
       } catch (error) {
-        new Logger().error(PREFIX, "An error occurred while modifying the auction embed. error:"+error);
+        new Logger().error(
+          PREFIX,
+          "An error occurred while modifying the auction embed. error:" + error
+        );
         await i.reply({
           content: "An error occurred while modifying the auction embed.",
           ephemeral: true,
@@ -2095,21 +2108,20 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
       errors.push("The item note must not exceed 50 characters.");
     }
 
-    if (!note || note === '') {
+    if (!note || note === "") {
       errors.push("The item note must not be empty.");
     }
 
-    if (
-      gapBetweenBids &&
-      isNaN(gapBetweenBids) 
-    ) {
+    if (gapBetweenBids && isNaN(gapBetweenBids)) {
       errors.push("Gap between bids must be a number and greater 0'.");
     }
 
     // Validate startingAt format
     const dateRegex = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
     if (!dateRegex.test(startingAt)) {
-      errors.push("Starting time must be in the format: **dd/mm/yyyy-hh:mm:ss**.");
+      errors.push(
+        "Starting time must be in the format: **dd/mm/yyyy-hh:mm:ss**."
+      );
     }
 
     const dateRegexAuctionMaxTime = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
@@ -2239,8 +2251,21 @@ export const createAuction = async (interaction) => {
 
   const choices = items.map((item) => item.name?.toLowerCase().trim());
 
+  // Avoid this command to be used in threads
+  if (interaction?.channel?.type && interaction?.channel?.type !== 0) {
+    await interaction.reply({
+      content: "This command can only be used in normal text channels.",
+      ephemeral: true,
+    });
+    return;
+  }
+
   // Check if the item is valid
-  if (!choices?.some(name => name.toLowerCase().trim() === itemName.toLowerCase().trim())) {
+  if (
+    !choices?.some(
+      (name) => name.toLowerCase().trim() === itemName.toLowerCase().trim()
+    )
+  ) {
     await interaction.reply({
       content: "Invalid item selected",
       ephemeral: true,
@@ -2308,7 +2333,9 @@ export const createAuction = async (interaction) => {
         .setMaxLength(19)
         .setMinLength(19)
         .setPlaceholder("Expected format: (dd/mm/yyyy-hh:mm:ss)")
-        .setValue(convertDateObjectToDateString(add(new Date(), { minutes: 20 })))
+        .setValue(
+          convertDateObjectToDateString(add(new Date(), { minutes: 20 }))
+        )
         .setRequired(true);
 
       const auctionMaxTime = new TextInputBuilder()
@@ -2325,9 +2352,7 @@ export const createAuction = async (interaction) => {
         .setCustomId("auction-create#gapBetweenBids")
         .setLabel("Gap between bids:")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder(
-          "Bids with difference of X or more will be allowed"
-        )
+        .setPlaceholder("Bids with difference of X or more will be allowed")
         .setRequired(true);
 
       const actionRows = [
@@ -2335,7 +2360,7 @@ export const createAuction = async (interaction) => {
         new ActionRowBuilder().addComponents(gapBetweenBids),
         //new ActionRowBuilder().addComponents(maxPrice),
         new ActionRowBuilder().addComponents(startingAt),
-        new ActionRowBuilder().addComponents(auctionMaxTime)
+        new ActionRowBuilder().addComponents(auctionMaxTime),
       ];
 
       modal.addComponents(actionRows);
@@ -2368,7 +2393,7 @@ export const createAuction = async (interaction) => {
 /**
  * Handle the auction start
  * @param {any} interaction The interaction
- * @returns The auction 
+ * @returns The auction
  */
 export const handleStartAuction = async (interaction) => {
   const auctionId = interaction.options.getString("auction-id");

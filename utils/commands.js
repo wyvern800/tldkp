@@ -401,7 +401,6 @@ export const commands = [
         required: true,
       }
     ],
-    commandExecution: api.handleStartAuction,
     permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "Auction System",
     new: true,
