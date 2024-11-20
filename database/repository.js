@@ -195,6 +195,18 @@ export async function processBid(interaction, auction) {
         return;
       }
 
+      // Check if the bid is higher than the gap between bids
+      const lastBid = bids.length > 0 ? bids[bids.length - 1].bid : 0;
+      if (bidAmount < lastBid + updatedAuction.gapBetweenBids) {
+        if (!interaction.replied) {
+          await interaction.reply({
+            content: `Your bid must be at least ${updatedAuction.gapBetweenBids} DKP higher than the last bid of ${lastBid} DKP.`,
+            ephemeral: true,
+          });
+        }
+        return;
+      }
+
       // Check if the auction has ended
       const auctionEndTime =
         updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
