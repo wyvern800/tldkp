@@ -315,7 +315,7 @@ export function createOrModifyAuctionEmbed(data) {
   )
   .setColor(data?.modalColor ?? 0x0099ff)
   .setThumbnail(
-    items.find((item) => item.name.trim() === data?.itemName.trim())?.image
+    items.find((item) => item.name.trim() === data?.itemName.trim())?.icon
   );
 
   // Only show bidders if the auction is not scheduled or cancelled

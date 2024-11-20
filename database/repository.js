@@ -28,6 +28,7 @@ import {
 } from "discord.js";
 import { items } from "../database/allItems.js";
 import { client } from "../src/index.js";
+import { searchItem } from "../database/itemsGrabber.js";
 
 const PREFIX = "Firebase";
 
@@ -160,6 +161,21 @@ export async function processBid(interaction, auction) {
       );
       const bids = updatedAuction?.bids ?? [];
 
+      // Check if the auction has ended
+      const auctionEndTime =
+        updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
+          ? updatedAuction.auctionMaxTime.toDate()
+          : updatedAuction?.auctionMaxTime;
+      if (auctionEndTime && isAfter(new Date(), auctionEndTime)) {
+        if (!interaction.replied) {
+          await interaction.reply({
+            content: `The auction has ended.`,
+            ephemeral: true,
+          });
+        }
+        return;
+      }
+
       // Check if the user has DKP
       if (userDkp?.dkp < bidAmount) {
         if (!interaction.replied) {
@@ -196,6 +212,11 @@ export async function processBid(interaction, auction) {
       }
 
       // Check if the bid is higher than the gap between bids
+      bids.sort((a, b) => {
+        const aParsed = a instanceof admin.firestore.Timestamp ? a.toDate() : a;
+        const bParsed = b instanceof admin.firestore.Timestamp ? b.toDate() : b;
+        return aParsed.createdAt - bParsed.createdAt;
+      });
       const lastBid = bids.length > 0 ? bids[bids.length - 1].bid : 0;
       if (bidAmount < lastBid + updatedAuction.gapBetweenBids) {
         if (!interaction.replied) {
@@ -207,24 +228,9 @@ export async function processBid(interaction, auction) {
         return;
       }
 
-      // Check if the auction has ended
-      const auctionEndTime =
-        updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
-          ? updatedAuction.auctionMaxTime.toDate()
-          : updatedAuction?.auctionMaxTime;
-      if (auctionEndTime && isAfter(new Date(), auctionEndTime)) {
-        if (!interaction.replied) {
-          await interaction.reply({
-            content: `The auction has ended.`,
-            ephemeral: true,
-          });
-        }
-        return;
-      }
-
       const copyBids = [
         ...bids,
-        { userId: interaction.user.id, bid: bidAmount },
+        { userId: interaction.user.id, bid: bidAmount, createdAt: new Date() },
       ];
 
       const auctionDTO = {
@@ -244,13 +250,53 @@ export async function processBid(interaction, auction) {
             } has just bidded ${bidAmount}!`,
           });
         }
+
+        // Update the auction embed
+        try {
+          const formattedStartingNew = convertDateObjectToDateString(
+            auction.startingAt
+          );
+          const formattedMaxTime = convertDateObjectToDateString(
+            auction.auctionMaxTime
+          );
+
+          const { prefix, status, modal } = statusParser(auction.auctionStatus);
+
+          let embed, components;
+          ({ embed, components } = createOrModifyAuctionEmbed({
+            itemName: auction.itemName,
+            startingPrice: `${auction.startingPrice}`,
+            itemNote: `${auction.itemNote}`,
+            gapBetweenBids: `${auction.gapBetweenBids}`,
+            startingAt: `${formattedStartingNew}`,
+            auctionMaxTime: `${formattedMaxTime}`,
+            auctionPrefix: prefix,
+            auctionStatus: status,
+            modalColor: modal,
+            highestBidder: {
+              bid: bidAmount,
+              name: interaction.user.name,
+            },
+          }));
+
+          let channel = await client.channels.fetch(auction.data.channelId);
+          let message = await channel.messages.fetch(auction.data.messageId);
+
+          await message.edit({
+            embeds: [embed],
+            components: components ? components : [],
+          });
+        } catch (error) {
+          console.error("Error in createOrModifyAuctionEmbed:", error);
+          await i.reply({
+            content: "An error occurred while modifying the auction embed.",
+            ephemeral: true,
+          });
+          return;
+        }
       } catch (err) {
-        console.log(err)
-        new Logger().logLocal(
-          PREFIX,
-          `Error updating auction`,
-          err
-        );
+        console.log(err);
+        new Logger().logLocal(PREFIX, `Error updating auction`, err);
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({
             content: `Failed to process bid of ${bidAmount} DKP.`,
@@ -302,7 +348,7 @@ export async function loadAllAuctions(discordBot) {
               const { commandName } = interaction;
 
               // Avoid this command to be used in threads
-              if (commandName === 'bid' && interaction?.channel?.type === 0) {
+              if (commandName === "bid" && interaction?.channel?.type === 0) {
                 try {
                   await interaction.reply({
                     content:
@@ -310,7 +356,11 @@ export async function loadAllAuctions(discordBot) {
                     ephemeral: true,
                   });
                 } catch (e) {
-                  new Logger().logLocal(PREFIX, `Error replying to interaction: bid`, e);
+                  new Logger().logLocal(
+                    PREFIX,
+                    `Error replying to interaction: bid`,
+                    e
+                  );
                 }
                 return;
               }
@@ -323,13 +373,17 @@ export async function loadAllAuctions(discordBot) {
           }
         }
       } catch (e) {
-        new Logger().logLocal(PREFIX, `Error loading auction ${auction.id} (deleted?)`, e);
+        new Logger().logLocal(
+          PREFIX,
+          `Error loading auction ${auction.id} (deleted?)`,
+          e
+        );
       }
     }
   } catch (err) {
     new Logger().logLocal(PREFIX, `Error loading auctions`, e);
   }
-  return auctionsMap?.size ?? 'no';
+  return auctionsMap?.size ?? "no";
 }
 
 /**
@@ -748,8 +802,7 @@ export async function handleUpdateDkp(interaction) {
   return await interaction.reply({ content: msg, ephemeral: true });
 }
 
-export const updateNickname = async (interaction) => {
-};
+export const updateNickname = async (interaction) => {};
 
 /**
  * Handles the language change
@@ -1663,14 +1716,19 @@ export const setRoleOnJoin = async (interaction) => {
  */
 export const handleAuctionAutocomplete = async (interaction) => {
   const focusedValue = interaction.options.getFocused();
-  const choices = items.map((item) => item.name?.trim());
-  const filtered = choices.filter((choice) =>
-    choice.toLowerCase().trim().includes(focusedValue.toLowerCase().trim())
-  );
 
-  await interaction.respond(
-    filtered.slice(0, 25).map((choice) => ({ name: choice, value: choice }))
-  );
+  await searchItem(focusedValue).then(async (res) => {
+    const items = res ?? [];
+    const choices = items?.map((item) => item.name?.trim());
+
+    const filtered = choices.filter((choice) =>
+      choice.toLowerCase().trim().includes(focusedValue.toLowerCase().trim())
+    );
+
+    await interaction.respond(
+      filtered.slice(0, 25).map((choice) => ({ name: choice, value: choice }))
+    );
+  });
 };
 
 /**
@@ -1760,7 +1818,7 @@ export const updateAuction = ({ _message = null, auction }) => {
         isAfter(now, firestoreAuctionMaxTime)) &&
       ((auction?.cancelled && auction?.cancelled === false) ||
         !auction?.cancelled);
-    const isStarted = isAfter(now, firestoreStarting);
+    const isStarted = isAfter(now, firestoreStarting) && ((auction?.cancelled === false) || !auction?.cancelled);
 
     if (isFinalized) {
       return "finalized";
@@ -1843,7 +1901,7 @@ export const updateAuction = ({ _message = null, auction }) => {
   });
 
   collector.on("collect", async (i) => {
-   if (i.customId === "start_auction") {
+    if (i.customId === "start_auction") {
       const userId = i?.user?.id;
 
       const isUserOwner = auction.ownerDiscordId === userId;
@@ -1864,8 +1922,13 @@ export const updateAuction = ({ _message = null, auction }) => {
 
       // set the thread permissions
       try {
-        await thread.permissionOverwrites.edit(thread.guild.roles.everyone, { 'SendMessages': false, 'AttachFiles': false, });
-        await thread.permissionOverwrites.edit(thread.client.user, { 'SendMessages': true });
+        await thread.permissionOverwrites.edit(thread.guild.roles.everyone, {
+          SendMessages: false,
+          AttachFiles: false,
+        });
+        await thread.permissionOverwrites.edit(thread.client.user, {
+          SendMessages: true,
+        });
       } catch (err) {
         console.log(err);
         new Logger().logLocal(
@@ -1877,7 +1940,7 @@ export const updateAuction = ({ _message = null, auction }) => {
           ephemeral: true,
         });
       }
-    
+
       // send the message to the thread
       try {
         thread.send(
@@ -1895,36 +1958,36 @@ export const updateAuction = ({ _message = null, auction }) => {
       }
 
       // set the auction thread id on the map
-      auctionsMap.set(thread.id, {... auction, data: {
-        ...auction.data,
-        threadId: thread.id,
-        messageId: _message?.id
-      }});
+      auctionsMap.set(thread.id, {
+        ...auction,
+        data: {
+          ...auction.data,
+          threadId: thread.id,
+          messageId: _message?.id,
+        },
+      });
 
-      thread.client.on(
-        "interactionCreate",
-        async (interaction) => {
-          const { commandName } = interaction;
+      thread.client.on("interactionCreate", async (interaction) => {
+        const { commandName } = interaction;
 
-          if (commandName === 'bid' && interaction?.channel?.type === 0) {
-            try {
-              await interaction.reply({
-                content:
-                  "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
-                ephemeral: true,
-              });
-            } catch (e) {
-              console.log(e)
-            }
-            return;
+        if (commandName === "bid" && interaction?.channel?.type === 0) {
+          try {
+            await interaction.reply({
+              content:
+                "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
+              ephemeral: true,
+            });
+          } catch (e) {
+            console.log(e);
           }
-
-          const theAuction = auctionsMap.get(interaction.channel.id);
-            if (theAuction) {    
-              await processBid(interaction, theAuction);
-            }
+          return;
         }
-      );
+
+        const theAuction = auctionsMap.get(interaction.channel.id);
+        if (theAuction) {
+          await processBid(interaction, theAuction);
+        }
+      });
 
       let embed, components;
       try {
@@ -1946,7 +2009,7 @@ export const updateAuction = ({ _message = null, auction }) => {
 
         const auctionDTO = {
           ...auction,
-          startingAt: new Date(),
+          startingAt: admin.firestore.FieldValue.serverTimestamp(),
           auctionStatus: status,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           data: {
@@ -2261,7 +2324,7 @@ export const createAuction = async (interaction) => {
   const itemName = interaction.options.getString("item");
   const itemNote = interaction.options.getString("note");
 
-  const choices = items.map((item) => item.name?.toLowerCase().trim());
+  const theItem = await searchItem(itemName?.toLowerCase()?.trim());
 
   // Avoid this command to be used in threads
   if (interaction?.channel?.type && interaction?.channel?.type !== 0) {
@@ -2274,9 +2337,7 @@ export const createAuction = async (interaction) => {
 
   // Check if the item is valid
   if (
-    !choices?.some(
-      (name) => name.toLowerCase().trim() === itemName.toLowerCase().trim()
-    )
+    !theItem?.length && theItem[0]?.name !== itemName?.toLowerCase()?.trim()
   ) {
     await interaction.reply({
       content: "Invalid item selected",
@@ -2400,54 +2461,4 @@ export const createAuction = async (interaction) => {
       components: [],
     });
   }
-};
-
-/**
- * Handle the auction start
- * @param {any} interaction The interaction
- * @returns The auction
- */
-export const handleStartAuction = async (interaction) => {
-  const auctionId = interaction.options.getString("auction-id");
-
-  const auction = await getAuctionData(auctionId);
-
-  const message = await interaction.fetchReply();
-
-  // Ensure the message has embeds before accessing them
-  if (!message.embeds || message.embeds.length === 0) {
-    await interaction.reply({
-      content: "No embeds found in the message",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  // Update the embed here
-  const embed = message.embeds[0];
-
-  if (!auction) {
-    await interaction.reply({
-      content: "Auction not found",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const embedBuilder = createOrModifyAuctionEmbed({
-    embedBuilder: embed,
-    data: {
-      auctionId: auctionId,
-      itemName: auction.itemName,
-      itemNote: auction.itemNote,
-      startingPrice: auction.startingPrice,
-      //maxPrice: auction.maxPrice,
-      gapBetweenBids: auction.gapBetweenBids,
-      startingAt: auction.startingAt,
-      auctionMaxTime: auction.auctionMaxTime,
-      auctionStatus: "has started",
-    },
-  });
-
-  await message.edit({ embeds: [embedBuilder] });
 };
