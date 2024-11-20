@@ -161,6 +161,34 @@ export async function processBid(interaction, auction) {
       );
       const bids = updatedAuction?.bids ?? [];
 
+      // Calculate the total DKP the user has bid across all auctions
+      const allAuctions = await db.collection("auctions").get();
+      let totalBidDkp = 0;
+
+      allAuctions.forEach((doc) => {
+        const auctionData = doc.data();
+        const userBid = auctionData.bids?.find(
+          (bid) => bid.userId === interaction.user.id
+        );
+        if (userBid) {
+          totalBidDkp += userBid.bid;
+        }
+      });
+
+      // Calculate the remaining DKP the user can use for bidding
+      const remainingDkp = userDkp?.dkp - totalBidDkp;
+
+      // Check if the user has enough remaining DKP to place the bid
+      if (remainingDkp < bidAmount) {
+        if (!interaction.replied) {
+          await interaction.reply({
+        content: `You don't have enough remaining DKP to bid ${bidAmount}! Your remaining DKP is ${remainingDkp}.`,
+        ephemeral: true,
+          });
+        }
+        return;
+      }
+
       // Check if the auction has ended
       const auctionEndTime =
         updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
@@ -253,21 +281,31 @@ export async function processBid(interaction, auction) {
 
         // Update the auction embed
         try {
+          const updatedStartTime =
+            updatedAuction?.startingAt instanceof admin.firestore.Timestamp
+          ? updatedAuction.startingAt.toDate()
+          : updatedAuction?.startingAt;
+
+          const auctionEndTime =
+            updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
+          ? updatedAuction.auctionMaxTime.toDate()
+          : updatedAuction?.auctionMaxTime;
+
           const formattedStartingNew = convertDateObjectToDateString(
-            auction.startingAt
+            updatedStartTime
           );
           const formattedMaxTime = convertDateObjectToDateString(
-            auction.auctionMaxTime
+            auctionEndTime
           );
 
-          const { prefix, status, modal } = statusParser(auction.auctionStatus);
+          const { prefix, status, modal } = statusParser(updatedAuction?.auctionStatus);
 
           let embed, components;
           ({ embed, components } = createOrModifyAuctionEmbed({
-            itemName: auction.itemName,
-            startingPrice: `${auction.startingPrice}`,
-            itemNote: `${auction.itemNote}`,
-            gapBetweenBids: `${auction.gapBetweenBids}`,
+            itemName: updatedAuction.itemName,
+            startingPrice: `${updatedAuction.startingPrice}`,
+            itemNote: `${updatedAuction.itemNote}`,
+            gapBetweenBids: `${updatedAuction.gapBetweenBids}`,
             startingAt: `${formattedStartingNew}`,
             auctionMaxTime: `${formattedMaxTime}`,
             auctionPrefix: prefix,
@@ -275,12 +313,12 @@ export async function processBid(interaction, auction) {
             modalColor: modal,
             highestBidder: {
               bid: bidAmount,
-              name: interaction.user.name,
+              name: `${interaction?.member?.nickname !== '' ? interaction.member.nickname : interaction.user.globalName}!`,
             },
           }));
 
-          let channel = await client.channels.fetch(auction.data.channelId);
-          let message = await channel.messages.fetch(auction.data.messageId);
+          let channel = await client.channels.fetch(updatedAuction.data.channelId);
+          let message = await channel.messages.fetch(updatedAuction.data.messageId);
 
           await message.edit({
             embeds: [embed],
@@ -1746,7 +1784,7 @@ export const statusParser = (_auctionStatus) => {
     case "started":
       auctionPrefix = "has been";
       auctionStatus = "started";
-      modalColor = 0x00ff99;
+      modalColor = 0x5865F2;
       break;
     case "cancelled":
       auctionPrefix = "has been";
@@ -1772,7 +1810,7 @@ export const statusParser = (_auctionStatus) => {
   };
 };
 
-export const updateAuction = ({ _message = null, auction }) => {
+export const updateAuction = async ({ _message = null, auction }) => {
   const message = _message;
 
   const firestoreAuctionMaxTime =
@@ -1818,7 +1856,7 @@ export const updateAuction = ({ _message = null, auction }) => {
         isAfter(now, firestoreAuctionMaxTime)) &&
       ((auction?.cancelled && auction?.cancelled === false) ||
         !auction?.cancelled);
-    const isStarted = isAfter(now, firestoreStarting) && ((auction?.cancelled === false) || !auction?.cancelled);
+    const isStarted = isAfter(now, firestoreStarting) && (!auction?.cancelled || auction?.cancelled === false);
 
     if (isFinalized) {
       return "finalized";
@@ -1838,6 +1876,12 @@ export const updateAuction = ({ _message = null, auction }) => {
 
   console.log(status);
 
+  const highestBid = Math.max(...(auction.bids?.map((bid) => bid.bid) || {}), 0);
+  const highestBidder = auction.bids?.find((bid) => bid.bid === highestBid);
+  const discord = client.users.cache.get(highestBidder?.userId);
+  const highestBidderMember = await message.guild.members.fetch(highestBidder?.userId);
+  const highestBidderNickname = highestBidderMember?.nickname || discord?.user?.globalName;
+
   const { embed, components } = createOrModifyAuctionEmbed({
     itemName: auction.itemName,
     itemNote: auction.itemNote,
@@ -1849,6 +1893,10 @@ export const updateAuction = ({ _message = null, auction }) => {
     auctionPrefix: prefix,
     auctionStatus: status,
     modalColor: modal,
+    highestBidder: {
+      bid: highestBid,
+      name: highestBidderNickname,
+    },
   });
   theEmbed = embed;
   theComponents = components;
@@ -2009,7 +2057,7 @@ export const updateAuction = ({ _message = null, auction }) => {
 
         const auctionDTO = {
           ...auction,
-          startingAt: admin.firestore.FieldValue.serverTimestamp(),
+          startingAt: new Date(),
           auctionStatus: status,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           data: {
@@ -2094,6 +2142,7 @@ export const updateAuction = ({ _message = null, auction }) => {
           auctionMaxTime: new Date(),
           auctionStatus: status,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          bids: [],
           cancelled: true,
         };
 

@@ -323,7 +323,7 @@ export function createOrModifyAuctionEmbed(data) {
     const hasBidder = data?.highestBidder;
     let textBidder = `Winning bid (Highest): Nobody has bidded yet!`;
     if (hasBidder) {
-      textBidder = `Highest bid (Winning): ${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP`;
+      textBidder = `Winning bid (Highest): ${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP!`;
     }
     newEmbed.setFooter({
       text: textBidder,
