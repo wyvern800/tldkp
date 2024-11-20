@@ -7,6 +7,7 @@ import {
   setDkp,
   isPositiveNumber,
   convertDateStringToDateObject,
+  convertDateObjectToDateString
 } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import cache from "../utils/cache.js";
@@ -30,6 +31,8 @@ import { items } from "../database/allItems.js";
 const PREFIX = "Firebase";
 
 config();
+
+let auctionLocks = new Map();
 
 /**
  * Gets the guild config
@@ -84,6 +87,145 @@ export async function getAuctionData(auctionId) {
   return auctionData;
 }
 
+export async function getAuctionDataByThreadId(threadId) {
+  const auctionSnapshot = db.collection("auctions");
+
+  const auctionQuery = auctionSnapshot.where(
+    "data.threadId",
+    "==",
+    threadId
+  );
+
+  const querySnapshot = await auctionQuery.get();
+
+  if (querySnapshot.empty) {
+    new Logger().log(PREFIX, `No auction found with threadId ${threadId}`);
+    return null;
+  }
+
+  let auctionData = null;
+  querySnapshot.forEach((doc) => {
+    auctionData = doc.data();
+  });
+
+  return auctionData;
+}
+
+/**
+ * Processes the bid
+ * 
+ * @param {any} interaction  The interaction
+ * @param {any} auction The auction
+ * @returns Processes the bid
+ */
+export async function processBid(interaction, auction) {
+  if (!interaction.isCommand()) return;
+
+  const { commandName } = interaction;
+
+  if (commandName === 'bid') {
+    const threadId = interaction.channel.id;
+
+    console.log(interaction.channel.id);
+    console.log(threadId);
+
+    console.log(interaction)
+
+    if (threadId !== auction?.data?.threadId) {
+      if (!interaction.replied) {
+        return await interaction.reply({
+          content: "**This command only works on an auction thread**\n\nFor example: Click on '**View topic**' on threads with the prefix **Auction**: <item name>'s bids\n\nThere you should be able to bid if the auction is running!",
+          ephemeral: true,
+        });
+      }
+      return;
+    }
+
+    const bidAmount = interaction.options.getNumber('dkp');
+
+    if (isNaN(bidAmount)) {
+      if (!interaction.replied) {
+        return await interaction.reply({ content: 'Please provide a valid bid amount.', ephemeral: true });
+      }
+      return;
+    }
+
+    // Acquire the lock for the specific auction
+    while (auctionLocks.get(threadId)) {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for 100ms before checking again
+    }
+    auctionLocks.set(threadId, true);
+
+    try {
+      const allDkps = await getGuildConfig(interaction.guild.id);
+      const updatedAuction = await getAuctionDataByThreadId(threadId);
+      const userDkp = allDkps?.memberDkps.find(memberDkp => memberDkp.userId === interaction.user.id);
+      const bids = updatedAuction?.bids ?? [];
+
+      // Check if the user has DKP
+      if (userDkp?.dkp < bidAmount) {
+        if (!interaction.replied) {
+          await interaction.reply({ content: `You don't have enough DKP to bid ${bidAmount}!`, ephemeral: true });
+        }
+        return;
+      }
+
+      const highestBid = Math.max(...(bids?.map(bid => bid.bid) || []), 0);
+
+      // Check if the bid is higher than the starting price
+      if (bidAmount < updatedAuction?.startingPrice) {
+        if (!interaction.replied) {
+          await interaction.reply({ content: `Your bid must be at least ${updatedAuction?.startingPrice} DKP.`, ephemeral: true });
+        }
+        return;
+      }
+
+      // Check if the bid is higher than the highest bid
+      if (bidAmount <= highestBid) {
+        if (!interaction.replied) {
+          await interaction.reply({ content: `Your bid must be higher than the current highest bid of ${highestBid} DKP.`, ephemeral: true });
+        }
+        return;
+      }
+
+      // Check if the auction has ended
+      const auctionEndTime = updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
+        ? updatedAuction.auctionMaxTime.toDate()
+        : updatedAuction?.auctionMaxTime;
+      if (auctionEndTime && isAfter(new Date(), auctionEndTime)) {
+        if (!interaction.replied) {
+          await interaction.reply({ content: `The auction has ended.`, ephemeral: true });
+        }
+        return;
+      }
+
+      const copyBids = [...bids, { userId: interaction.user.id, bid: bidAmount }];
+
+      const auctionDTO = {
+        ...auction,
+        bids: copyBids,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      try {
+        await updateAuctionConfig(auction.data.messageId, auctionDTO);
+
+        // Process the bid
+        if (!interaction.replied) {
+          await interaction.reply({ content: `<@${interaction.user.id}> ${userDkp?.ign ? `(${userDkp?.ign})`: ''} has just bidded ${bidAmount}!` });
+        }
+      } catch (err) {
+        new Logger().logLocal(PREFIX, `Error updating auction ${auction.id}`, err);
+        if (!interaction.replied) {
+          await interaction.reply({ content: `Failed to process bid of ${bidAmount} DKP.`, ephemeral: true });
+        }
+      }
+    } finally {
+      auctionLocks.set(threadId, false);
+    }
+  }
+}
+
 /**
  *
  * @param {any} discordBot The discord bot
@@ -106,9 +248,18 @@ export async function loadAllAuctions(discordBot) {
     try {
       let channel = await discordBot.channels.fetch(auction.data.channelId);
       let message = await channel.messages.fetch(auction.data.messageId);
+      
 
       if (channel && message) {
+        
         updateAuction({ _message: message, auction });
+
+        // Auction thread
+        if (auction.data?.threadId) {
+          const thread = await discordBot.channels.fetch(auction.data?.threadId);
+
+          thread.client.on('interactionCreate', async (interaction) => await processBid(interaction, auction));
+        }
       }
     } catch (e) {
       console.log(e);
@@ -1632,9 +1783,7 @@ export const updateAuction = ({ _message = null, auction }) => {
       isEqual(now, firestoreAuctionMaxTime) || 
       isAfter(now, firestoreAuctionMaxTime)) && 
       ((auction?.cancelled && auction?.cancelled === false) || !auction?.cancelled);
-    const isStarted = 
-      isAfter(now, firestoreStarting) && 
-      isBefore(now, firestoreAuctionMaxTime);
+    const isStarted = isAfter(now, firestoreStarting);
 
       if (isFinalized) {
         return "finalized";
@@ -1652,6 +1801,8 @@ export const updateAuction = ({ _message = null, auction }) => {
 
   const { prefix, status, modal } = statusParser(dynamicAuctionStatus());
 
+  console.log(status)
+
   const { embed, components } = createOrModifyAuctionEmbed({
     itemName: auction.itemName,
     startingPrice: `${auction.startingPrice}`,
@@ -1665,6 +1816,25 @@ export const updateAuction = ({ _message = null, auction }) => {
   });
   theEmbed = embed;
   theComponents = components;
+
+  const auctionDTO = {
+    ...auction,
+    auctionStatus: status,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // Trigger the status on database
+  (async () => { try {
+    await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
+  } catch (error) {
+    console.log(error)
+    new Logger().error(PREFIX, "An error occurred while updating the auction.");
+    await i.reply({
+      content: "An error occurred while updating the auction.",
+      ephemeral: true,
+    });
+    return;
+  } })();
 
   (async () => {
     try {
@@ -1697,8 +1867,6 @@ export const updateAuction = ({ _message = null, auction }) => {
 
       const isUserOwner = auction.ownerDiscordId === userId;
 
-      console.log("isOwner", isUserOwner);
-
       if (!isUserOwner) {
         await i.reply({
           content: "You are not the owner of this auction, and can't do that.",
@@ -1707,16 +1875,51 @@ export const updateAuction = ({ _message = null, auction }) => {
         return;
       }
 
+      // create the thread only if it doesn't exist
+      let thread = await message.startThread({
+        name: `Auction: ${auction?.itemName}'s bids`,
+        reason: 'All bids are going to be here!',
+      });
+
+      try {
+        await thread.permissionOverwrites.create(thread.guild.roles.everyone, {
+          SEND_MESSAGES: false,
+        });
+        await thread.permissionOverwrites.create(thread.client.user, {
+          SEND_MESSAGES: true,
+        });
+      } catch (err) {
+        new Logger().logLocal(PREFIX, "An error occurred while setting the thread permissions.");
+        await i.reply({
+          content: "An error occurred while setting the thread permissions.",
+          ephemeral: true,
+        });
+      }
+
+      try {
+        thread.send(`Auction started for **${auction?.itemName}**!\n\n- Starting price: **${auction?.startingPrice} DKP**\n\n@everyone can start bidding by typing: **/bid ${auction?.startingPrice}**, goodluck!`);
+      } catch (error) {
+        new Logger().logLocal(PREFIX, "An error occurred while sending a message to the thread.");
+        await i.reply({
+          content: "An error occurred while sending a message to the thread.",
+          ephemeral: true,
+        });
+      }
+
+      thread.client.on('interactionCreate', async (interaction) => await processBid(interaction, auction));
+
       let embed, components;
       try {
         const { prefix, status, modal } = statusParser("started");
 
+        const formattedStartingNew = convertDateObjectToDateString(new Date());
+
         ({ embed, components } = createOrModifyAuctionEmbed({
           itemName: auction.itemName,
           startingPrice: `${auction.startingPrice}`,
-          maxPrice: `${auction.maxPrice}`,
+          itemNote: `${auction.itemNote}`,
           gapBetweenBids: `${auction.gapBetweenBids}`,
-          startingAt: `${formattedStarting}`,
+          startingAt: `${formattedStartingNew}`,
           auctionMaxTime: `${formattedMaxTime}`,
           auctionPrefix: prefix,
           auctionStatus: status,
@@ -1726,8 +1929,12 @@ export const updateAuction = ({ _message = null, auction }) => {
         const auctionDTO = {
           ...auction,
           startingAt: new Date(),
-          auctionStatus: 'started',
+          auctionStatus: status,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          data: {
+            ...auction.data,
+            threadId: thread.id
+          }
         };
 
         try {
@@ -1782,13 +1989,17 @@ export const updateAuction = ({ _message = null, auction }) => {
       try {
         const { prefix, status, modal } = statusParser("cancelled");
 
+        const formattedStartingNew = convertDateObjectToDateString(new Date());
+
+        const formattedMaxBid = convertDateObjectToDateString(new Date());
+
         ({ embed, components } = createOrModifyAuctionEmbed({
           itemName: auction.itemName,
           startingPrice: `${auction.startingPrice}`,
-          maxPrice: `${auction.maxPrice}`,
+          itemNote: `${auction.itemNote}`,
           gapBetweenBids: `${auction.gapBetweenBids}`,
-          startingAt: `${formattedStarting}`,
-          auctionMaxTime: `${formattedMaxTime}`,
+          startingAt: `${formattedStartingNew}`,
+          auctionMaxTime: `${formattedMaxBid}`,
           auctionPrefix: prefix,
           auctionStatus: status,
           modalColor: modal,
@@ -1798,7 +2009,7 @@ export const updateAuction = ({ _message = null, auction }) => {
           ...auction,
           startingAt: new Date(),
           auctionMaxTime: new Date(),
-          auctionStatus: 'cancelled',
+          auctionStatus: status,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           cancelled: true
         };
@@ -1850,7 +2061,7 @@ export const updateAuction = ({ _message = null, auction }) => {
  * @param {any} interaction Handle the modal submission for creating an auction
  */
 export const handleSubmitModalCreateAuction = async (interaction) => {
-  const [, itemName] = interaction.customId.split("#").slice(1);
+  const [, itemName, note] = interaction.customId.split("#").slice(1);
   try {
     // Defer the interaction response immediately
     await interaction.deferReply({ ephemeral: true });
@@ -1859,9 +2070,9 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
     const startingPrice = interaction.fields.getTextInputValue(
       `${command}#startingPrice`
     );
-    const maxPrice = interaction.fields.getTextInputValue(
+    /*const maxPrice = interaction.fields.getTextInputValue(
       `${command}#maxPrice`
-    );
+    );*/
     const startingAt = interaction.fields.getTextInputValue(
       `${command}#startingAt`
     );
@@ -1880,22 +2091,17 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
       errors.push("Starting price must be a number and greater than 0.");
     }
 
-    const parsedMaxPrice = parseFloat(maxPrice);
-    if (
-      maxPrice &&
-      isNaN(maxPrice) &&
-      parsedMaxPrice < parsedStartingPrice &&
-      parsedMaxPrice <= 0
-    ) {
-      errors.push(
-        "Max price must be a number, greater than 0, and greater than the starting price'."
-      );
+    if (note && note.length > 50) {
+      errors.push("The item note must not exceed 50 characters.");
+    }
+
+    if (!note || note === '') {
+      errors.push("The item note must not be empty.");
     }
 
     if (
       gapBetweenBids &&
-      isNaN(gapBetweenBids) &&
-      parsedMaxPrice < parsedStartingPrice
+      isNaN(gapBetweenBids) 
     ) {
       errors.push("Gap between bids must be a number and greater 0'.");
     }
@@ -1903,13 +2109,13 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
     // Validate startingAt format
     const dateRegex = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
     if (!dateRegex.test(startingAt)) {
-      errors.push("Starting time must be in the format dd/mm/yyyy-hh:mm:ss.");
+      errors.push("Starting time must be in the format: **dd/mm/yyyy-hh:mm:ss**.");
     }
 
     const dateRegexAuctionMaxTime = /^\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2}$/;
     if (!dateRegexAuctionMaxTime.test(auctionMaxTime)) {
       errors.push(
-        "Auction max time must be in the format dd/mm/yyyy-hh:mm:ss."
+        "Auction max time must be in the format: **dd/mm/yyyy-hh:mm:ss**."
       );
     }
 
@@ -1939,15 +2145,12 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
       });
     }
 
-    /**
-     * TODO: bids = [{ userId: string, bidValue: number, createdAt: Date }]
-     */
     const { modal, prefix, status } = statusParser("scheduled");
     const auctionDTO = {
       itemName,
+      itemNote: note,
       auctionMaxTime: parsedAuctionMaxTime,
       gapBetweenBids: parseFloat(gapBetweenBids),
-      maxPrice: parseFloat(maxPrice),
       startingAt: parsedStartingAt,
       startingPrice: parseFloat(startingPrice),
       auctionStatus: status,
@@ -1962,10 +2165,9 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
 
     try {
       let { embed, components } = createOrModifyAuctionEmbed({
-        auctionId: "ff",
         itemName,
+        itemNote: note,
         startingPrice,
-        maxPrice,
         gapBetweenBids,
         startingAt,
         auctionMaxTime,
@@ -2027,12 +2229,24 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
 };
 
 /**
- *
+ * Create the auction
  *
  * @param {any} interaction The interaction
  */
 export const createAuction = async (interaction) => {
   const itemName = interaction.options.getString("item");
+  const itemNote = interaction.options.getString("note");
+
+  const choices = items.map((item) => item.name?.toLowerCase().trim());
+
+  // Check if the item is valid
+  if (!choices?.some(name => name.toLowerCase().trim() === itemName.toLowerCase().trim())) {
+    await interaction.reply({
+      content: "Invalid item selected",
+      ephemeral: true,
+    });
+    return;
+  }
 
   if (!itemName) {
     await interaction.reply({
@@ -2070,7 +2284,7 @@ export const createAuction = async (interaction) => {
 
     if (confirmation.customId === "confirm") {
       const modal = new ModalBuilder()
-        .setCustomId(`auction-create#modal#${itemName}`)
+        .setCustomId(`auction-create#modal#${itemName}#${itemNote}`)
         .setTitle("Enter Auction Details");
 
       const startingPrice = new TextInputBuilder()
@@ -2080,25 +2294,31 @@ export const createAuction = async (interaction) => {
         .setPlaceholder("Enter a number here")
         .setRequired(true);
 
-      const maxPrice = new TextInputBuilder()
+      /*const maxPrice = new TextInputBuilder()
         .setCustomId("auction-create#maxPrice")
         .setLabel("Bid max price:")
         .setStyle(TextInputStyle.Short)
         .setPlaceholder("Enter a number here")
-        .setRequired(false);
+        .setRequired(false);*/
 
       const startingAt = new TextInputBuilder()
         .setCustomId("auction-create#startingAt")
-        .setLabel("Starting time:")
+        .setLabel("When will the auction start:")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Type in format (dd/mm/yyyy:hh:mm:ss)")
+        .setMaxLength(19)
+        .setMinLength(19)
+        .setPlaceholder("Expected format: (dd/mm/yyyy-hh:mm:ss)")
+        .setValue(convertDateObjectToDateString(add(new Date(), { minutes: 20 })))
         .setRequired(true);
 
       const auctionMaxTime = new TextInputBuilder()
         .setCustomId("auction-create#auctionMaxTime")
         .setLabel("Auction max time:")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Type in format (dd/mm/yyyy:hh:mm:ss)")
+        .setMaxLength(19)
+        .setMinLength(19)
+        .setPlaceholder("Expected format: (dd/mm/yyyy-hh:mm:ss)")
+        .setValue(convertDateObjectToDateString(add(new Date(), { hours: 1 })))
         .setRequired(true);
 
       const gapBetweenBids = new TextInputBuilder()
@@ -2106,16 +2326,16 @@ export const createAuction = async (interaction) => {
         .setLabel("Gap between bids:")
         .setStyle(TextInputStyle.Short)
         .setPlaceholder(
-          "Only bids that have a difference of X or more will be accepted"
+          "Bids with difference of X or more will be allowed"
         )
         .setRequired(true);
 
       const actionRows = [
         new ActionRowBuilder().addComponents(startingPrice),
-        new ActionRowBuilder().addComponents(maxPrice),
-        new ActionRowBuilder().addComponents(startingAt),
-        new ActionRowBuilder().addComponents(auctionMaxTime),
         new ActionRowBuilder().addComponents(gapBetweenBids),
+        //new ActionRowBuilder().addComponents(maxPrice),
+        new ActionRowBuilder().addComponents(startingAt),
+        new ActionRowBuilder().addComponents(auctionMaxTime)
       ];
 
       modal.addComponents(actionRows);
@@ -2145,13 +2365,17 @@ export const createAuction = async (interaction) => {
   }
 };
 
+/**
+ * Handle the auction start
+ * @param {any} interaction The interaction
+ * @returns The auction 
+ */
 export const handleStartAuction = async (interaction) => {
   const auctionId = interaction.options.getString("auction-id");
 
   const auction = await getAuctionData(auctionId);
 
   const message = await interaction.fetchReply();
-  console.log(message);
 
   // Ensure the message has embeds before accessing them
   if (!message.embeds || message.embeds.length === 0) {
@@ -2178,8 +2402,9 @@ export const handleStartAuction = async (interaction) => {
     data: {
       auctionId: auctionId,
       itemName: auction.itemName,
+      itemNote: auction.itemNote,
       startingPrice: auction.startingPrice,
-      maxPrice: auction.maxPrice,
+      //maxPrice: auction.maxPrice,
       gapBetweenBids: auction.gapBetweenBids,
       startingAt: auction.startingAt,
       auctionMaxTime: auction.auctionMaxTime,

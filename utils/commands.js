@@ -35,7 +35,8 @@ export async function loadCommands() {
       commandExecution: undefined,
       permissions: undefined,
       commandCategory: undefined,
-      new: undefined
+      new: undefined,
+      noExecution: undefined
     }));
 
     try {
@@ -374,30 +375,37 @@ export const commands = [
         required: true,
         autocomplete: true,
       },
+      {
+        name: "note",
+        type: ApplicationCommandOptionType.String,
+        description: "Trait? Stats? Anything you want to add",
+        required: true,
+      },
     ],
     commandExecution: api.createAuction,
     handleAutocomplete: api.handleAuctionAutocomplete,
     handleSubmitModal: api.handleSubmitModalCreateAuction,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
-    commandCategory: "DKP System",
+    commandCategory: "Auction System",
     new: true
   },
   {
-    name: "auction-start",
+    name: "bid",
     description:
-      "Starts an auction",
+      "Bid on an auction",
     options: [
       {
-        name: "auction-id",
-        type: ApplicationCommandOptionType.String,
-        description: "The ID of the auction",
+        name: "dkp",
+        type: ApplicationCommandOptionType.Number,
+        description: "The amount of DKP",
         required: true,
       }
     ],
     commandExecution: api.handleStartAuction,
-    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
-    commandCategory: "DKP System",
-    new: true
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
+    commandCategory: "Auction System",
+    new: true,
+    noExecution: true
   }
 
   /*{
@@ -457,7 +465,11 @@ const anwerInteraction = async (interaction, answer) => {
 export async function handleCommands(interaction, commandName) {
   const userId = interaction.user.id;
 
-  if (interaction.isCommand() && isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE)) {
+  const commandToFind = commands?.find(
+    (c) => c.name?.toLowerCase() === commandName
+  );
+
+  if (interaction.isCommand() && isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE) && !commandToFind?.noExecution) {
     try {
       await anwerInteraction(interaction, {
         content: "You have exceeded the maximum number of commands per minute. Please try again later.",
@@ -473,10 +485,6 @@ export async function handleCommands(interaction, commandName) {
     }
     return;
   }
-
-  const commandToFind = commands?.find(
-    (c) => c.name?.toLowerCase() === commandName
-  );
 
   if (!commandToFind) {
     new Logger(interaction).log(
@@ -503,7 +511,9 @@ export async function handleCommands(interaction, commandName) {
     }
   } else {
     try {
-        return commandToFind.commandExecution(interaction);
+        if (!commandToFind?.noExecution) {
+          return commandToFind.commandExecution(interaction);
+        }
     } catch (e) {
       new Logger(interaction).error(
         `${PREFIX}`,

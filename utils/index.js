@@ -246,17 +246,17 @@ export function createOrModifyAuctionEmbed(data) {
   // Create buttons
   let components = null;
 
-  const bidComponent = new ButtonBuilder()
+  /*const bidComponent = new ButtonBuilder()
     .setCustomId("bid")
     .setLabel("Bid")
     .setEmoji("🤑")
-    .setStyle(ButtonStyle.Secondary);
+    .setStyle(ButtonStyle.Secondary);*/
   const startAuctionComponent = new ButtonBuilder()
     .setCustomId("start_auction")
     .setLabel("Start Auction now!")
     .setEmoji("💸")
     .setStyle(ButtonStyle.Success);
-  const stopAuctionComponent = new ButtonBuilder()
+  const cancelAuctionComponent = new ButtonBuilder()
     .setCustomId("stop_auction")
     .setLabel("Cancel auction now")
     .setEmoji("✖️")
@@ -264,9 +264,9 @@ export function createOrModifyAuctionEmbed(data) {
 
   // The buttons
   if (data?.auctionStatus === "scheduled") {
-    components = [startAuctionComponent];
-  } else if (data?.auctionStatus === "started") {
-    components = [bidComponent, stopAuctionComponent];
+    components = [startAuctionComponent, cancelAuctionComponent];
+  /*} else if (data?.auctionStatus === "started") {
+    components = [bidComponent];*/
   } else {
     components = null;
   }
@@ -287,32 +287,28 @@ export function createOrModifyAuctionEmbed(data) {
     `With the minimum price starting at: **${data?.startingPrice?.toString()} DKP**!`
   )
   .addFields(
-    { name: "Item", value: data?.itemName?.trim() },
+    { name: "Item", value: `${data?.itemName?.trim()} (${data?.itemNote})` },
     {
       name: "Starting price",
       value: `${data?.startingPrice?.toString()} DKP`,
       inline: true,
     },
     {
-      name: "Max price",
-      value: `${data?.maxPrice?.toString()} DKP`,
-      inline: true,
-    },
-    {
-      name: "Gap between bids:",
+      name: "Gap between bids",
       value: `${data?.gapBetweenBids} DKP`,
       inline: true,
-    }
+    },
+    { name: '\u200b', value: '\u200b', inline: true }
   )
   .addFields(
-    { name: "Starting at:", value: `${data?.startingAt} **(UTC-3)**`, inline: true },
+    { name: "Starting at", value: `${data?.startingAt?.replace('-', ' ')} **(UTC-3)**`, inline: true },
     {
-      name: "Auction valid until:",
-      value: `${data?.auctionMaxTime} **(UTC-3)**`,
+      name: "Auction valid until",
+      value: `${data?.auctionMaxTime?.replace('-', ' ')} **(UTC-3)**`,
       inline: true,
     },
     {
-      name: "How to bid?",
+      name: "How to bid",
       value: `[Click to Learn](https://discordjs.guide/ 'Click here to learn how to bid')`,
       inline: true,
     }
@@ -325,7 +321,7 @@ export function createOrModifyAuctionEmbed(data) {
   // Only show bidders if the auction is not scheduled or cancelled
   if (data?.auctionStatus !== "scheduled" && data?.auctionStatus !== "cancelled") {
     const hasBidder = data?.highestBidder;
-    let textBidder = `Highest bid (Winning): Nobody has bid yet!`;
+    let textBidder = `Winning bid (Highest): Nobody has bidded yet!`;
     if (hasBidder) {
       textBidder = `Highest bid (Winning): ${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP`;
     }
@@ -358,4 +354,19 @@ export function convertDateStringToDateObject(time) {
     )
   );
   return parsed;
+}
+
+export function convertDateObjectToDateString(date) {
+  const formattedStartingNew = date
+          .toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+          .replace(",", "")
+          .replace(" ", "-");
+  return formattedStartingNew;
 }
