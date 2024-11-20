@@ -35,7 +35,6 @@ export const searchItem = async (itemName) => {
 
     if (response.data && response.data.result && response.data.result.data) {
       const result = response.data.result.data.pageData;
-      console.log(result);
       const formatted = result.map((item) => {
         if (item.icon) {
           item.icon = transformIconPath(item.icon);
