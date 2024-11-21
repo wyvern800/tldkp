@@ -36,6 +36,7 @@ config();
 
 let auctionLocks = new Map();
 export const auctionsMap = new Map();
+export const threadListeners = new Map();
 
 /**
  * Gets the guild config
@@ -395,7 +396,7 @@ export async function loadAllAuctions(discordBot) {
             );
             auctionsMap.set(auction.data?.threadId, auction);
 
-            thread.client.on("interactionCreate", async (interaction) => {
+            const listener = async (interaction) => {
               const { commandName } = interaction;
 
               // Avoid this command to be used in threads
@@ -420,7 +421,25 @@ export async function loadAllAuctions(discordBot) {
               if (auction) {
                 await processBid(interaction, auction);
               }
-            });
+            };
+
+            // set the listener for the thread only if there is an started auction
+            if (auction?.auctionStatus === "started") {
+              threadListeners.set(thread.id, listener);
+              thread.client.on("interactionCreate", listener);
+            } else {
+              const listener = threadListeners.get(thread.id);
+              if (listener) {
+                  discordBot.removeListener('interactionCreate', listener);
+                  threadListeners.delete(thread.id);
+                  new Logger().logLocal(PREFIX, `Listener removed for thread ${thread.name}`);
+              }
+              await thread.setLocked(true);
+              new Logger().logLocal(
+                "Auctions",
+                `This auction for ${auction?.itemName} is not running, so no listener is needed`
+              );
+            }
           }
         }
       } catch (e) {
@@ -1811,7 +1830,7 @@ export const statusParser = (_auctionStatus) => {
       break;
     default:
       auctionPrefix = "has been";
-      auctionStatus = "finished";
+      auctionStatus = "finalized";
       modalColor = 0x00ff00;
       break;
   }
@@ -1890,8 +1909,6 @@ export const updateAuction = async ({ _message = null, auction }) => {
 
   const { prefix, status, modal } = statusParser(dynamicAuctionStatus());
 
-  console.log(status);
-
   const highestBid = Math.max(
     ...(auction.bids?.map((bid) => bid.bid) || {}),
     0
@@ -1937,10 +1954,7 @@ export const updateAuction = async ({ _message = null, auction }) => {
   // Trigger the status on database
   (async () => {
     try {
-      if (auction?.finalized && !auction.finalized === true) {
-        Logger().logLocal("Auction", "Auction is already finalized.");
-        await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
-      }
+      await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
     } catch (error) {
       console.log(error);
       new Logger().error(
@@ -1957,13 +1971,10 @@ export const updateAuction = async ({ _message = null, auction }) => {
 
   (async () => {
     try {
-      if (!auction?.finalized && !auction?.cancelled) {
-        new Logger().logLocal("Auction", "Auction is already finalized/cancelled, skipped discord.");
-        await message.edit({
-          embeds: [theEmbed],
-          components: theComponents ? theComponents : [],
-        });
-      }
+      await message.edit({
+        embeds: [theEmbed],
+        components: theComponents ? theComponents : [],
+      });
     } catch (error) {
       console.error("Error editing message:", error);
       await i.reply({
@@ -2048,7 +2059,8 @@ export const updateAuction = async ({ _message = null, auction }) => {
         },
       });
 
-      thread.client.on("interactionCreate", async (interaction) => {
+      // set the listener for the thread
+      const listerner = async (interaction) => {
         const { commandName } = interaction;
 
         if (commandName === "bid" && interaction?.channel?.type === 0) {
@@ -2068,7 +2080,10 @@ export const updateAuction = async ({ _message = null, auction }) => {
         if (theAuction) {
           await processBid(interaction, theAuction);
         }
-      });
+      };
+
+      threadListeners.set(thread.id, listerner);
+      thread.client.on("interactionCreate", listerner);
 
       let embed, components;
       try {
@@ -2123,12 +2138,10 @@ export const updateAuction = async ({ _message = null, auction }) => {
       }
 
       try {
-        if (status !== "finalized" && status !== "cancelled") {
           await message.edit({
             embeds: [embed],
             components: components ? components : [],
           });
-        }
       } catch (error) {
         new Logger().error(
           PREFIX,
@@ -2211,13 +2224,14 @@ export const updateAuction = async ({ _message = null, auction }) => {
       }
 
       try {
-        if (status !== "finalized" && status !== "cancelled") {
-          Logger().logLocal("Auction", "Auction is already finalized, skipped discord.");
+          Logger().logLocal(
+            "Auction",
+            "Auction is already finalized, skipped discord."
+          );
           await message.edit({
             embeds: [embed],
             components: components ? components : [],
           });
-        }
       } catch (error) {
         console.error("Error editing message:", error);
         await i.reply({
@@ -2500,7 +2514,7 @@ export const createAuction = async (interaction) => {
         .setMinLength(19)
         .setPlaceholder("Expected format: (dd/mm/yyyy-hh:mm:ss)")
         .setValue(
-          convertDateObjectToDateString(add(new Date(), { minutes: 20 }))
+          convertDateObjectToDateString(add(new Date(), { seconds: 20 }))
         )
         .setRequired(true);
 
@@ -2511,7 +2525,7 @@ export const createAuction = async (interaction) => {
         .setMaxLength(19)
         .setMinLength(19)
         .setPlaceholder("Expected format: (dd/mm/yyyy-hh:mm:ss)")
-        .setValue(convertDateObjectToDateString(add(new Date(), { hours: 1 })))
+        .setValue(convertDateObjectToDateString(add(new Date(), { seconds: 40 })))
         .setRequired(true);
 
       const gapBetweenBids = new TextInputBuilder()

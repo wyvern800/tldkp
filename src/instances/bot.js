@@ -3,6 +3,7 @@ import { handleCommands, handleAutoComplete, handleSubmitModal } from "../../uti
 import { loadCommands } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
+import { threadListeners } from "../../database/repository.js";
 
 const PREFIX = "Discord.js";
 
@@ -114,6 +115,19 @@ export const createBotClient = () => {
       await handleSubmitModal(interaction, command?.toLowerCase());
     } else if (interaction.isAutocomplete()) {
       await handleAutoComplete(interaction, commandName?.toLowerCase());
+    }
+  });
+
+  // When a thread is deleted
+  client.on('threadDelete', (thread) => {
+    new Logger().logLocal(PREFIX, `Thread deleted: ${thread.name} (${thread.id})`);
+
+    // Remove the listener for this thread
+    const listener = threadListeners.get(thread.id);
+    if (listener) {
+        client.removeListener('interactionCreate', listener);
+        threadListeners.delete(thread.id);
+        new Logger().logLocal(PREFIX, `Listener removed for thread ${thread.name}`);
     }
   });
 
