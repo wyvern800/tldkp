@@ -182,8 +182,8 @@ export async function processBid(interaction, auction) {
       if (remainingDkp < bidAmount) {
         if (!interaction.replied) {
           await interaction.reply({
-        content: `You don't have enough remaining DKP to bid ${bidAmount}! Your remaining DKP is ${remainingDkp}.`,
-        ephemeral: true,
+            content: `You don't have enough remaining DKP to bid ${bidAmount}! Your remaining DKP (open to bid) is ${remainingDkp}.`,
+            ephemeral: true,
           });
         }
         return;
@@ -283,22 +283,24 @@ export async function processBid(interaction, auction) {
         try {
           const updatedStartTime =
             updatedAuction?.startingAt instanceof admin.firestore.Timestamp
-          ? updatedAuction.startingAt.toDate()
-          : updatedAuction?.startingAt;
+              ? updatedAuction.startingAt.toDate()
+              : updatedAuction?.startingAt;
 
           const auctionEndTime =
             updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
-          ? updatedAuction.auctionMaxTime.toDate()
-          : updatedAuction?.auctionMaxTime;
+              ? updatedAuction.auctionMaxTime.toDate()
+              : updatedAuction?.auctionMaxTime;
 
-          const formattedStartingNew = convertDateObjectToDateString(
-            updatedStartTime
-          );
-          const formattedMaxTime = convertDateObjectToDateString(
-            auctionEndTime
+          const formattedStartingNew =
+            convertDateObjectToDateString(updatedStartTime);
+          const formattedMaxTime =
+            convertDateObjectToDateString(auctionEndTime);
+
+          const { prefix, status, modal } = statusParser(
+            updatedAuction?.auctionStatus
           );
 
-          const { prefix, status, modal } = statusParser(updatedAuction?.auctionStatus);
+          console.log(interaction?.member);
 
           let embed, components;
           ({ embed, components } = createOrModifyAuctionEmbed({
@@ -313,17 +315,28 @@ export async function processBid(interaction, auction) {
             modalColor: modal,
             highestBidder: {
               bid: bidAmount,
-              name: `${interaction?.member?.nickname !== '' ? interaction.member.nickname : interaction.user.globalName}!`,
+              name: `${
+                interaction?.member?.nickname &&
+                interaction?.member?.nickname !== ""
+                  ? interaction.member.nickname
+                  : interaction.user.globalName
+              }!`,
             },
           }));
 
-          let channel = await client.channels.fetch(updatedAuction.data.channelId);
-          let message = await channel.messages.fetch(updatedAuction.data.messageId);
+          let channel = await client.channels.fetch(
+            updatedAuction.data.channelId
+          );
+          let message = await channel.messages.fetch(
+            updatedAuction.data.messageId
+          );
 
-          await message.edit({
-            embeds: [embed],
-            components: components ? components : [],
-          });
+          if (!updatedAuction?.finalized && !updatedAuction?.cancelled) {
+            await message.edit({
+              embeds: [embed],
+              components: components ? components : [],
+            });
+          }
         } catch (error) {
           console.error("Error in createOrModifyAuctionEmbed:", error);
           await i.reply({
@@ -1784,7 +1797,7 @@ export const statusParser = (_auctionStatus) => {
     case "started":
       auctionPrefix = "has been";
       auctionStatus = "started";
-      modalColor = 0x5865F2;
+      modalColor = 0x5865f2;
       break;
     case "cancelled":
       auctionPrefix = "has been";
@@ -1853,10 +1866,13 @@ export const updateAuction = async ({ _message = null, auction }) => {
     const isFinalized =
       (isEqual(firestoreStarting, firestoreAuctionMaxTime) ||
         isEqual(now, firestoreAuctionMaxTime) ||
-        isAfter(now, firestoreAuctionMaxTime)) &&
+        isAfter(now, firestoreAuctionMaxTime) ||
+        auction?.finalized) &&
       ((auction?.cancelled && auction?.cancelled === false) ||
         !auction?.cancelled);
-    const isStarted = isAfter(now, firestoreStarting) && (!auction?.cancelled || auction?.cancelled === false);
+    const isStarted =
+      isAfter(now, firestoreStarting) &&
+      (!auction?.cancelled || auction?.cancelled === false);
 
     if (isFinalized) {
       return "finalized";
@@ -1876,11 +1892,21 @@ export const updateAuction = async ({ _message = null, auction }) => {
 
   console.log(status);
 
-  const highestBid = Math.max(...(auction.bids?.map((bid) => bid.bid) || {}), 0);
+  const highestBid = Math.max(
+    ...(auction.bids?.map((bid) => bid.bid) || {}),
+    0
+  );
   const highestBidder = auction.bids?.find((bid) => bid.bid === highestBid);
-  const discord = client.users.cache.get(highestBidder?.userId);
-  const highestBidderMember = await message.guild.members.fetch(highestBidder?.userId);
-  const highestBidderNickname = highestBidderMember?.nickname || discord?.user?.globalName;
+  const highestBidderMember = await message.guild.members.fetch(
+    highestBidder?.userId
+  );
+  const highestBidderNickname =
+    highestBidderMember?.nickname &&
+    highestBidderMember?.nickname !== "" &&
+    highestBidderMember?.nickname !== "null" &&
+    highestBidderMember?.nickname !== null
+      ? highestBidderMember.nickname
+      : highestBidderMember?.user?.globalName;
 
   const { embed, components } = createOrModifyAuctionEmbed({
     itemName: auction.itemName,
@@ -1905,12 +1931,16 @@ export const updateAuction = async ({ _message = null, auction }) => {
     ...auction,
     auctionStatus: status,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...(status === "finalized" && { finalized: true }),
   };
 
   // Trigger the status on database
   (async () => {
     try {
-      await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
+      if (auction?.finalized && !auction.finalized === true) {
+        Logger().logLocal("Auction", "Auction is already finalized.");
+        await updateAuctionConfig(auction?.data?.messageId, auctionDTO);
+      }
     } catch (error) {
       console.log(error);
       new Logger().error(
@@ -1927,10 +1957,13 @@ export const updateAuction = async ({ _message = null, auction }) => {
 
   (async () => {
     try {
-      await message.edit({
-        embeds: [theEmbed],
-        components: theComponents ? theComponents : [],
-      });
+      if (!auction?.finalized && !auction?.cancelled) {
+        new Logger().logLocal("Auction", "Auction is already finalized/cancelled, skipped discord.");
+        await message.edit({
+          embeds: [theEmbed],
+          components: theComponents ? theComponents : [],
+        });
+      }
     } catch (error) {
       console.error("Error editing message:", error);
       await i.reply({
@@ -2090,13 +2123,17 @@ export const updateAuction = async ({ _message = null, auction }) => {
       }
 
       try {
-        await message.edit({
-          embeds: [embed],
-          components: components ? components : [],
-        });
-        console.log(`${i.user.tag} start.`);
+        if (status !== "finalized" && status !== "cancelled") {
+          await message.edit({
+            embeds: [embed],
+            components: components ? components : [],
+          });
+        }
       } catch (error) {
-        console.error("Error editing message:", error);
+        new Logger().error(
+          PREFIX,
+          `An error occurred while editing the message: ${error}`
+        );
         await i.reply({
           content: "An error occurred while editing the message.",
           ephemeral: true,
@@ -2147,7 +2184,9 @@ export const updateAuction = async ({ _message = null, auction }) => {
         };
 
         try {
-          await updateAuctionConfig(auction.data.messageId, auctionDTO);
+          if (auction?.finalized && !auction.finalized === true) {
+            await updateAuctionConfig(auction.data.messageId, auctionDTO);
+          }
         } catch (error) {
           new Logger().error(
             PREFIX,
@@ -2172,11 +2211,13 @@ export const updateAuction = async ({ _message = null, auction }) => {
       }
 
       try {
-        await message.edit({
-          embeds: [embed],
-          components: components ? components : [],
-        });
-        console.log(`${i.user.tag} start.`);
+        if (status !== "finalized" && status !== "cancelled") {
+          Logger().logLocal("Auction", "Auction is already finalized, skipped discord.");
+          await message.edit({
+            embeds: [embed],
+            components: components ? components : [],
+          });
+        }
       } catch (error) {
         console.error("Error editing message:", error);
         await i.reply({
@@ -2187,9 +2228,11 @@ export const updateAuction = async ({ _message = null, auction }) => {
     }
   });
 
-  collector.on("end", (collected) => {
-    console.log(`Collected ${collected.size} interactions.`);
-  });
+  if (process.env.NODE_ENV === "development") {
+    collector.on("end", (collected) => {
+      console.log(`Collected ${collected.size} interactions.`);
+    });
+  }
 };
 
 /**
@@ -2386,7 +2429,8 @@ export const createAuction = async (interaction) => {
 
   // Check if the item is valid
   if (
-    !theItem?.length && theItem[0]?.name !== itemName?.toLowerCase()?.trim()
+    !theItem?.length &&
+    theItem[0]?.name !== itemName?.toLowerCase()?.trim()
   ) {
     await interaction.reply({
       content: "Invalid item selected",

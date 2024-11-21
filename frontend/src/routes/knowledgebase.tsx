@@ -13,10 +13,14 @@ import {
   AccordionIcon,
   Box,
   Spinner,
+  Image,
+  Center
 } from "@chakra-ui/react";
 import { IoChevronForward } from "react-icons/io5";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import bid from "../assets/howto/1.png";
+import bid2 from "../assets/howto/2.png";
 
 export default function KnowledgeBasePage() {
   const location = useLocation();
@@ -117,24 +121,16 @@ export default function KnowledgeBasePage() {
                   </AccordionButton>
                 </h2>
                 <AccordionPanel pb={4}>
-                  To bid, click on the item you want to bid on and enter the
-                  amount you want to bid.
-                </AccordionPanel>
-              </AccordionItem>
-
-              <AccordionItem>
-                <h2>
-                  <AccordionButton>
-                    <Box flex="1" textAlign="left">
-                      How can I customize my HUD?
-                    </Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  HUDs are customizable, allowing players to tailor the
-                  interface to their preferences and enhance their gaming
-                  experience.
+                  1- To bid, you must wait for the auction to start. Once the bidding thread starts you can click on <b style={{color: "0AAAEF"}}>1 message</b> &rsaquo; on the upper right corner (Like in the photo): <br/>
+                  <Center>
+                    <Image src={bid} width="40%" alt='Dan Abramov' borderRadius={"10px"} margin={"15px"}/><br/>
+                  </Center>
+                  2- And there use the command <b>/bid [amount]</b> (Like in the photo):
+                  <Center>
+                    <Image src={bid2} width={"30%"} alt='Dan Abramov' borderRadius={"10px"} margin={"15px"}/><br/>
+                  </Center>
+                  3- Then if you have sufficient DKP (not bidded in others items) you can keep bidding until your DKP is fully alocated.<br/>
+                  4- Then if you have the highest bid, you will be notified and you can claim the item when the guild master decides to distribute.
                 </AccordionPanel>
               </AccordionItem>
 
@@ -148,8 +144,7 @@ export default function KnowledgeBasePage() {
                   </AccordionButton>
                 </h2>
                 <AccordionPanel pb={4}>
-                  You can share your HUD by clicking the share button above and
-                  uploading your HUD file.
+                  You can share your HUD by clicking HUDS and then upload clicking on the button 'Upload HUD', have in mind that your HUD must be accepted in order for it to be freely available to others.
                 </AccordionPanel>
               </AccordionItem>
             </Accordion>

@@ -309,7 +309,7 @@ export function createOrModifyAuctionEmbed(data) {
     },
     {
       name: "How to bid",
-      value: `[Click to Learn](https://discordjs.guide/ 'Click here to learn how to bid')`,
+      value: `[Click to Learn](https://tldkp.online?knowledge-base?read=how-do-i-bid 'Click here to learn how to bid')`,
       inline: true,
     }
   )
@@ -320,7 +320,7 @@ export function createOrModifyAuctionEmbed(data) {
 
   // Only show bidders if the auction is not scheduled or cancelled
   if (data?.auctionStatus !== "scheduled" && data?.auctionStatus !== "cancelled") {
-    const hasBidder = data?.highestBidder;
+    const hasBidder = data?.highestBidder?.name !== undefined && data?.highestBidder?.bid !== 0;
     let textBidder = `Winning bid (Highest): Nobody has bidded yet!`;
     if (hasBidder) {
       textBidder = `Winning bid (Highest): ${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP!`;
