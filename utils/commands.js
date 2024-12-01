@@ -307,6 +307,33 @@ export const commands = [
             name: "20 minutes",
             value: 20,
           },
+          {
+            name: "25 minutes",
+            value: 25,
+          },
+          {
+            name: "30 minutes",
+            value: 30,
+          },
+          {
+            name: "35 minutes",
+            value: 35,
+          },
+           {
+            name: "40 minutes",
+            value: 40,
+          },
+           {
+            name: "45 minutes",
+            value: 45,
+          },
+           {
+            name: "50 minutes",
+            value: 50,
+           }, {
+            name: "1 hour",
+            value: 60,
+          },
         ],
         required: true,
       },
