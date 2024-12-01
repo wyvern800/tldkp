@@ -1082,7 +1082,7 @@ export async function claimDkpCode(interaction) {
   updateDkp(
     increasedDkp,
     user.id,
-    choices === "add" ? amount : -amount,
+    amount,
     user,
     guildDataResponse?.guildData?.name,
     guildDataResponse
@@ -1097,18 +1097,10 @@ export async function claimDkpCode(interaction) {
 
   await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
 
-  const answer = {
-    add: "increased to",
-    remove: "subtracted to",
-    set: "set to",
-  };
-
   const value = newGuildData?.memberDkps?.find(
     (member) => member.userId === user.id
   );
-  const msg = `<@${user.id}>'s DKP was ${
-    answer[choices?.toLowerCase() ?? "updated to"]
-  } ${value?.dkp}!`;
+  const msg = `<@${user.id}>'s DKP was increased to **${value?.dkp}**!`;
   new Logger(interaction).log(PREFIX, msg);
   return await interaction.reply({ content: msg, ephemeral: true });
 }
