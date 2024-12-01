@@ -19,6 +19,7 @@ import multer from "multer";
 import Clerk from "../../utils/clerk.js";
 import { uploadFile } from "../../utils/index.js";
 import { getPermissionVerbose } from "../../utils/commands.js";
+import { Logger } from "../../utils/logger.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -282,7 +283,7 @@ export const createServer = (client) => {
   });
 
   app.listen(port, () => {
-    console.log(`[Express] HTTP Server running on port ${port}`);
+    new Logger().log("express", `HTTP Server running on port ${port}`);
   });
 
   return app;
