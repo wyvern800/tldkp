@@ -16,6 +16,16 @@ const PREFIX = "Firebase";
 
 config();
 
+const functionExecutionCount = {};
+
+function trackFunctionExecution(functionName) {
+  if (!functionExecutionCount[functionName]) {
+    functionExecutionCount[functionName] = 0;
+  }
+  functionExecutionCount[functionName]++;
+  new Logger().log('repository.js', `Function ${functionName} executed ${functionExecutionCount[functionName]} times`);
+}
+
 /**
  * Gets the guild config
  *
@@ -23,6 +33,8 @@ config();
  * @returns { any } Data
  */
 export async function getGuildConfig(guildId) {
+  trackFunctionExecution('getGuildConfig');
+
   const guildSnapshot = await db.collection("guilds").doc(guildId).get();
 
   if (!guildSnapshot.exists) {
@@ -40,6 +52,7 @@ export async function getGuildConfig(guildId) {
  * @returns { any } Data
  */
 export async function getAllGuilds() {
+  trackFunctionExecution('getAllGuilds');
   const snapshot = await db.collection("guilds").get();
 
   if (snapshot.empty) {
@@ -56,6 +69,7 @@ export async function getAllGuilds() {
 }
 
 export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
+  trackFunctionExecution('getGuildsByOwnerOrUser');
   try {
     const guildsRef = db.collection("guilds");
 
@@ -194,6 +208,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
  * @returns { any[] } The data
  */
 export async function getData(guildId, collection) {
+  trackFunctionExecution('getGuildsByOwnerOrUser');
   const doc = await db.collection(collection).doc(guildId).get();
 
   if (!doc.exists) {
@@ -207,6 +222,7 @@ export async function getData(guildId, collection) {
 }
 
 async function getDkpByUserId(interaction, guildId, userId) {
+  trackFunctionExecution('getDkpByUserId');
   const doc = await db.collection("guilds").doc(guildId).get();
 
   // If the document doesn't exist, log an error and return null
@@ -242,6 +258,7 @@ async function getDkpByUserId(interaction, guildId, userId) {
  * @returns { any } Response
  */
 export async function guildCreate(guild) {
+  trackFunctionExecution('guildCreate');
   const defaultConfig = {
     guildData: {
       id: guild.id,
@@ -275,6 +292,7 @@ export async function guildCreate(guild) {
  * @returns
  */
 export async function handleUpdateDkp(interaction) {
+  trackFunctionExecution('handleUpdateDkp');
   const choices = interaction.options.getString("operation");
   const user = interaction.options.getUser("user");
   const amount = interaction.options.getInteger("amount");
@@ -384,6 +402,7 @@ export async function handleUpdateDkp(interaction) {
 }
 
 export const updateNickname = async (interaction) => {
+  trackFunctionExecution('updateNickname');
   const user = interaction.user;
   const nickname = interaction.options.getString("nickname");
 
@@ -480,6 +499,7 @@ export const updateNickname = async (interaction) => {
  * @returns { any } Response
  */
 export async function changeLanguage(interaction) {
+  trackFunctionExecution('changeLanguage');
   const language = interaction.options.getString("language");
 
   const guildDataResponse = await getGuildConfig(interaction.guild.id);
@@ -514,6 +534,7 @@ export async function changeLanguage(interaction) {
  * @returns { void }
  */
 export const handleClear = async (interaction) => {
+  trackFunctionExecution('handleClear');
   const { options } = interaction;
 
   const amount = options.getInteger("amount") || 100;
@@ -571,6 +592,7 @@ export const handleClear = async (interaction) => {
  * @returns { void }
  */
 export const handleCheck = async (interaction) => {
+  trackFunctionExecution('handleCheck');
   const user = interaction.user;
 
   try {
@@ -616,6 +638,7 @@ export const handleCheck = async (interaction) => {
  * @returns { void }
  */
 export const checkOther = async (interaction) => {
+  trackFunctionExecution('checkOther');
   const { options } = interaction;
   const user = options.getUser("user");
   try {
@@ -669,6 +692,7 @@ export const checkOther = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const setGuildNickname = async (interaction) => {
+  trackFunctionExecution('setGuildNickname');
   const nickname = interaction.options.getString("alias");
 
   try {
@@ -750,6 +774,7 @@ export const setGuildNickname = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const setupAutoDecay = async (interaction) => {
+  trackFunctionExecution('setupAutoDecay');
   const percentage = interaction.options.getNumber("percentage");
   const interval = interaction.options.getInteger("interval");
 
@@ -809,6 +834,7 @@ export const setupAutoDecay = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const toggleDkpNotifications = async (interaction) => {
+  trackFunctionExecution('toggleDkpNotifications');
   try {
     const guildId = interaction.guild.id;
 
@@ -865,6 +891,7 @@ export const toggleDkpNotifications = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const toggleDecay = async (interaction) => {
+  trackFunctionExecution('toggleDecay');
   try {
     const guildId = interaction.guild.id;
 
@@ -938,6 +965,7 @@ export const toggleDecay = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const setMinimumCap = async (interaction) => {
+  trackFunctionExecution('setMinimumCap');
   const minimumCap = interaction.options.getInteger("minimum_cap");
 
   if (minimumCap < 0) {
@@ -989,6 +1017,7 @@ export const setMinimumCap = async (interaction) => {
  * @returns
  */
 export async function claimDkpCode(interaction) {
+  trackFunctionExecution('claimDkpCode');
   const amount = interaction.options.getInteger("amount");
   const expiration = interaction.options.getNumber("expiration-in-minutes");
 
@@ -1047,6 +1076,7 @@ export async function claimDkpCode(interaction) {
  * @returns { any } Response
  */
 export async function generateDkpCode(interaction) {
+  trackFunctionExecution('generateDkpCode');
   const amount = interaction.options.getInteger("amount");
   const expiration = interaction.options.getNumber("expiration-in-minutes");
   const note = interaction.options.getString("note");
@@ -1105,6 +1135,7 @@ export async function generateDkpCode(interaction) {
  * @returns { any } Response
  */
 export async function redeemDkpCode(interaction) {
+  trackFunctionExecution('redeemDkpCode');
   const code = interaction.options.getString("code");
 
   if (!code) {
@@ -1203,6 +1234,7 @@ export async function redeemDkpCode(interaction) {
  * @returns { any[] } List of codes
  */
 export async function getAllCodes() {
+  trackFunctionExecution('getAllCodes');
   const snapshot = await db.collection("codes").get();
 
   if (snapshot.empty) {
@@ -1228,6 +1260,7 @@ export async function getAllCodes() {
  * @returns
  */
 export async function updateGuildConfig(guildId, guildConfig) {
+  trackFunctionExecution('updateGuildConfig');
   const response = await db
     .collection("guilds")
     .doc(guildId)
@@ -1236,6 +1269,7 @@ export async function updateGuildConfig(guildId, guildConfig) {
 }
 
 export const setRoleOnJoin = async (interaction) => {
+  trackFunctionExecution('setRoleOnJoin');
   const role = interaction.options.getRole("role");
   const amount = interaction.options.getInteger("amount");
 
