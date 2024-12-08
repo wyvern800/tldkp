@@ -18,22 +18,23 @@ config();
 
 const functionExecutionCount = {};
 
-function trackFunctionExecution(functionName) {
+function trackFunctionExecution(functionName, calledBy) {
   if (!functionExecutionCount[functionName]) {
     functionExecutionCount[functionName] = 0;
   }
   functionExecutionCount[functionName]++;
-  new Logger().log('repository.js', `Function ${functionName} executed ${functionExecutionCount[functionName]} times`);
+  new Logger().log('repository.js', `Function ${functionName} executed ${functionExecutionCount[functionName]} times ${calledBy ? `(Called last time by ${calledBy})` : ''}`);
 }
 
 /**
  * Gets the guild config
  *
  * @param { string } guildId The guild id
+ * @param { string } calledBy Which function is calling this
  * @returns { any } Data
  */
-export async function getGuildConfig(guildId) {
-  trackFunctionExecution('getGuildConfig');
+export async function getGuildConfig(guildId, calledBy) {
+  trackFunctionExecution('getGuildConfig', calledBy);
 
   const guildSnapshot = await db.collection("guilds").doc(guildId).get();
 
@@ -280,7 +281,7 @@ export async function guildCreate(guild) {
   };
 
   const res = await db.collection("guilds").doc(guild.id).set(defaultConfig);
-  new Logger().log(PREFIX, `Config added for guild ${guild.id}`);
+  new Logger().log(PREFIX, `Config created for guild ${guild.id}`);
   return res;
 }
 
@@ -297,8 +298,8 @@ export async function handleUpdateDkp(interaction) {
   const user = interaction.options.getUser("user");
   const amount = interaction.options.getInteger("amount");
 
-  const { memberDkps } = await getGuildConfig(interaction.guild.id);
-  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const guildDataResponse = await getGuildConfig(interaction.guild.id, 'handleUpdateDkp');
+  const { memberDkps } = guildDataResponse;
 
   const { id } = interaction.user;
 
@@ -407,7 +408,7 @@ export const updateNickname = async (interaction) => {
   const nickname = interaction.options.getString("nickname");
 
   try {
-    const guildData = await getGuildConfig(interaction.guild.id);
+    const guildData = await getGuildConfig(interaction.guild.id, 'updateNickname');
     let copyGuildData = { ...guildData };
     const { memberDkps } = guildData;
 
@@ -502,7 +503,7 @@ export async function changeLanguage(interaction) {
   trackFunctionExecution('changeLanguage');
   const language = interaction.options.getString("language");
 
-  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const guildDataResponse = await getGuildConfig(interaction.guild.id, 'changeLanguage');
 
   const newGuildData = { ...guildDataResponse, language };
 
@@ -1021,8 +1022,8 @@ export async function claimDkpCode(interaction) {
   const amount = interaction.options.getInteger("amount");
   const expiration = interaction.options.getNumber("expiration-in-minutes");
 
-  const { memberDkps } = await getGuildConfig(interaction.guild.id);
   const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const { memberDkps } = guildDataResponse;
 
   const { id } = interaction.user;
 
@@ -1183,7 +1184,7 @@ export async function redeemDkpCode(interaction) {
     const userId = interaction.user.id;
 
     // Get the guild config
-    const guildDataResponse = await getGuildConfig(guildId);
+    const guildDataResponse = await getGuildConfig(guildId, 'redeemDkpCode');
     let newGuildData = guildDataResponse;
 
     // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist

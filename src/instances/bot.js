@@ -36,7 +36,7 @@ export const createBotClient = () => {
 
   // When the bot joins a new guild
   client.on("guildCreate", async (guild) => {
-    const response = await api.getGuildConfig(guild.id);
+    const response = await api.getGuildConfig(guild.id, 'guildCreateEvent from bot.js');
 
     if (response) {
       new Logger().log(PREFIX, `Guild data already exists!`);
@@ -56,7 +56,7 @@ export const createBotClient = () => {
     const userId = member.id;
 
     // Fetch the guild configuration
-    const guildConfig = await api.getGuildConfig(guildId);
+    const guildConfig = await api.getGuildConfig(guildId, 'guildMemberAddEvent from bot.js');
 
     // Ensure the guild's DKP array is initialized
     if (!guildConfig.memberDkps) {
