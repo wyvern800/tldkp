@@ -50,7 +50,7 @@ export class Logger {
    * @param {string} message The log message
    */
   log(prefix, message) {
-    const msg = `[${this.guildId ? `${this.guildId}/${this.guildName}(${this.guildId})/` : ''}${prefix}] ${message}`;
+    const msg = `[${this.guildId ? `${this.guildName}(${this.guildId})/` : ''}${prefix}] ${message}`;
     Logger.winstonLogger.info(msg);
   }
 
@@ -61,7 +61,7 @@ export class Logger {
    * @param {string} message The log message
    */
   logLocal(prefix, message) {
-    const msg = `[${this.guildId ? `${this.guildId}/${this.guildName}(${this.guildId})/` : ''}${prefix}] ${message}`;
+    const msg = `[${this.guildId ? `${this.guildName}(${this.guildId})/` : ''}${prefix}] ${message}`;
     Logger.winstonLogger.info(msg);
   }
 
@@ -72,7 +72,7 @@ export class Logger {
    * @param {string} message The log message
    */
   error(prefix, errorMessage) {
-    const messageError = `[${this.guildId ? `${this.guildId}/${this.guildName}(${this.guildId})/` : ''}${prefix}] ${errorMessage}`;
+    const messageError = `[${this.guildId ? `${this.guildName}(${this.guildId})/` : ''}${prefix}] ${errorMessage}`;
     Logger.rollbar.error(messageError);
     Logger.winstonLogger.error(messageError);
   }
@@ -84,7 +84,7 @@ export class Logger {
    * @param {string} message The log message
    */
   criticalError(prefix, errorMessage) {
-    const messageCritical = `[${this.guildId ? `${this.guildId}/${this.guildName}(${this.guildId})/` : ''}${prefix}] ${errorMessage}`;
+    const messageCritical = `[${this.guildId ? `${this.guildName}(${this.guildId})/` : ''}${prefix}] ${errorMessage}`;
     Logger.rollbar.critical(messageCritical);
     Logger.winstonLogger.error(messageCritical);
   }
