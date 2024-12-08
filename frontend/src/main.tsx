@@ -19,6 +19,7 @@ import DashboardPage from "./routes/dashboard";
 import AdminPage from "./routes/admin";
 import HudsPage from "./routes/huds";
 import NotFoundPage from "./routes/not-found";
+import KnowledgeBasePage from "./routes/knowledgebase";
 
 const config = {
   initialColorMode: "dark",
@@ -51,6 +52,10 @@ const router = createBrowserRouter([
         element: <AdminLayout />,
         path: "admin",
         children: [{ path: "/admin", element: <AdminPage /> }],
+      },
+      {
+        element: <KnowledgeBasePage />,
+        path: "/knowledge-base"
       },
     ],
     errorElement: <NotFoundPage />

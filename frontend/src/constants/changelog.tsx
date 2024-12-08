@@ -30,4 +30,11 @@ export const changelog = [
       "Released this 'little-big' feature here, where people will be able to share their UI's with the community. I'll be pushing this today, so people can test it out. I decided to have this, since I didn't see any app with this functionality yet, will come this week",
     ]
   },
+  {
+    version: 'v1.0.3',
+    date: '2024-11-20',
+    changes: [
+      "We've added an Auction System, where you can create an auctions, and people can bid on them. The auctions will be closed when you decide, and the winner will be the one with the highest bid. The winner will have the DKP deducted from his account. The auction creator can also cancel it if the auction didn's start yet. The auction creator can also set a minimum bid incremented. As you already know, there are some expenses we must pay to have this working since its usage is huge, hence that, the feature will be available free at start, but will become a premium feature soon, for those who supports the bot",
+    ]
+  },
 ];

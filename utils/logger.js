@@ -1,19 +1,40 @@
 import Rollbar from 'rollbar';
 import { config } from 'dotenv';
+import winston from "winston";
+import { format } from 'date-fns';
 
 config();
 
 export class Logger {
   static rollbar = null;
+  static winstonLogger = null;
 
   constructor(interaction) {
+    if (Logger.winstonLogger === null) {
+      Logger.winstonLogger = winston.createLogger({
+        level: 'info',
+        format: winston.format.combine(
+          winston.format.colorize(), // Add colorize format
+          winston.format.timestamp(),
+          winston.format.printf(({ timestamp, level, message }) => {
+            return `[${level}] [${format(timestamp, "hh:mm:ss | dd/MM/yyyy")}] ${message}`;
+          })
+        ),
+        transports: [
+          new winston.transports.Console(),
+          new winston.transports.File({ filename: 'combined.log' })
+        ]
+      });
+      Logger.winstonLogger.info(`[Logger] Initializing Winston...`);
+    }
+
     if (Logger.rollbar === null) {
-      console.log(`[Rollbar] Initializing now...`);
       Logger.rollbar = new Rollbar({
         accessToken: process.env.ROLLBAR_ACCESS_TOKEN,
         captureUncaught: true,
         captureUnhandledRejections: true,
       });
+      Logger.winstonLogger.info(`[Logger] Initializing Rollbar...`);
     }
 
     if (interaction) {
@@ -29,8 +50,7 @@ export class Logger {
    */
   log(prefix, message) {
     const msg = `[${this.guildName ? `${this.guildName}/` : ''}${prefix}] ${message}`;
-    console.log(msg);
-    Logger.rollbar.log(msg);
+    Logger.winstonLogger.info(msg);
   }
 
   /**
@@ -41,7 +61,7 @@ export class Logger {
    */
   logLocal(prefix, message) {
     const msg = `[${this.guildName ? `${this.guildName}/` : ''}${prefix}] ${message}`;
-    console.log(msg);
+    Logger.winstonLogger.info(msg);
   }
 
   /**
@@ -52,8 +72,8 @@ export class Logger {
    */
   error(prefix, errorMessage) {
     const messageError = `[${this.guildName ? `${this.guildName}/` : ''}${prefix}] ${errorMessage}`;
-    console.log(messageError);
     Logger.rollbar.error(messageError);
+    Logger.winstonLogger.error(messageError);
   }
 
   /**
@@ -64,7 +84,7 @@ export class Logger {
    */
   criticalError(prefix, errorMessage) {
     const messageCritical = `[${this.guildName ? `${this.guildName}/` : ''}${prefix}] ${errorMessage}`;
-    console.log(messageCritical);
     Logger.rollbar.critical(messageCritical);
+    Logger.winstonLogger.error(messageCritical);
   }
 }

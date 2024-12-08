@@ -1,4 +1,4 @@
-[
+export const items = [
   {
     "name": "Silent Outlaw",
     "compoundId": "item-2023_Costume_Body_001",
