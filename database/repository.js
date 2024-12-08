@@ -8,8 +8,6 @@ import {
   isPositiveNumber,
 } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
-import { getMemberById } from "../utils/discord.js";
-import cache from "../utils/cache.js";
 import { config } from "dotenv";
 import { isAfter, add, formatDistance } from "date-fns";
 import { generateClaimCode } from "../utils/index.js";
@@ -25,22 +23,14 @@ config();
  * @returns { any } Data
  */
 export async function getGuildConfig(guildId) {
-  const cacheKey = `guild-${guildId}`;
-  let guildData = cache.get(cacheKey);
+  const guildSnapshot = await db.collection("guilds").doc(guildId).get();
 
-  if (!guildData) {
-    const guildSnapshot = await db.collection("guilds").doc(guildId).get();
-
-    if (!guildSnapshot.exists) {
-      new Logger().log(PREFIX, `No config found for guild ${guildId}`);
-      return null;
-    }
-
-    guildData = guildSnapshot.data();
-    cache.set(cacheKey, guildData);
+  if (!guildSnapshot.exists) {
+    new Logger().log(PREFIX, `No config found for guild ${guildId}`);
+    return null;
   }
 
-  return guildData;
+  return guildSnapshot.data();
 }
 
 /**
@@ -50,37 +40,22 @@ export async function getGuildConfig(guildId) {
  * @returns { any } Data
  */
 export async function getAllGuilds() {
-  const cacheKey = `guilds-all`;
-  let guildsData = cache.get(cacheKey);
+  const snapshot = await db.collection("guilds").get();
 
-  if (!guildsData) {
-    const snapshot = await db.collection("guilds").get();
-
-    if (snapshot.empty) {
-      new Logger().log(PREFIX, `No guilds found`);
-      return [];
-    }
-
-    const guilds = [];
-    snapshot.forEach((doc) => {
-      guilds.push({ id: doc.id, ...doc.data() });
-    });
-
-    guildsData = guilds;
-    cache.set(cacheKey, guildsData);
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No guilds found`);
+    return [];
   }
 
-  return guildsData;
+  const guilds = [];
+  snapshot.forEach((doc) => {
+    guilds.push({ id: doc.id, ...doc.data() });
+  });
+
+  return guilds;
 }
 
 export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
-  const cacheKey = `guilds-${userOrOwnerId}`;
-  let cachedData = cache.get(cacheKey);
-
-  if (cachedData) {
-    return cachedData;
-  }
-
   try {
     const guildsRef = db.collection("guilds");
 
@@ -133,11 +108,17 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
               // try and grab data
               try {
                 owner = await guildData?.members?.fetch(ownerId);
-                avatarURL = owner?.user.displayAvatarURL({ dynamic: true, size: 32 });
+                avatarURL = owner?.user.displayAvatarURL({
+                  dynamic: true,
+                  size: 32,
+                });
               } catch (error) {
-                new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
+                new Logger().logLocal(
+                  PREFIX,
+                  `Owner not found for guild ${id}`
+                );
               }
-              
+
               const memberDkps = await Promise.all(
                 guild?.memberDkps.map(async (memberDkp) => {
                   let memberData = {};
@@ -145,10 +126,18 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
 
                   // try and grab data
                   try {
-                    memberData = await guildData?.members?.fetch(memberDkp.userId);
-                    avatarURL = memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 });
+                    memberData = await guildData?.members?.fetch(
+                      memberDkp.userId
+                    );
+                    avatarURL = memberData?.user?.displayAvatarURL({
+                      dynamic: true,
+                      size: 32,
+                    });
                   } catch (error) {
-                    new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
+                    new Logger().logLocal(
+                      PREFIX,
+                      `Member not found for guild ${id}`
+                    );
                   }
 
                   return {
@@ -156,7 +145,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
                     discordData: {
                       displayName: memberData?.user?.globalName ?? "",
                       preferredColor: memberData?.user?.accentColor ?? "",
-                      avatarURL
+                      avatarURL,
                     },
                   };
                 })
@@ -169,7 +158,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
                   ownerDiscordData: {
                     displayName: owner?.user?.globalName ?? "",
                     preferredColor: owner?.user?.accentColor ?? "",
-                    avatarURL
+                    avatarURL,
                   },
                 },
                 memberDkps,
@@ -190,9 +179,6 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
       memberGuilds: member,
     };
 
-    // Store the result in the cache
-    cache.set(cacheKey, result);
-
     return result;
   } catch (error) {
     console.log(error);
@@ -208,13 +194,6 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
  * @returns { any[] } The data
  */
 export async function getData(guildId, collection) {
-  const cacheKey = `${collection}-${guildId}`;
-  let cachedData = cache.get(cacheKey);
-
-  if (cachedData) {
-    return cachedData;
-  }
-
   const doc = await db.collection(collection).doc(guildId).get();
 
   if (!doc.exists) {
@@ -223,7 +202,6 @@ export async function getData(guildId, collection) {
   }
 
   const data = doc.data();
-  cache.set(cacheKey, data);
 
   return data;
 }
@@ -695,25 +673,20 @@ export const setGuildNickname = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        throw new Error("Guild document not found");
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      throw new Error("Guild document not found");
     }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
 
     // Destructure the lastUpdatedGuildAlias field
     const { lastUpdatedGuildAlias } = guildData?.guildData;
@@ -739,9 +712,6 @@ export const setGuildNickname = async (interaction) => {
         "guildData.lastUpdatedGuildAlias":
           admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      // Invalidate the cache
-      cache.del(cacheKey);
 
       const msg = "Guild alias updated successfully!";
       return await interaction.reply({ content: msg, ephemeral: true });
@@ -785,26 +755,21 @@ export const setupAutoDecay = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return;
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return;
     }
+
+    // Get the data from the document snapshot
+    guildData = guildSnapshot.data();
 
     const togglablesPrefix = "togglables.decaySystem";
 
@@ -818,9 +783,6 @@ export const setupAutoDecay = async (interaction) => {
         [`${togglablesPrefix}.enabled`]: false,
         [`${togglablesPrefix}.minimumCap`]: 100,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `The auto decaying system was set, now you must execute **/decay-toggle** once to enable the scheduler, please have in mind
       that if you don't enable the system, the decay will not be executed, also the default minimum cap is 100, which means a person will only
@@ -849,29 +811,24 @@ export const setupAutoDecay = async (interaction) => {
 export const toggleDkpNotifications = async (interaction) => {
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
 
     const togglablesPrefix = "togglables.dkpSystem";
     const enabled = guildData?.togglables?.dkpSystem?.dmNotifications;
@@ -884,9 +841,6 @@ export const toggleDkpNotifications = async (interaction) => {
       .update({
         [`${togglablesPrefix}.dmNotifications`]: newValue,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `Togglable: direct messages updated to: ${newValue}!`;
     return await interaction.reply({ content: msg, ephemeral: true });
@@ -913,29 +867,24 @@ export const toggleDkpNotifications = async (interaction) => {
 export const toggleDecay = async (interaction) => {
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
 
     const togglablesPrefix = "togglables.decaySystem";
 
@@ -959,9 +908,6 @@ export const toggleDecay = async (interaction) => {
           ? admin.firestore.FieldValue.serverTimestamp()
           : null,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `Togglable: decaying system is now ${
       !enabled ? "enabled" : "disabled"
@@ -1001,28 +947,20 @@ export const setMinimumCap = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
 
     const togglablesPrefix = "togglables.decaySystem";
@@ -1034,9 +972,6 @@ export const setMinimumCap = async (interaction) => {
       .update({
         [`${togglablesPrefix}.minimumCap`]: minimumCap,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `Togglable: decay minimum cap updated successfully to **${minimumCap}**!`;
     return await interaction.reply({ content: msg, ephemeral: true });
@@ -1082,7 +1017,7 @@ export async function claimDkpCode(interaction) {
   updateDkp(
     increasedDkp,
     user.id,
-    choices === "add" ? amount : -amount,
+    amount,
     user,
     guildDataResponse?.guildData?.name,
     guildDataResponse
@@ -1097,18 +1032,10 @@ export async function claimDkpCode(interaction) {
 
   await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
 
-  const answer = {
-    add: "increased to",
-    remove: "subtracted to",
-    set: "set to",
-  };
-
   const value = newGuildData?.memberDkps?.find(
     (member) => member.userId === user.id
   );
-  const msg = `<@${user.id}>'s DKP was ${
-    answer[choices?.toLowerCase() ?? "updated to"]
-  } ${value?.dkp}!`;
+  const msg = `<@${user.id}>'s DKP was increased to **${value?.dkp}**!`;
   new Logger(interaction).log(PREFIX, msg);
   return await interaction.reply({ content: msg, ephemeral: true });
 }
@@ -1276,25 +1203,19 @@ export async function redeemDkpCode(interaction) {
  * @returns { any[] } List of codes
  */
 export async function getAllCodes() {
-  const cacheKey = `codes-all`;
-  let codesData = cache.get(cacheKey);
+  const snapshot = await db.collection("codes").get();
 
-  if (!codesData) {
-    const snapshot = await db.collection("codes").get();
-
-    if (snapshot.empty) {
-      new Logger().log(PREFIX, `No codes found`);
-      return [];
-    }
-
-    const codes = [];
-    snapshot.forEach((doc) => {
-      codes.push({ id: doc.id, ...doc.data() });
-    });
-
-    codesData = codes;
-    cache.set(cacheKey, codesData);
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No codes found`);
+    return [];
   }
+
+  const codes = [];
+  snapshot.forEach((doc) => {
+    codes.push({ id: doc.id, ...doc.data() });
+  });
+
+  const codesData = codes;
 
   return codesData;
 }
@@ -1333,28 +1254,20 @@ export const setRoleOnJoin = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
 
     const prefix = "togglables.dkpSystem";
@@ -1369,9 +1282,6 @@ export const setRoleOnJoin = async (interaction) => {
           : undefined),
         ...(role ? { [`${prefix}.roleToAssign`]: role.id } : undefined),
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     let msg = `Now when a member joins, they will:`;
     if (role) {
