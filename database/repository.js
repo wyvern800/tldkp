@@ -73,35 +73,23 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
   trackFunctionExecution('getGuildsByOwnerOrUser');
   try {
     const guildsRef = db.collection("guilds");
-
-    const ownerQuery = guildsRef.where(
-      "guildData.ownerId",
-      "==",
-      userOrOwnerId
-    );
-    const ownerSnapshot = await ownerQuery.get();
-
     const allGuildsSnapshot = await guildsRef.get();
 
     const ownerGuilds = [];
-    if (!ownerSnapshot.empty) {
-      ownerSnapshot.forEach((doc) => {
-        ownerGuilds.push({ ...doc.data() });
-      });
-    }
-
-    // Guildas em que o usuário é membro
     const memberGuilds = [];
+
     allGuildsSnapshot.forEach((doc) => {
       const data = doc.data();
       const members = data?.memberDkps || [];
 
-      // Filter the members that match the userOrOwnerId
+      if (data.guildData.ownerId === userOrOwnerId) {
+        ownerGuilds.push({ ...data });
+      }
+
       const filteredMembers = members.filter(
         (member) => member?.userId === userOrOwnerId
       );
 
-      // Only add the guild if there are matching members
       if (filteredMembers.length > 0) {
         memberGuilds.push({
           ...data,
@@ -110,84 +98,70 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
       }
     });
 
-    const [owner, member] = await Promise.all([ownerGuilds, memberGuilds]).then(
-      async (values) => {
-        const parseMembers = async (_guilds) => {
-          return Promise.all(
-            _guilds.map(async (guild) => {
-              const { id, ownerId } = guild?.guildData;
-              const guildData = discordBot?.guilds?.cache.get(id);
-              let owner = {};
+    const parseMembers = async (_guilds) => {
+      return Promise.all(
+        _guilds.map(async (guild) => {
+          const { id, ownerId } = guild?.guildData;
+          const guildData = discordBot?.guilds?.cache.get(id);
+          let owner = {};
+          let avatarURL = "";
+
+          try {
+            owner = await guildData?.members?.fetch(ownerId);
+            avatarURL = owner?.user.displayAvatarURL({
+              dynamic: true,
+              size: 32,
+            });
+          } catch (error) {
+            new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
+          }
+
+          const memberDkps = await Promise.all(
+            guild?.memberDkps.map(async (memberDkp) => {
+              let memberData = {};
               let avatarURL = "";
 
-              // try and grab data
               try {
-                owner = await guildData?.members?.fetch(ownerId);
-                avatarURL = owner?.user.displayAvatarURL({
+                memberData = await guildData?.members?.fetch(memberDkp.userId);
+                avatarURL = memberData?.user?.displayAvatarURL({
                   dynamic: true,
                   size: 32,
                 });
               } catch (error) {
-                new Logger().logLocal(
-                  PREFIX,
-                  `Owner not found for guild ${id}`
-                );
+                new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
               }
 
-              const memberDkps = await Promise.all(
-                guild?.memberDkps.map(async (memberDkp) => {
-                  let memberData = {};
-                  let avatarURL = "";
-
-                  // try and grab data
-                  try {
-                    memberData = await guildData?.members?.fetch(
-                      memberDkp.userId
-                    );
-                    avatarURL = memberData?.user?.displayAvatarURL({
-                      dynamic: true,
-                      size: 32,
-                    });
-                  } catch (error) {
-                    new Logger().logLocal(
-                      PREFIX,
-                      `Member not found for guild ${id}`
-                    );
-                  }
-
-                  return {
-                    ...memberDkp,
-                    discordData: {
-                      displayName: memberData?.user?.globalName ?? "",
-                      preferredColor: memberData?.user?.accentColor ?? "",
-                      avatarURL,
-                    },
-                  };
-                })
-              );
-
               return {
-                ...guild,
-                guildData: {
-                  ...guild?.guildData,
-                  ownerDiscordData: {
-                    displayName: owner?.user?.globalName ?? "",
-                    preferredColor: owner?.user?.accentColor ?? "",
-                    avatarURL,
-                  },
+                ...memberDkp,
+                discordData: {
+                  displayName: memberData?.user?.globalName ?? "",
+                  preferredColor: memberData?.user?.accentColor ?? "",
+                  avatarURL,
                 },
-                memberDkps,
               };
             })
           );
-        };
 
-        const ownerGuilds = await parseMembers(values[0]);
-        const memberGuilds = await parseMembers(values[1]);
+          return {
+            ...guild,
+            guildData: {
+              ...guild?.guildData,
+              ownerDiscordData: {
+                displayName: owner?.user?.globalName ?? "",
+                preferredColor: owner?.user?.accentColor ?? "",
+                avatarURL,
+              },
+            },
+            memberDkps,
+          };
+        })
+      );
+    };
 
-        return [ownerGuilds, memberGuilds];
-      }
-    );
+    const [owner, member] = await Promise.all([
+      parseMembers(ownerGuilds),
+      parseMembers(memberGuilds),
+    ]);
 
     const result = {
       ownerGuilds: owner,
