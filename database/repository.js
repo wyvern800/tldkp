@@ -768,9 +768,6 @@ export const setupAutoDecay = async (interaction) => {
       return;
     }
 
-    // Get the data from the document snapshot
-    guildData = guildSnapshot.data();
-
     const togglablesPrefix = "togglables.decaySystem";
 
     await admin
@@ -790,6 +787,7 @@ export const setupAutoDecay = async (interaction) => {
     `;
     return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
+    console.log(error)
     const msg = "Error while setting up the auto-decaying system";
     new Logger(interaction).log(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
