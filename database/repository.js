@@ -789,7 +789,7 @@ export const setupAutoDecay = async (interaction) => {
   } catch (error) {
     console.log(error)
     const msg = "Error while setting up the auto-decaying system";
-    new Logger(interaction).log(PREFIX, msg);
+    new Logger(interaction).error(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
