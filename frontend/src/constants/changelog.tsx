@@ -1,11 +1,23 @@
 export const changelog = [
   {
-    version: 'v1.0.0',
-    date: '2024-11-03',
+    version: 'v1.0.2^2',
+    date: '2024-12-23',
     changes: [
-      'Added commands for claiming DKP with funny redeeming codes',
-      'Corrected bug where setting a name without having a dkp, would tell nothing, but give an error',
-      'Implemented a feature: You can now set a role on join, and also give new members a fixed amount of DKP once (thanks for the suggestion @potetto)',
+      "Fixed a bug where we could not set up auto decay system, was something related to the old and glithy cache system",
+    ]
+  },
+  {
+    version: 'v1.0.2^1',
+    date: '2024-12-02',
+    changes: [
+      "Removed all the cache system, so the app should be more real-time, and avoids the data loss",
+    ]
+  },
+  {
+    version: 'v1.0.2',
+    date: '2024-11-15',
+    changes: [
+      "Released this 'little-big' feature here, where people will be able to share their UI's with the community. I'll be pushing this today, so people can test it out. I decided to have this, since I didn't see any app with this functionality yet, will come this week",
     ]
   },
   {
@@ -24,10 +36,12 @@ export const changelog = [
     ]
   },
   {
-    version: 'v1.0.2',
-    date: '2024-11-15',
+    version: 'v1.0.0',
+    date: '2024-11-03',
     changes: [
-      "Released this 'little-big' feature here, where people will be able to share their UI's with the community. I'll be pushing this today, so people can test it out. I decided to have this, since I didn't see any app with this functionality yet, will come this week",
+      'Added commands for claiming DKP with funny redeeming codes',
+      'Corrected bug where setting a name without having a dkp, would tell nothing, but give an error',
+      'Implemented a feature: You can now set a role on join, and also give new members a fixed amount of DKP once (thanks for the suggestion @potetto)',
     ]
   },
 ];
