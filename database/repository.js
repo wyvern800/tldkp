@@ -1235,11 +1235,29 @@ export async function getAllCodes() {
 export async function updateGuildConfig(guildId, guildConfig) {
   trackFunctionExecution('updateGuildConfig');
   const response = await db
-    .collection("guilds")
+    .collection("guilds") 
     .doc(guildId)
     .update(guildConfig);
   return response;
 }
+
+/**
+ * Deletes a guild and its data from Firebase
+ * 
+ * @param {string} guildId The ID of the guild to delete
+ * @returns {Promise<void>} A promise that resolves when the guild is deleted
+ */
+export const deleteGuild = async (guildId) => {
+  trackFunctionExecution('deleteGuild');
+  
+  try {
+    await db.collection("guilds").doc(guildId).delete();
+    new Logger().log(PREFIX, `Guild ${guildId} was deleted successfully`);
+  } catch (error) {
+    new Logger().error(PREFIX, `Error deleting guild ${guildId}`, error);
+    throw error;
+  }
+};
 
 export const setRoleOnJoin = async (interaction) => {
   trackFunctionExecution('setRoleOnJoin');
