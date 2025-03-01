@@ -1,5 +1,12 @@
 export const changelog = [
   {
+    version: 'v1.0.2^3',
+    date: '2025-03-01',
+    changes: [
+      "Included a feature where guild admins can delete their guild from the app and remove all data",
+    ]
+  },
+  {
     version: 'v1.0.2^2',
     date: '2024-12-23',
     changes: [
