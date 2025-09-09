@@ -11,7 +11,6 @@ const Wrapper = styled.div`
 
 export default function SignInPage() {
   const textColor = useColorModeValue("gray.600", "gray.300");
-  const headingColor = useColorModeValue("gray.800", "white");
 
   return (
     <Container maxW="container.md" py={16}>

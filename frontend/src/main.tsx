@@ -17,7 +17,6 @@ import SignInPage from "./routes/sign-in";
 import SignUpPage from "./routes/sign-up";
 import DashboardPage from "./routes/dashboard";
 import AdminPage from "./routes/admin";
-import HudsPage from "./routes/huds";
 import NotFoundPage from "./routes/not-found";
 
 const config = {
