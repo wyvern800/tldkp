@@ -64,7 +64,7 @@ export const createServer = (client) => {
 
   app.use(
     cors({
-      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.org",
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200,
@@ -82,7 +82,7 @@ export const createServer = (client) => {
 
   apiRouter.use(
     cors({
-      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.org",
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200,
