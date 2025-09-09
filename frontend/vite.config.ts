@@ -19,7 +19,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: "https://tldkp.online/api",
+        target: "https://tldkp.org/api",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },

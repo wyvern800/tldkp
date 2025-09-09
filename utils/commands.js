@@ -252,7 +252,7 @@ export const commands = [
     description: "Get help from the bot",
     commandExecution: async (interaction) => {
       const msg = `There is a section in the website where you can see all the commands available and their usage, and also now you can check all of your member's DKPS at our brand new Dashboard.  
-      [Click here to check out!](https://tldkp.online/)
+      [Click here to check out!](https://tldkp.org/)
       `;
       return await interaction.reply({
         content: msg,
