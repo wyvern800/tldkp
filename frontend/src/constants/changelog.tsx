@@ -1,5 +1,13 @@
 export const changelog = [
   {
+    version: 'v1.0.2^4',
+    date: '2025-09-09',
+    changes: [
+      "A visual revamp is now available, with new colors, animations, and a new design",
+      "New domain is now available, so you can access the app at https://tldkp.org",
+    ]
+  },
+  {
     version: 'v1.0.2^3',
     date: '2025-03-01',
     changes: [

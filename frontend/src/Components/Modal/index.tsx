@@ -75,10 +75,12 @@ function Modal({
           backdropFilter="blur(10px) hue-rotate(90deg)"
         />
         <ModalOverlay />
-        <ModalContent>
+        <ModalContent maxH="80vh">
           <ModalHeader>{title}</ModalHeader>
           <ModalCloseButton />
-          <ModalBody>{children}</ModalBody>
+          <ModalBody overflowY="auto" maxH="60vh">
+            {children}
+          </ModalBody>
           <ModalFooter></ModalFooter>
         </ModalContent>
       </ModalChakra>
