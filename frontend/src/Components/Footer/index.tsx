@@ -213,7 +213,7 @@ function Footer({ complete = true }: FooterProps) {
                     </Link>
 
                     <Link
-                      href="https://www.paypal.com/donate/?hosted_button_id=A9XGWD2V94UZ4"
+                      href="https://github.com/sponsors/wyvern800"
                       isExternal
                     >
                       <MagicCard
