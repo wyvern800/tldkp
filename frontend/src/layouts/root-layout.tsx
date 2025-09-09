@@ -1,21 +1,25 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { ClerkProvider, ClerkLoaded, ClerkLoading } from "@clerk/clerk-react";
-import { Container, useColorModeValue/*, useDisclosure*/ } from "@chakra-ui/react";
+import { Container, useColorModeValue, useDisclosure } from "@chakra-ui/react";
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
 import { Spinner } from "@chakra-ui/react";
-//import Modal from "../Components/Modal";
-//import { useEffect } from "react";
+import AnnouncementModal from "../Components/AnnouncementModal";
+import { useEffect } from "react";
 
 export default function RootLayout() {
   const navigate = useNavigate();
-  //const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
-  // Modal for advising users that the website is under attack
-  /*useEffect(() => {
-    onOpen();
+  // Show announcement modal on page load
+  useEffect(() => {
+    // Check if user has already seen the announcement
+    const hasSeenAnnouncement = localStorage.getItem("tldkp-announcement-seen");
+    if (hasSeenAnnouncement !== "true") {
+      onOpen();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);*/
+  }, []);
 
   const bg = useColorModeValue("blue.600", "white");
   const gradient = useColorModeValue(
@@ -25,16 +29,7 @@ export default function RootLayout() {
 
   return (
     <>
-      {/*<Modal
-        title="We're experiencing attacks"
-        state={{ isOpen, onClose }}
-        isCentered={true}
-        closeOnOverlayClick={true}
-      >
-        Hello, sorry for the inconvenience, but we're currently experiencing attacks to our databases which caused the usage
-        to be disabled. We're working on fixing this issue and we'll be back soon. Thank you for your patience.
-        There is no ETA for when we'll be back, but we're working on it.
-      </Modal>*/}
+      <AnnouncementModal isOpen={isOpen} onClose={onClose} />
       <ClerkProvider
         routerPush={(to) => navigate(to)}
         routerReplace={(to) => navigate(to, { replace: true })}
