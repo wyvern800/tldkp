@@ -52,7 +52,7 @@ function AnnouncementModal({ isOpen, onClose }: AnnouncementModalProps) {
 
   const handleDonateClick = () => {
     // Open donation link in new tab
-    window.open("https://www.paypal.com/donate/?hosted_button_id=A9XGWD2V94UZ4", "_blank");
+    window.open("https://github.com/sponsors/wyvern800", "_blank");
   };
 
   if (hasSeenAnnouncement) {
