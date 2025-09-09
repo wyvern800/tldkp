@@ -26,7 +26,6 @@ import {
   MagicCard, 
   MagicFloat, 
   MagicShimmer, 
-  MagicGradientBorder,
   MagicReveal,
   MagicPulse,
   MagicTypewriter,
@@ -49,10 +48,9 @@ function Feature({ title, desc, icon, badge, delay = 0 }: FeatureProps) {
 
   return (
     <MagicReveal direction="up" delay={delay} distance={30}>
-      <MagicGradientBorder
-        gradient="linear-gradient(45deg, #0F766E, #059669, #0D9488)"
-        thickness={2}
-        animated={true}
+      <Box
+        border="2px solid"
+        borderColor="gray.200"
         borderRadius="xl"
       >
         <MagicCard
@@ -184,7 +182,7 @@ function Feature({ title, desc, icon, badge, delay = 0 }: FeatureProps) {
             <Icon as={FaArrowRight} ml={2} />
           </Flex>
         </MagicCard>
-      </MagicGradientBorder>
+      </Box>
     </MagicReveal>
   );
 }
@@ -337,9 +335,7 @@ function StackExp(): ReactNode {
             <Box
               p={8}
               borderRadius="2xl"
-              bgGradient="linear(135deg, teal.50, green.50, blue.50)"
-              border="2px solid"
-              borderColor="teal.200"
+              bgColor={"rgba(255 255 255 / 0.05)"}
               boxShadow="xl"
               maxW="2xl"
               mx="auto"

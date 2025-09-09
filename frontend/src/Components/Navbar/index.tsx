@@ -3,12 +3,9 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Flex,
-  Spacer,
   Box,
   Heading,
   UnorderedList,
-  Button,
-  Divider,
   useDisclosure,
   Tooltip,
   Image,
@@ -37,7 +34,6 @@ import {
   MagicCard, 
   MagicFloat, 
   MagicShimmer, 
-  MagicGradientBorder,
   MagicReveal,
   MagicPulse,
   MagicStagger
@@ -224,10 +220,9 @@ function Navbar() {
                 <MagicFloat intensity={2} speed={5}>
                   <HStack spacing={3} cursor="pointer">
                     <MagicPulse intensity={0.3} speed={4} color="rgba(14, 165, 233, 0.3)">
-                      <MagicGradientBorder
-                        gradient="linear-gradient(45deg, #0F766E, #059669, #0D9488)"
-                        thickness={2}
-                        animated={true}
+                      <Box
+                        border="2px solid"
+                        borderColor="gray.200"
                         borderRadius="xl"
                       >
                         <Box
@@ -249,7 +244,7 @@ function Navbar() {
                             />
                           </MagicShimmer>
                         </Box>
-                      </MagicGradientBorder>
+                      </Box>
                     </MagicPulse>
                     
                     <VStack align="start" spacing={0}>
@@ -349,10 +344,9 @@ function Navbar() {
                     </HStack>
                   </MagicCard>
 
-                  <MagicGradientBorder
-                    gradient="linear-gradient(45deg, #0F766E, #059669)"
-                    thickness={2}
-                    animated={false}
+                  <Box
+                    border="2px solid"
+                    borderColor="gray.200"
                     borderRadius="xl"
                   >
                     <MagicCard
@@ -377,14 +371,13 @@ function Navbar() {
                         <Text>Add to Server</Text>
                       </HStack>
                     </MagicCard>
-                  </MagicGradientBorder>
+                  </Box>
 
                   <SignedOut>
                     <Link to="/sign-in">
-                      <MagicGradientBorder
-                        gradient="linear-gradient(45deg, #8B5CF6, #A855F7)"
-                        thickness={2}
-                        animated={false}
+                      <Box
+                        border="2px solid"
+                        borderColor="purple.300"
                         borderRadius="xl"
                       >
                         <MagicCard
@@ -406,7 +399,7 @@ function Navbar() {
                             <Text>Login</Text>
                           </HStack>
                         </MagicCard>
-                      </MagicGradientBorder>
+                      </Box>
                     </Link>
                   </SignedOut>
 

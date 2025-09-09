@@ -27,7 +27,6 @@ import {
   MagicCard, 
   MagicFloat, 
   MagicShimmer, 
-  MagicGradientBorder,
   MagicReveal,
   MagicPulse,
   MagicStagger
@@ -102,10 +101,9 @@ function Footer({ complete = true }: FooterProps) {
               <MagicReveal direction="up" delay={0.5}>
                 <VStack spacing={6} textAlign="center">
                   <MagicPulse intensity={0.2} speed={4} color="rgba(14, 165, 233, 0.2)">
-                    <MagicGradientBorder
-                      gradient="linear-gradient(45deg, #0F766E, #059669, #0D9488)"
-                      thickness={3}
-                      animated={true}
+                    <Box
+                      border="3px solid"
+                      borderColor="gray.200"
                       borderRadius="2xl"
                     >
                       <HStack spacing={4} p={6}>
@@ -143,7 +141,7 @@ function Footer({ complete = true }: FooterProps) {
                           </Text>
                         </VStack>
                       </HStack>
-                    </MagicGradientBorder>
+                    </Box>
                   </MagicPulse>
                   
                   <Text 
