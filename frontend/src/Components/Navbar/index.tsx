@@ -54,7 +54,6 @@ import { RiSlashCommands } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 import { BsFillMegaphoneFill } from "react-icons/bs";
 import { changelog } from "../../constants/changelog";
-import { SiMaterialdesignicons } from "react-icons/si";
 
 function Navbar() {
   const { isOpen, onOpen, onClose } = useDisclosure();
