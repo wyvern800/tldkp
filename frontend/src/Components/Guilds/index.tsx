@@ -111,7 +111,7 @@ const { getToken } = useAuth();
         </center>
       ) : (
         <>
-          <Accordion allowToggle>
+          <Accordion allowToggle w="full">
             {data?.map((guild: any, index: number) => {
               const { icon, name, alias } = guild?.guildData ?? {};
               const { memberDkps } = guild ?? [];
@@ -120,11 +120,12 @@ const { getToken } = useAuth();
                 <AccordionItem
                   key={`${guild?.guildData?.id}${index}`}
                   defaultChecked={true}
+                  w="full"
                 >
-                  <h2>
-                    <AccordionButton>
-                      <Box as="span" flex="1" textAlign="left">
-                        <HStack justifyContent={"space-between"} width={"100%"}>
+                  <h2 style={{ width: "100%" }}>
+                    <AccordionButton w="full">
+                      <Box as="span" flex="1" textAlign="left" w="full">
+                        <HStack justifyContent={"space-between"} w="full" style={{ width: "100%" }}>
                           <HStack>
                             <Logo
                               style={{ width: "25px", borderRadius: "50px" }}

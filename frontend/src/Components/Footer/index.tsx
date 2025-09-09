@@ -263,7 +263,7 @@ function Footer({ complete = true }: FooterProps) {
                   </MagicFloat>
                   
                   <Text fontSize="sm" color={textColor} opacity={0.8} fontWeight="medium">
-                    © 2024 TLDKP. All rights reserved.
+                    © 2024-2025 TLDKP. All rights reserved.
                   </Text>
                 </VStack>
               </MagicReveal>
