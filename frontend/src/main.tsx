@@ -34,14 +34,14 @@ const router = createBrowserRouter([
       { path: "/thanks", element: <div>Thanks page</div> },
       { path: "/success", element: <div>Success page</div> },
       { path: "/cancel", element: <div>Cancel page</div> },
-      {
+      /*{
         element: <HudsPage />,
         path: "/huds"
-      },
+      }
       {
         element: <HudsPage />,
         path: "/huds/:hudId"
-      },
+      },*/
       {
         element: <DashboardLayout />,
         path: "/dashboard",

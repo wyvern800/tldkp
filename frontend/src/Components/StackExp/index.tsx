@@ -160,8 +160,8 @@ function Feature({ title, desc, icon, badge, delay = 0 }: FeatureProps) {
             mb={6}
             fontWeight="medium"
           >
-            {desc}
-          </Text>
+        {desc}
+      </Text>
           
           <Flex 
             align="center" 
@@ -182,7 +182,7 @@ function Feature({ title, desc, icon, badge, delay = 0 }: FeatureProps) {
             <Icon as={FaArrowRight} ml={2} />
           </Flex>
         </MagicCard>
-      </Box>
+    </Box>
     </MagicReveal>
   );
 }
@@ -316,7 +316,7 @@ function StackExp(): ReactNode {
       <MagicStagger stagger={0.2} delay={0.5}>
         <VStack spacing={12} maxW="5xl" mx="auto" position="relative" zIndex={1}>
           {features.map((feature, index) => (
-            <Feature
+      <Feature
               key={index}
               title={feature.title}
               desc={feature.desc}
@@ -328,61 +328,55 @@ function StackExp(): ReactNode {
         </VStack>
       </MagicStagger>
 
-      {/* Magic Call-to-Action */}
-      <MagicReveal direction="up" delay={2}>
-        <VStack spacing={6} mt={20} textAlign="center" position="relative" zIndex={1}>
-          <MagicPulse intensity={0.3} speed={4} color="rgba(14, 165, 233, 0.2)">
+      {/* Static Call-to-Action */}
+      <VStack spacing={6} mt={20} textAlign="center" position="relative" zIndex={1}>
+        <Box
+          p={8}
+          borderRadius="2xl"
+          bgColor={"rgba(255 255 255 / 0.05)"}
+          boxShadow="xl"
+          maxW="2xl"
+          mx="auto"
+        >
+          <VStack spacing={4}>
+            <HStack spacing={3}>
+              <Icon as={FaMagic} color="teal.500" boxSize={6} />
+              <Heading
+                fontSize="2xl"
+                bgGradient="linear(to-r, teal.600, green.600)"
+                bgClip="text"
+                fontWeight="bold"
+              >
+                Ready to Transform Your Guild?
+              </Heading>
+            </HStack>
+            <Text color={textColor} fontSize="lg" maxW="md">
+              Join thousands of guilds already using TLDKP to manage their Dragon Kill Points
+            </Text>
             <Box
-              p={8}
-              borderRadius="2xl"
-              bgColor={"rgba(255 255 255 / 0.05)"}
-              boxShadow="xl"
-              maxW="2xl"
-              mx="auto"
+              as="button"
+              px={8}
+              py={4}
+              bgGradient="linear(45deg, teal.500, green.500)"
+              color="white"
+              borderRadius="xl"
+              fontWeight="bold"
+              fontSize="lg"
+              textTransform="uppercase"
+              letterSpacing="wide"
+              boxShadow="lg"
+              _hover={{
+                transform: "translateY(-2px)",
+                boxShadow: "2xl",
+                bgGradient: "linear(45deg, teal.600, green.600)"
+              }}
+              transition="all 0.3s ease"
             >
-              <VStack spacing={4}>
-                <HStack spacing={3}>
-                  <Icon as={FaMagic} color="teal.500" boxSize={6} />
-                  <Heading
-                    fontSize="2xl"
-                    bgGradient="linear(to-r, teal.600, green.600)"
-                    bgClip="text"
-                    fontWeight="bold"
-                  >
-                    Ready to Transform Your Guild?
-                  </Heading>
-                </HStack>
-                <Text color={textColor} fontSize="lg" maxW="md">
-                  Join thousands of guilds already using TLDKP to manage their Dragon Kill Points
-                </Text>
-                <MagicFloat intensity={2} speed={3}>
-                  <Box
-                    as="button"
-                    px={8}
-                    py={4}
-                    bgGradient="linear(45deg, teal.500, green.500)"
-                    color="white"
-                    borderRadius="xl"
-                    fontWeight="bold"
-                    fontSize="lg"
-                    textTransform="uppercase"
-                    letterSpacing="wide"
-                    boxShadow="lg"
-                    _hover={{
-                      transform: "translateY(-2px)",
-                      boxShadow: "2xl",
-                      bgGradient: "linear(45deg, teal.600, green.600)"
-                    }}
-                    transition="all 0.3s ease"
-                  >
-                    Get Started Now
-                  </Box>
-                </MagicFloat>
-              </VStack>
+              Get Started Now
             </Box>
-          </MagicPulse>
-        </VStack>
-      </MagicReveal>
+          </VStack>
+        </Box>
+      </VStack>
     </Container>
   );
 }

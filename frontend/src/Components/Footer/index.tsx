@@ -26,7 +26,6 @@ import icon from "../../assets/tl.webp";
 import { 
   MagicCard, 
   MagicFloat, 
-  MagicShimmer, 
   MagicReveal,
   MagicPulse,
   MagicStagger
@@ -97,64 +96,56 @@ function Footer({ complete = true }: FooterProps) {
         <Container maxW="container.xl" py={20} position="relative" zIndex={1}>
           <MagicStagger stagger={0.2} delay={0.3}>
             <VStack spacing={16} align="center">
-              {/* Magic Logo and Description */}
-              <MagicReveal direction="up" delay={0.5}>
-                <VStack spacing={6} textAlign="center">
-                  <MagicPulse intensity={0.2} speed={4} color="rgba(14, 165, 233, 0.2)">
+              {/* Static Logo and Description */}
+              <VStack spacing={6} textAlign="center">
+                <Box
+                  border="3px solid"
+                  borderColor="gray.200"
+                  borderRadius="2xl"
+                >
+                  <HStack spacing={4} p={6}>
                     <Box
-                      border="3px solid"
-                      borderColor="gray.200"
-                      borderRadius="2xl"
+                      p={4}
+                      borderRadius="xl"
+                      bgGradient="linear(135deg, teal.50, green.50)"
+                      boxShadow="xl"
                     >
-                      <HStack spacing={4} p={6}>
-                        <MagicShimmer
-                          color="linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)"
-                        >
-                          <Box
-                            p={4}
-                            borderRadius="xl"
-                            bgGradient="linear(135deg, teal.50, green.50)"
-                            boxShadow="xl"
-                          >
-                            <Image src={icon} boxSize="48px" alt="TLDKP Logo" />
-                          </Box>
-                        </MagicShimmer>
-                        
-                        <VStack align="start" spacing={1}>
-                          <Heading
-                            size="2xl"
-                            bgGradient="linear(45deg, teal.400, green.400, blue.400)"
-                            bgClip="text"
-                            fontWeight="black"
-                            textShadow="0 0 20px rgba(14, 165, 233, 0.3)"
-                          >
-                            TLDKP
-                          </Heading>
-                          <Text 
-                            fontSize="sm" 
-                            color={textColor} 
-                            fontWeight="bold"
-                            textTransform="uppercase"
-                            letterSpacing="wide"
-                          >
-                            Dragon Kill Points
-                          </Text>
-                        </VStack>
-                      </HStack>
+                      <Image src={icon} boxSize="48px" alt="TLDKP Logo" />
                     </Box>
-                  </MagicPulse>
+                    
+                    <VStack align="start" spacing={1}>
+                      <Heading
+                        size="2xl"
+                        bgGradient="linear(45deg, teal.400, green.400, blue.400)"
+                        bgClip="text"
+                        fontWeight="black"
+                        textShadow="0 0 20px rgba(14, 165, 233, 0.3)"
+                      >
+                        TLDKP
+                      </Heading>
+                      <Text 
+                        fontSize="sm" 
+                        color={textColor} 
+                        fontWeight="bold"
+                        textTransform="uppercase"
+                        letterSpacing="wide"
+                      >
+                        Dragon Kill Points
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </Box>
                   
-                  <Text 
-                    fontSize="xl" 
-                    color={textColor}
-                    maxW="2xl"
-                    lineHeight="1.7"
-                    fontWeight="medium"
-                  >
-                    Your favorite Throne & Liberty Discord bot for managing DKP systems
-                  </Text>
-                </VStack>
-              </MagicReveal>
+                <Text 
+                  fontSize="xl" 
+                  color={textColor}
+                  maxW="2xl"
+                  lineHeight="1.7"
+                  fontWeight="medium"
+                >
+                  Your favorite Throne & Liberty Discord bot for managing DKP systems
+                </Text>
+              </VStack>
 
               {/* Magic Links Section */}
               <MagicReveal direction="up" delay={0.8}>

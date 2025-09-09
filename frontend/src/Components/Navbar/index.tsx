@@ -277,7 +277,7 @@ function Navbar() {
             {!isMobile && (
               <MagicStagger stagger={0.1} delay={0.4}>
                 <HStack spacing={3}>
-                  <Tooltip label="Share and get other player's HUDS" hasArrow>
+                  {/*<Tooltip label="Share and get other player's HUDS" hasArrow>
                     <Link to="/huds">
                       <MagicCard
                         as="button"
@@ -302,7 +302,7 @@ function Navbar() {
                         </HStack>
                       </MagicCard>
                     </Link>
-                  </Tooltip>
+                  </Tooltip>*/}
 
                   <MagicCard
                     as="button"
@@ -434,10 +434,10 @@ function Navbar() {
                       zIndex={99999}
                       position="relative"
                     >
-                      <MenuItem icon={<SiMaterialdesignicons />} as={Link} to="/huds">
+                      {/*<MenuItem icon={<SiMaterialdesignicons />} as={Link} to="/huds">
                         HUDS
                         <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
-                      </MenuItem>
+                      </MenuItem>*/}
                       <MenuItem icon={<BsFillMegaphoneFill />} onClick={() => onNewModalOpen()}>
                         What's New?
                       </MenuItem>
