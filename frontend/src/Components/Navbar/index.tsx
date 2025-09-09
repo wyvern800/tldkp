@@ -28,7 +28,8 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
-  MenuDivider
+  MenuDivider,
+  Portal
 } from "@chakra-ui/react";
 import { 
   MagicCard, 
@@ -45,7 +46,7 @@ import icon from "../../assets/tl.webp";
 import api from "../../services/axiosInstance";
 import { CommandType, CommandOptions } from "../../types/CommandType";
 import { TiSortNumerically } from "react-icons/ti";
-import { MdDashboard, MdSubdirectoryArrowRight } from "react-icons/md";
+import { MdDashboard, MdSubdirectoryArrowRight, MdDehaze } from "react-icons/md";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
@@ -200,7 +201,7 @@ function Navbar() {
         shadow="sm"
         position="sticky"
         top={0}
-        zIndex={1000}
+        zIndex={99999}
         backdropFilter="blur(10px)"
         bgGradient={useColorModeValue(
           "linear(to-r, white, gray.50)",
@@ -420,39 +421,58 @@ function Navbar() {
 
             {/* Mobile Navigation */}
             {isMobile && (
-              <Menu>
-                <MenuButton
-                  as={IconButton}
-                  icon={<Icon as={MdDashboard} />}
-                  variant="ghost"
-                  size="sm"
-                />
-                <MenuList>
-                  <MenuItem icon={<SiMaterialdesignicons />} as={Link} to="/huds">
-                    HUDS
-                    <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
-                  </MenuItem>
-                  <MenuItem icon={<BsFillMegaphoneFill />} onClick={() => onNewModalOpen()}>
-                    What's New?
-                  </MenuItem>
-                  <MenuItem icon={<RiSlashCommands />} onClick={() => onOpen()}>
-                    Commands
-                    <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
-                  </MenuItem>
-                  <MenuDivider />
-                  <MenuItem 
-                    icon={<IoAddOutline />} 
-                    onClick={() => window.open(import.meta.env.VITE_BOT_INSTALL, "_blank")}
-                  >
-                    Add to Server
-                  </MenuItem>
-                  <SignedOut>
-                    <MenuItem icon={<FaDiscord />} as={Link} to="/sign-in">
-                      Login with Discord
-                    </MenuItem>
-                  </SignedOut>
-                </MenuList>
-              </Menu>
+              <HStack spacing={2}>
+                <Menu>
+                  <MenuButton
+                    as={IconButton}
+                    icon={<Icon as={MdDehaze} />}
+                    variant="ghost"
+                    size="sm"
+                  />
+                  <Portal>
+                    <MenuList 
+                      zIndex={99999}
+                      position="relative"
+                    >
+                      <MenuItem icon={<SiMaterialdesignicons />} as={Link} to="/huds">
+                        HUDS
+                        <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
+                      </MenuItem>
+                      <MenuItem icon={<BsFillMegaphoneFill />} onClick={() => onNewModalOpen()}>
+                        What's New?
+                      </MenuItem>
+                      <MenuItem icon={<RiSlashCommands />} onClick={() => onOpen()}>
+                        Commands
+                        <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
+                      </MenuItem>
+                      <MenuDivider />
+                      <MenuItem 
+                        icon={<IoAddOutline />} 
+                        onClick={() => window.open(import.meta.env.VITE_BOT_INSTALL, "_blank")}
+                      >
+                        Add to Server
+                      </MenuItem>
+                      <SignedOut>
+                        <MenuItem icon={<FaDiscord />} as={Link} to="/sign-in">
+                          Login with Discord
+                        </MenuItem>
+                      </SignedOut>
+                    </MenuList>
+                  </Portal>
+                </Menu>
+                
+                <SignedIn>
+                  <UserButton>
+                    <UserButton.MenuItems>
+                      <UserButton.Link
+                        label="Dashboard"
+                        labelIcon={<MdDashboard />}
+                        href="/dashboard"
+                      />
+                    </UserButton.MenuItems>
+                  </UserButton>
+                </SignedIn>
+              </HStack>
             )}
           </Flex>
         </Container>
