@@ -9,6 +9,8 @@ import ResponseBase from "../../utils/responses.js";
 import {
   getGuildsByOwnerOrUser,
   getAllGuilds,
+  getGuildConfig,
+  deleteGuild,
 } from "../../database/repository.js";
 import "dotenv/config";
 import rateLimit from "express-rate-limit";
@@ -63,7 +65,7 @@ export const createServer = (client) => {
 
   app.use(
     cors({
-      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.org",
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200,
@@ -81,7 +83,7 @@ export const createServer = (client) => {
 
   apiRouter.use(
     cors({
-      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.online",
+      origin: process.env.ENV === "dev" ? "*" : "https://www.tldkp.org",
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       optionsSuccessStatus: 200,
@@ -252,6 +254,36 @@ export const createServer = (client) => {
       await getGuildsByOwnerOrUser(userDiscordId, client).then((guild) => {
         return new ResponseBase(res).success(guild);
       });
+    }
+  });
+
+  apiRouter.delete("/guilds/:guildId", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("Unauthorized");
+    }
+
+    try {
+      // Get guild data to check ownership
+      const guildData = await getGuildConfig(guildId);
+      
+      if (!guildData) {
+        return new ResponseBase(res).notFound("Guild not found");
+      }
+
+      // Check if user is owner
+      if (guildData.guildData.ownerId !== userDiscordId) {
+        return new ResponseBase(res).notAllowed("Only guild owner can delete the guild");
+      }
+
+      // Delete guild
+      await deleteGuild(guildId);
+      return new ResponseBase(res).success({ message: "Guild deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting guild:", error);
+      return new ResponseBase(res).error("Failed to delete guild");
     }
   });
 

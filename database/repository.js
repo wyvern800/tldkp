@@ -10,7 +10,6 @@ import {
   convertDateObjectToDateString,
 } from "../utils/index.js";
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
-import cache from "../utils/cache.js";
 import { config } from "dotenv";
 import { isAfter, add, formatDistance, isBefore, isEqual } from "date-fns";
 import {
@@ -37,30 +36,34 @@ config();
 let auctionLocks = new Map();
 export const auctionsMap = new Map();
 export const threadListeners = new Map();
+const functionExecutionCount = {};
+
+function trackFunctionExecution(functionName, calledBy) {
+  if (!functionExecutionCount[functionName]) {
+    functionExecutionCount[functionName] = 0;
+  }
+  functionExecutionCount[functionName]++;
+  new Logger().log('repository.js', `Function ${functionName} executed ${functionExecutionCount[functionName]} times ${calledBy ? `(Called last time by ${calledBy})` : ''}`);
+}
 
 /**
  * Gets the guild config
  *
  * @param { string } guildId The guild id
+ * @param { string } calledBy Which function is calling this
  * @returns { any } Data
  */
-export async function getGuildConfig(guildId) {
-  const cacheKey = `guild-${guildId}`;
-  let guildData = cache.get(cacheKey);
+export async function getGuildConfig(guildId, calledBy) {
+  trackFunctionExecution('getGuildConfig', calledBy);
 
-  if (!guildData) {
-    const guildSnapshot = await db.collection("guilds").doc(guildId).get();
+  const guildSnapshot = await db.collection("guilds").doc(guildId).get();
 
-    if (!guildSnapshot.exists) {
-      new Logger().log(PREFIX, `No config found for guild ${guildId}`);
-      return null;
-    }
-
-    guildData = guildSnapshot.data();
-    cache.set(cacheKey, guildData);
+  if (!guildSnapshot.exists) {
+    new Logger().log(PREFIX, `No config found for guild ${guildId}`);
+    return null;
   }
 
-  return guildData;
+  return guildSnapshot.data();
 }
 
 /**
@@ -490,68 +493,43 @@ export async function loadAllAuctions(discordBot) {
  * @returns { any } Data
  */
 export async function getAllGuilds() {
-  const cacheKey = `guilds-all`;
-  let guildsData = cache.get(cacheKey);
+  trackFunctionExecution('getAllGuilds');
+  const snapshot = await db.collection("guilds").get();
 
-  if (!guildsData) {
-    const snapshot = await db.collection("guilds").get();
-
-    if (snapshot.empty) {
-      new Logger().log(PREFIX, `No guilds found`);
-      return [];
-    }
-
-    const guilds = [];
-    snapshot.forEach((doc) => {
-      guilds.push({ id: doc.id, ...doc.data() });
-    });
-
-    guildsData = guilds;
-    cache.set(cacheKey, guildsData);
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No guilds found`);
+    return [];
   }
 
-  return guildsData;
+  const guilds = [];
+  snapshot.forEach((doc) => {
+    guilds.push({ id: doc.id, ...doc.data() });
+  });
+
+  return guilds;
 }
 
 export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
-  const cacheKey = `guilds-${userOrOwnerId}`;
-  let cachedData = cache.get(cacheKey);
-
-  if (cachedData) {
-    return cachedData;
-  }
-
+  trackFunctionExecution('getGuildsByOwnerOrUser');
   try {
     const guildsRef = db.collection("guilds");
-
-    const ownerQuery = guildsRef.where(
-      "guildData.ownerId",
-      "==",
-      userOrOwnerId
-    );
-    const ownerSnapshot = await ownerQuery.get();
-
     const allGuildsSnapshot = await guildsRef.get();
 
     const ownerGuilds = [];
-    if (!ownerSnapshot.empty) {
-      ownerSnapshot.forEach((doc) => {
-        ownerGuilds.push({ ...doc.data() });
-      });
-    }
-
-    // Guildas em que o usuário é membro
     const memberGuilds = [];
+
     allGuildsSnapshot.forEach((doc) => {
       const data = doc.data();
       const members = data?.memberDkps || [];
 
-      // Filter the members that match the userOrOwnerId
+      if (data.guildData.ownerId === userOrOwnerId) {
+        ownerGuilds.push({ ...data });
+      }
+
       const filteredMembers = members.filter(
         (member) => member?.userId === userOrOwnerId
       );
 
-      // Only add the guild if there are matching members
       if (filteredMembers.length > 0) {
         memberGuilds.push({
           ...data,
@@ -560,92 +538,75 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
       }
     });
 
-    const [owner, member] = await Promise.all([ownerGuilds, memberGuilds]).then(
-      async (values) => {
-        const parseMembers = async (_guilds) => {
-          return Promise.all(
-            _guilds.map(async (guild) => {
-              const { id, ownerId } = guild?.guildData;
-              const guildData = discordBot?.guilds?.cache.get(id);
-              let owner = {};
+    const parseMembers = async (_guilds) => {
+      return Promise.all(
+        _guilds.map(async (guild) => {
+          const { id, ownerId } = guild?.guildData;
+          const guildData = discordBot?.guilds?.cache.get(id);
+          let owner = {};
+          let avatarURL = "";
+
+          try {
+            owner = await guildData?.members?.fetch(ownerId);
+            avatarURL = owner?.user.displayAvatarURL({
+              dynamic: true,
+              size: 32,
+            });
+          } catch (error) {
+            new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
+          }
+
+          const memberDkps = await Promise.all(
+            guild?.memberDkps.map(async (memberDkp) => {
+              let memberData = {};
               let avatarURL = "";
 
-              // try and grab data
               try {
-                owner = await guildData?.members?.fetch(ownerId);
-                avatarURL = owner?.user.displayAvatarURL({
+                memberData = await guildData?.members?.fetch(memberDkp.userId);
+                avatarURL = memberData?.user?.displayAvatarURL({
                   dynamic: true,
                   size: 32,
                 });
               } catch (error) {
-                new Logger().logLocal(
-                  PREFIX,
-                  `Owner not found for guild ${id}`
-                );
+                new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
               }
 
-              const memberDkps = await Promise.all(
-                guild?.memberDkps.map(async (memberDkp) => {
-                  let memberData = {};
-                  let avatarURL = "";
-
-                  // try and grab data
-                  try {
-                    memberData = await guildData?.members?.fetch(
-                      memberDkp.userId
-                    );
-                    avatarURL = memberData?.user?.displayAvatarURL({
-                      dynamic: true,
-                      size: 32,
-                    });
-                  } catch (error) {
-                    new Logger().logLocal(
-                      PREFIX,
-                      `Member not found for guild ${id}`
-                    );
-                  }
-
-                  return {
-                    ...memberDkp,
-                    discordData: {
-                      displayName: memberData?.user?.globalName ?? "",
-                      preferredColor: memberData?.user?.accentColor ?? "",
-                      avatarURL,
-                    },
-                  };
-                })
-              );
-
               return {
-                ...guild,
-                guildData: {
-                  ...guild?.guildData,
-                  ownerDiscordData: {
-                    displayName: owner?.user?.globalName ?? "",
-                    preferredColor: owner?.user?.accentColor ?? "",
-                    avatarURL,
-                  },
+                ...memberDkp,
+                discordData: {
+                  displayName: memberData?.user?.globalName ?? "",
+                  preferredColor: memberData?.user?.accentColor ?? "",
+                  avatarURL,
                 },
-                memberDkps,
               };
             })
           );
-        };
 
-        const ownerGuilds = await parseMembers(values[0]);
-        const memberGuilds = await parseMembers(values[1]);
+          return {
+            ...guild,
+            guildData: {
+              ...guild?.guildData,
+              ownerDiscordData: {
+                displayName: owner?.user?.globalName ?? "",
+                preferredColor: owner?.user?.accentColor ?? "",
+                avatarURL,
+              },
+            },
+            memberDkps,
+          };
+        })
+      );
+    };
 
-        return [ownerGuilds, memberGuilds];
-      }
-    );
+    const [owner, member] = await Promise.all([
+      parseMembers(ownerGuilds),
+      parseMembers(memberGuilds),
+    ]);
 
     const result = {
       ownerGuilds: owner,
       memberGuilds: member,
     };
-
-    // Store the result in the cache
-    cache.set(cacheKey, result);
 
     return result;
   } catch (error) {
@@ -662,13 +623,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
  * @returns { any[] } The data
  */
 export async function getData(guildId, collection) {
-  const cacheKey = `${collection}-${guildId}`;
-  let cachedData = cache.get(cacheKey);
-
-  if (cachedData) {
-    return cachedData;
-  }
-
+  trackFunctionExecution('getGuildsByOwnerOrUser');
   const doc = await db.collection(collection).doc(guildId).get();
 
   if (!doc.exists) {
@@ -677,12 +632,12 @@ export async function getData(guildId, collection) {
   }
 
   const data = doc.data();
-  cache.set(cacheKey, data);
 
   return data;
 }
 
 async function getDkpByUserId(interaction, guildId, userId) {
+  trackFunctionExecution('getDkpByUserId');
   const doc = await db.collection("guilds").doc(guildId).get();
 
   // If the document doesn't exist, log an error and return null
@@ -718,6 +673,7 @@ async function getDkpByUserId(interaction, guildId, userId) {
  * @returns { any } Response
  */
 export async function guildCreate(guild) {
+  trackFunctionExecution('guildCreate');
   const defaultConfig = {
     guildData: {
       id: guild.id,
@@ -739,7 +695,7 @@ export async function guildCreate(guild) {
   };
 
   const res = await db.collection("guilds").doc(guild.id).set(defaultConfig);
-  new Logger().log(PREFIX, `Config added for guild ${guild.id}`);
+  new Logger().log(PREFIX, `Config created for guild ${guild.id}`);
   return res;
 }
 
@@ -791,12 +747,13 @@ export async function updateAuctionConfig(messageId, auction) {
  * @returns
  */
 export async function handleUpdateDkp(interaction) {
+  trackFunctionExecution('handleUpdateDkp');
   const choices = interaction.options.getString("operation");
   const user = interaction.options.getUser("user");
   const amount = interaction.options.getInteger("amount");
 
-  const { memberDkps } = await getGuildConfig(interaction.guild.id);
-  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const guildDataResponse = await getGuildConfig(interaction.guild.id, 'handleUpdateDkp');
+  const { memberDkps } = guildDataResponse;
 
   const { id } = interaction.user;
 
@@ -899,7 +856,96 @@ export async function handleUpdateDkp(interaction) {
   return await interaction.reply({ content: msg, ephemeral: true });
 }
 
-export const updateNickname = async (interaction) => {};
+export const updateNickname = async (interaction) => {
+  trackFunctionExecution('updateNickname');
+  const user = interaction.user;
+  const nickname = interaction.options.getString("nickname");
+
+  try {
+    const guildData = await getGuildConfig(interaction.guild.id, 'updateNickname');
+    let copyGuildData = { ...guildData };
+    const { memberDkps } = guildData;
+
+    let memberIndex = memberDkps.findIndex(
+      (member) => member.userId === user.id
+    );
+
+    if (memberIndex !== -1) {
+      const { updatedAt } = memberDkps[memberIndex]; // Assuming this is a Firestore Timestamp
+      const notSetYet = !updatedAt; // Check if updatedAt is set
+
+      // Ensure updatedAt is a valid Timestamp
+      const updatedAtDate =
+        updatedAt instanceof admin.firestore.Timestamp
+          ? updatedAt.toDate() // Convert Timestamp to Date
+          : new Date();
+
+      // Check if the date is valid
+      if (isNaN(updatedAtDate.getTime())) {
+        throw new Error("Invalid updatedAt date.");
+      }
+
+      const future = add(updatedAtDate, { hours: 1 });
+
+      // You can only change the nickname if it is not set yet or if 1 hour have passed since updatedAt
+      if (notSetYet || isAfter(new Date(), future)) {
+        // Update the nickname
+        copyGuildData.memberDkps[memberIndex].ign = nickname;
+        copyGuildData.memberDkps[memberIndex].updatedAt = new Date();
+
+        try {
+          const nickname = interaction.options.getString("nickname");
+
+          try {
+            await db
+              .collection("guilds")
+              .doc(interaction.guild.id)
+              .update(copyGuildData);
+            const msg = `Your in-game nickname was changed to: ${nickname}!`;
+            new Logger(interaction).log(PREFIX, msg);
+            interaction.reply({ content: msg, ephemeral: true });
+          } catch (err) {
+            console.log(err);
+            const msg = `Failed to update your in-game nickname.`;
+            new Logger(interaction).error(PREFIX, msg, err);
+            interaction.reply({ content: msg, ephemeral: true });
+          }
+        } catch (err) {
+          const msg = "Error setting in-game nickname";
+          new Logger(interaction).log(PREFIX, msg);
+          return await interaction.reply({
+            content: msg,
+            ephemeral: true,
+          });
+        }
+      } else {
+        // Send a message if nickname change is not allowed
+        const allowedDateFormatted = formatDistance(future, new Date(), {
+          addSuffix: true,
+        });
+        const msg = `You can only change your nickname once in 1 hour, you will be able ${allowedDateFormatted}.`;
+        new Logger(interaction).log(PREFIX, msg);
+        return await interaction.reply({
+          content: msg,
+          ephemeral: true,
+        });
+      }
+    } else {
+      // Send a message if the user is not found in the memberDkps array
+      const msg =
+        "You don't have DKP yet, you must have before setting a nickname.";
+      new Logger(interaction).log(PREFIX, msg);
+    }
+  } catch (error) {
+    console.log(error);
+    const msg = "Error updating in-game nickname";
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({
+      content: msg,
+      ephemeral: true,
+    });
+  }
+};
 
 /**
  * Handles the language change
@@ -908,9 +954,10 @@ export const updateNickname = async (interaction) => {};
  * @returns { any } Response
  */
 export async function changeLanguage(interaction) {
+  trackFunctionExecution('changeLanguage');
   const language = interaction.options.getString("language");
 
-  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const guildDataResponse = await getGuildConfig(interaction.guild.id, 'changeLanguage');
 
   const newGuildData = { ...guildDataResponse, language };
 
@@ -942,6 +989,7 @@ export async function changeLanguage(interaction) {
  * @returns { void }
  */
 export const handleClear = async (interaction) => {
+  trackFunctionExecution('handleClear');
   const { options } = interaction;
 
   const amount = options.getInteger("amount") || 100;
@@ -999,6 +1047,7 @@ export const handleClear = async (interaction) => {
  * @returns { void }
  */
 export const handleCheck = async (interaction) => {
+  trackFunctionExecution('handleCheck');
   const user = interaction.user;
 
   try {
@@ -1044,6 +1093,7 @@ export const handleCheck = async (interaction) => {
  * @returns { void }
  */
 export const checkOther = async (interaction) => {
+  trackFunctionExecution('checkOther');
   const { options } = interaction;
   const user = options.getUser("user");
   try {
@@ -1097,29 +1147,25 @@ export const checkOther = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const setGuildNickname = async (interaction) => {
+  trackFunctionExecution('setGuildNickname');
   const nickname = interaction.options.getString("alias");
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        throw new Error("Guild document not found");
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      throw new Error("Guild document not found");
     }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
 
     // Destructure the lastUpdatedGuildAlias field
     const { lastUpdatedGuildAlias } = guildData?.guildData;
@@ -1145,9 +1191,6 @@ export const setGuildNickname = async (interaction) => {
         "guildData.lastUpdatedGuildAlias":
           admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      // Invalidate the cache
-      cache.del(cacheKey);
 
       const msg = "Guild alias updated successfully!";
       return await interaction.reply({ content: msg, ephemeral: true });
@@ -1186,30 +1229,23 @@ export const setGuildNickname = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const setupAutoDecay = async (interaction) => {
+  trackFunctionExecution('setupAutoDecay');
   const percentage = interaction.options.getNumber("percentage");
   const interval = interaction.options.getInteger("interval");
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return;
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return;
     }
 
     const togglablesPrefix = "togglables.decaySystem";
@@ -1225,17 +1261,15 @@ export const setupAutoDecay = async (interaction) => {
         [`${togglablesPrefix}.minimumCap`]: 100,
       });
 
-    // Invalidate the cache
-    cache.del(cacheKey);
-
     const msg = `The auto decaying system was set, now you must execute **/decay-toggle** once to enable the scheduler, please have in mind
       that if you don't enable the system, the decay will not be executed, also the default minimum cap is 100, which means a person will only
       lose their DKPs only if their cap is above 100, if it reaches 100, it will stop being removed, you can change that with **/decay-change-minimum-cap** command.
     `;
     return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
+    console.log(error)
     const msg = "Error while setting up the auto-decaying system";
-    new Logger(interaction).log(PREFIX, msg);
+    new Logger(interaction).error(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
   }
 };
@@ -1253,31 +1287,27 @@ export const setupAutoDecay = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const toggleDkpNotifications = async (interaction) => {
+  trackFunctionExecution('toggleDkpNotifications');
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
 
     const togglablesPrefix = "togglables.dkpSystem";
     const enabled = guildData?.togglables?.dkpSystem?.dmNotifications;
@@ -1290,9 +1320,6 @@ export const toggleDkpNotifications = async (interaction) => {
       .update({
         [`${togglablesPrefix}.dmNotifications`]: newValue,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `Togglable: direct messages updated to: ${newValue}!`;
     return await interaction.reply({ content: msg, ephemeral: true });
@@ -1317,31 +1344,27 @@ export const toggleDkpNotifications = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const toggleDecay = async (interaction) => {
+  trackFunctionExecution('toggleDecay');
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
+
+    // Get the data from the document snapshot
+    const guildData = guildSnapshot.data();
 
     const togglablesPrefix = "togglables.decaySystem";
 
@@ -1365,9 +1388,6 @@ export const toggleDecay = async (interaction) => {
           ? admin.firestore.FieldValue.serverTimestamp()
           : null,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `Togglable: decaying system is now ${
       !enabled ? "enabled" : "disabled"
@@ -1398,6 +1418,7 @@ export const toggleDecay = async (interaction) => {
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
 export const setMinimumCap = async (interaction) => {
+  trackFunctionExecution('setMinimumCap');
   const minimumCap = interaction.options.getInteger("minimum_cap");
 
   if (minimumCap < 0) {
@@ -1407,28 +1428,20 @@ export const setMinimumCap = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
 
     const togglablesPrefix = "togglables.decaySystem";
@@ -1440,9 +1453,6 @@ export const setMinimumCap = async (interaction) => {
       .update({
         [`${togglablesPrefix}.minimumCap`]: minimumCap,
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     const msg = `Togglable: decay minimum cap updated successfully to **${minimumCap}**!`;
     return await interaction.reply({ content: msg, ephemeral: true });
@@ -1460,11 +1470,12 @@ export const setMinimumCap = async (interaction) => {
  * @returns
  */
 export async function claimDkpCode(interaction) {
+  trackFunctionExecution('claimDkpCode');
   const amount = interaction.options.getInteger("amount");
   const expiration = interaction.options.getNumber("expiration-in-minutes");
 
-  const { memberDkps } = await getGuildConfig(interaction.guild.id);
   const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const { memberDkps } = guildDataResponse;
 
   const { id } = interaction.user;
 
@@ -1488,7 +1499,7 @@ export async function claimDkpCode(interaction) {
   updateDkp(
     increasedDkp,
     user.id,
-    choices === "add" ? amount : -amount,
+    amount,
     user,
     guildDataResponse?.guildData?.name,
     guildDataResponse
@@ -1503,18 +1514,10 @@ export async function claimDkpCode(interaction) {
 
   await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
 
-  const answer = {
-    add: "increased to",
-    remove: "subtracted to",
-    set: "set to",
-  };
-
   const value = newGuildData?.memberDkps?.find(
     (member) => member.userId === user.id
   );
-  const msg = `<@${user.id}>'s DKP was ${
-    answer[choices?.toLowerCase() ?? "updated to"]
-  } ${value?.dkp}!`;
+  const msg = `<@${user.id}>'s DKP was increased to **${value?.dkp}**!`;
   new Logger(interaction).log(PREFIX, msg);
   return await interaction.reply({ content: msg, ephemeral: true });
 }
@@ -1526,6 +1529,7 @@ export async function claimDkpCode(interaction) {
  * @returns { any } Response
  */
 export async function generateDkpCode(interaction) {
+  trackFunctionExecution('generateDkpCode');
   const amount = interaction.options.getInteger("amount");
   const expiration = interaction.options.getNumber("expiration-in-minutes");
   const note = interaction.options.getString("note");
@@ -1595,6 +1599,7 @@ export async function generateDkpCode(interaction) {
  * @returns { any } Response
  */
 export async function redeemDkpCode(interaction) {
+  trackFunctionExecution('redeemDkpCode');
   const code = interaction.options.getString("code");
 
   if (!code) {
@@ -1642,7 +1647,7 @@ export async function redeemDkpCode(interaction) {
     const userId = interaction.user.id;
 
     // Get the guild config
-    const guildDataResponse = await getGuildConfig(guildId);
+    const guildDataResponse = await getGuildConfig(guildId, 'redeemDkpCode');
     let newGuildData = guildDataResponse;
 
     // Initialize increasedDkp as a copy of the existing memberDkps array or an empty array if it doesn't exist
@@ -1693,25 +1698,20 @@ export async function redeemDkpCode(interaction) {
  * @returns { any[] } List of codes
  */
 export async function getAllCodes() {
-  const cacheKey = `codes-all`;
-  let codesData = cache.get(cacheKey);
+  trackFunctionExecution('getAllCodes');
+  const snapshot = await db.collection("codes").get();
 
-  if (!codesData) {
-    const snapshot = await db.collection("codes").get();
-
-    if (snapshot.empty) {
-      new Logger().log(PREFIX, `No codes found`);
-      return [];
-    }
-
-    const codes = [];
-    snapshot.forEach((doc) => {
-      codes.push({ id: doc.id, ...doc.data() });
-    });
-
-    codesData = codes;
-    cache.set(cacheKey, codesData);
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No codes found`);
+    return [];
   }
+
+  const codes = [];
+  snapshot.forEach((doc) => {
+    codes.push({ id: doc.id, ...doc.data() });
+  });
+
+  const codesData = codes;
 
   return codesData;
 }
@@ -1724,14 +1724,34 @@ export async function getAllCodes() {
  * @returns
  */
 export async function updateGuildConfig(guildId, guildConfig) {
+  trackFunctionExecution('updateGuildConfig');
   const response = await db
-    .collection("guilds")
+    .collection("guilds") 
     .doc(guildId)
     .update(guildConfig);
   return response;
 }
 
+/**
+ * Deletes a guild and its data from Firebase
+ * 
+ * @param {string} guildId The ID of the guild to delete
+ * @returns {Promise<void>} A promise that resolves when the guild is deleted
+ */
+export const deleteGuild = async (guildId) => {
+  trackFunctionExecution('deleteGuild');
+  
+  try {
+    await db.collection("guilds").doc(guildId).delete();
+    new Logger().log(PREFIX, `Guild ${guildId} was deleted successfully`);
+  } catch (error) {
+    new Logger().error(PREFIX, `Error deleting guild ${guildId}`, error);
+    throw error;
+  }
+};
+
 export const setRoleOnJoin = async (interaction) => {
+  trackFunctionExecution('setRoleOnJoin');
   const role = interaction.options.getRole("role");
   const amount = interaction.options.getInteger("amount");
 
@@ -1750,28 +1770,20 @@ export const setRoleOnJoin = async (interaction) => {
 
   try {
     const guildId = interaction.guild.id;
-    const cacheKey = `guild-${guildId}`;
-    let guildData = cache.get(cacheKey);
 
-    if (!guildData) {
-      // Direct query to Firestore for the specific guild document
-      const guildRef = admin.firestore().collection("guilds").doc(guildId);
+    // Direct query to Firestore for the specific guild document
+    const guildRef = admin.firestore().collection("guilds").doc(guildId);
 
-      // Fetch the document snapshot
-      const guildSnapshot = await guildRef.get();
+    // Fetch the document snapshot
+    const guildSnapshot = await guildRef.get();
 
-      // Ensure the document exists
-      if (!guildSnapshot.exists) {
-        new Logger(interaction).log(PREFIX, "Guild document not found");
-        return await interaction.reply({
-          content: "Guild document not found",
-          ephemeral: true,
-        });
-      }
-
-      // Get the data from the document snapshot
-      guildData = guildSnapshot.data();
-      cache.set(cacheKey, guildData);
+    // Ensure the document exists
+    if (!guildSnapshot.exists) {
+      new Logger(interaction).log(PREFIX, "Guild document not found");
+      return await interaction.reply({
+        content: "Guild document not found",
+        ephemeral: true,
+      });
     }
 
     const prefix = "togglables.dkpSystem";
@@ -1786,9 +1798,6 @@ export const setRoleOnJoin = async (interaction) => {
           : undefined),
         ...(role ? { [`${prefix}.roleToAssign`]: role.id } : undefined),
       });
-
-    // Invalidate the cache
-    cache.del(cacheKey);
 
     let msg = `Now when a member joins, they will:`;
     if (role) {

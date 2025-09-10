@@ -15,22 +15,77 @@ import {
   TableContainer,
   Tag,
   HStack,
-  Spacer,
-  Text
+  Text,
+  IconButton,
+  useToast,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  Button,
 } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
+import { DeleteIcon } from "@chakra-ui/icons";
 import styled from "styled-components";
 import unknown from "../../assets/unknown.png";
-import { useUser } from "@clerk/clerk-react";
-import { useState, useEffect } from "react";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { useState, useEffect, useRef } from "react";
+import api from "../../services/axiosInstance";
 
 const Logo = styled.img`
   width: 20%;
 `;
 
-const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode => {
-  const { isLoaded, user } = useUser();
+const Guilds = ({ data: initialData, loaded, isBackoffice = false }: any): React.ReactNode => {
+const { isLoaded, user } = useUser();
+const { getToken } = useAuth();
   const [myDiscordId, setMyDiscordId] = useState<string | undefined>("");
+  const [data, setData] = useState(initialData);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [guildToDelete, setGuildToDelete] = useState<any>(null);
+  const cancelRef = useRef<any>();
+  const toast = useToast();
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
+  const handleDelete = async (guild: any) => {
+    setGuildToDelete(guild);
+    setIsDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/guilds/${guildToDelete.guildData.id}`, {
+        headers: {
+          Authorization: `Bearer ${await getToken()}`,
+        },
+      });
+      setData((prev: any[]) => prev.filter((g: any) => g.guildData.id !== guildToDelete.guildData.id));
+      toast({
+        title: "Guild deleted",
+        description: "The guild has been deleted successfully.",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error: any) {
+      console.error('Error deleting guild:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the guild. Please try again.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsDeleteOpen(false);
+      setGuildToDelete(null);
+    }
+  };
 
   // Effect to get the logged user userId
   useEffect(() => {
@@ -56,7 +111,7 @@ const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode =>
         </center>
       ) : (
         <>
-          <Accordion allowToggle>
+          <Accordion allowToggle w="full">
             {data?.map((guild: any, index: number) => {
               const { icon, name, alias } = guild?.guildData ?? {};
               const { memberDkps } = guild ?? [];
@@ -65,16 +120,17 @@ const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode =>
                 <AccordionItem
                   key={`${guild?.guildData?.id}${index}`}
                   defaultChecked={true}
+                  w="full"
                 >
-                  <h2>
-                    <AccordionButton>
-                      <Box as="span" flex="1" textAlign="left">
-                        <HStack justifyContent={"space-between"} width={"100%"}>
+                  <h2 style={{ width: "100%" }}>
+                    <AccordionButton w="full">
+                      <Box as="span" flex="1" textAlign="left" w="full">
+                        <HStack justifyContent={"space-between"} w="full" style={{ width: "100%" }}>
                           <HStack>
                             <Logo
                               style={{ width: "25px", borderRadius: "50px" }}
                               src={icon && icon !== "" ? icon : unknown}
-                            ></Logo>
+                            />
                             <HStack>
                               {alias && alias !== null && alias !== "" ? (
                                 <>
@@ -88,12 +144,26 @@ const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode =>
                               )}
                             </HStack>
                           </HStack>
-                          <Spacer />
-                          {memberDkps?.length && (
-                            <Tag marginRight="8px" colorScheme="teal">
-                              {memberDkps?.length}
-                            </Tag>
-                          )}
+                          <HStack spacing={2}>
+                            {guild?.guildData?.ownerId === myDiscordId && (
+                              <IconButton
+                                aria-label="Delete guild"
+                                icon={<DeleteIcon />}
+                                size="sm"
+                                colorScheme="red"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(guild);
+                                }}
+                              />
+                            )}
+                            {memberDkps?.length && (
+                              <Tag colorScheme="teal">
+                                {memberDkps?.length}
+                              </Tag>
+                            )}
+                          </HStack>
                         </HStack>
                       </Box>
                       <AccordionIcon />
@@ -158,6 +228,35 @@ const Guilds = ({ data, loaded, isBackoffice = false }: any): React.ReactNode =>
           </Accordion>
         </>
       )}
+      <AlertDialog
+        isOpen={isDeleteOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={() => setIsDeleteOpen(false)}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Guild
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              Are you sure you want to delete this guild? This action cannot be undone.<br/>
+              <br/>
+              <p>You will lose everything:</p>
+              <p>- Access to your guild data like: Members, DKPs...</p>
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={() => setIsDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={confirmDelete} ml={3}>
+                Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </>
   );
 };

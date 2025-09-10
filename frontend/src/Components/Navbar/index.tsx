@@ -1,17 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Flex,
-  Spacer,
   Box,
   Heading,
   UnorderedList,
-  Button,
-  Divider,
   useDisclosure,
   Tooltip,
   Image,
   HStack,
+  VStack,
   Stack,
   ListItem,
   Tag,
@@ -20,8 +19,26 @@ import {
   TagLabel,
   Badge,
   Text,
-  Icon
+  Icon,
+  useColorModeValue,
+  Container,
+  IconButton,
+  useBreakpointValue,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  MenuDivider,
+  Portal
 } from "@chakra-ui/react";
+import { 
+  MagicCard, 
+  MagicFloat, 
+  MagicShimmer, 
+  MagicReveal,
+  MagicPulse,
+  MagicStagger
+} from "../../lib/magic-ui";
 import { CiAt } from "react-icons/ci";
 import { VscSymbolParameter } from "react-icons/vsc";
 import Modal from "../Modal";
@@ -29,7 +46,7 @@ import icon from "../../assets/tl.webp";
 import api from "../../services/axiosInstance";
 import { CommandType, CommandOptions } from "../../types/CommandType";
 import { TiSortNumerically } from "react-icons/ti";
-import { MdDashboard, MdSubdirectoryArrowRight } from "react-icons/md";
+import { MdDashboard, MdSubdirectoryArrowRight, MdDehaze } from "react-icons/md";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
@@ -37,7 +54,6 @@ import { RiSlashCommands } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 import { BsFillMegaphoneFill } from "react-icons/bs";
 import { changelog } from "../../constants/changelog";
-import { SiMaterialdesignicons } from "react-icons/si";
 
 function Navbar() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -167,176 +183,355 @@ function Navbar() {
     );
   };
 
+  const navBg = useColorModeValue("white", "gray.800");
+  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const isMobile = useBreakpointValue({ base: true, md: false });
+
   return (
-    <>
-      <Flex
-        minWidth="100%"
-        alignItems="center"
-        gap="2"
-        p="5"
-        direction={["row", "column"]}
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      <Box
+        bg={navBg}
+        borderBottom="1px"
+        borderColor={borderColor}
+        shadow="sm"
+        position="sticky"
+        top={0}
+        zIndex={99999}
+        backdropFilter="blur(10px)"
+        bgGradient={useColorModeValue(
+          "linear(to-r, white, gray.50)",
+          "linear(to-r, gray.800, gray.900)"
+        )}
       >
-        <Flex
-          minWidth="100%"
-          alignItems="center"
-          justifyContent="center"
-          direction={["column", "row"]}
-        >
-          <Box>
-            <HStack spacing="5px">
-              <Image
-                boxSize="30px"
-                objectFit="cover"
-                src={icon}
-                alt="Throne & Liberty Logo"
-              />
-              <Tooltip
-                hasArrow
-                label="Throne & Liberty Dragon Kill Points"
-                colorScheme="gray.600"
-                placement="auto-start"
-              >
-                <Link to="/">
-                  <Heading size="lg" textShadow={"2px 2px #0000008a"}>
-                    TLDKP
-                  </Heading>
-                </Link>
-              </Tooltip>
-            </HStack>
-            <Spacer />
-          </Box>
-          <Spacer />
-          <Stack direction={["column", "row"]} alignItems="center" gap="5">
-            <Tooltip
-              hasArrow
-              label="Share and get other player's HUDS"
-              colorScheme="gray.600"
-              placement="auto-start"
-            >
-              <Link to="/huds">
-                <Button leftIcon={<SiMaterialdesignicons />} colorScheme="teal">
-                  HUDS
-                  <Badge ml="3" colorScheme="black">
-                    New
-                  </Badge>
-                </Button>
+        <Container maxW="container.xl" px={4}>
+          <Flex
+            minH="70px"
+            alignItems="center"
+            justifyContent="space-between"
+            py={4}
+          >
+            {/* Magic Logo Section */}
+            <MagicReveal direction="left" delay={0.2}>
+              <Link to="/">
+                <MagicFloat intensity={2} speed={5}>
+                  <HStack spacing={3} cursor="pointer">
+                    <MagicPulse intensity={0.3} speed={4} color="rgba(14, 165, 233, 0.3)">
+                      <Box
+                        border="2px solid"
+                        borderColor="gray.200"
+                        borderRadius="xl"
+                      >
+                        <Box
+                          p={3}
+                          borderRadius="lg"
+                          bgGradient="linear(135deg, teal.50, green.50)"
+                          boxShadow="lg"
+                          position="relative"
+                          overflow="hidden"
+                        >
+                          <MagicShimmer
+                            color="linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)"
+                          >
+                            <Image
+                              boxSize="36px"
+                              objectFit="cover"
+                              src={icon}
+                              alt="Throne & Liberty Logo"
+                            />
+                          </MagicShimmer>
+                        </Box>
+                      </Box>
+                    </MagicPulse>
+                    
+                    <VStack align="start" spacing={0}>
+                      <Heading
+                        size="lg"
+                        bgGradient="linear(45deg, teal.400, green.400, blue.400)"
+                        bgClip="text"
+                        fontWeight="black"
+                        textShadow="0 0 20px rgba(14, 165, 233, 0.3)"
+                      >
+                        TLDKP
+                      </Heading>
+                      <Text 
+                        fontSize="xs" 
+                        color="gray.500" 
+                        fontWeight="bold"
+                        textTransform="uppercase"
+                        letterSpacing="wide"
+                      >
+                        Dragon Kill Points
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </MagicFloat>
               </Link>
-            </Tooltip>
-            <Button
-              leftIcon={<BsFillMegaphoneFill />}
-              colorScheme="teal"
-              onClick={() => onNewModalOpen()}
-            >
-              Whats new?
-            </Button>
-            <Button
-              leftIcon={<RiSlashCommands />}
-              colorScheme="teal"
-              onClick={() => onOpen()}
-            >
-              Commands
-              <Badge ml="3" colorScheme="black">
-                New
-              </Badge>
-            </Button>
+            </MagicReveal>
 
-            <Button
-              leftIcon={<IoAddOutline />}
-              colorScheme="teal"
-              onClick={() => {
-                window.open(import.meta.env.VITE_BOT_INSTALL, "_blank");
-              }}
-            >
-              Add to my server
-            </Button>
+            {/* Magic Desktop Navigation */}
+            {!isMobile && (
+              <MagicStagger stagger={0.1} delay={0.4}>
+                <HStack spacing={3}>
+                  {/*<Tooltip label="Share and get other player's HUDS" hasArrow>
+                    <Link to="/huds">
+                      <MagicCard
+                        as="button"
+                        p={3}
+                        borderRadius="xl"
+                        bg="transparent"
+                        _hover={{
+                          bg: "teal.50",
+                          transform: "translateY(-3px)",
+                          boxShadow: "xl"
+                        }}
+                        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                        position="relative"
+                        overflow="hidden"
+                      >
+                        <HStack spacing={2}>
+                          <Icon as={SiMaterialdesignicons} color="teal.500" boxSize={4} />
+                          <Text fontWeight="bold" color="teal.600">HUDS</Text>
+                          <Badge colorScheme="green" variant="solid" fontSize="xs" borderRadius="full">
+                            New
+                          </Badge>
+                        </HStack>
+                      </MagicCard>
+                    </Link>
+                  </Tooltip>*/}
 
-            <SignedOut>
-              <Link to="/sign-in">
-                <Button leftIcon={<FaDiscord />} colorScheme="teal">
-                  Login with Discord
-                </Button>
-              </Link>
-            </SignedOut>
+                  <MagicCard
+                    as="button"
+                    p={3}
+                    borderRadius="xl"
+                    bg="transparent"
+                    onClick={() => onNewModalOpen()}
+                    _hover={{
+                      bg: "teal.50",
+                      transform: "translateY(-3px)",
+                      boxShadow: "xl"
+                    }}
+                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                  >
+                    <HStack spacing={2}>
+                      <Icon as={BsFillMegaphoneFill} color="teal.500" boxSize={4} />
+                      <Text fontWeight="bold" color="teal.600">What's New?</Text>
+                    </HStack>
+                  </MagicCard>
 
-            {/*<Icon
-              _hover={{ cursor: "pointer", opacity: 0.7 }}
-              as={colorMode === "light" ? MoonIcon : SunIcon}
-              w={5}
-              h={5}
-              color="white"
-              onClick={toggleColorMode}
-            />*/}
-            <SignedIn>
-              <UserButton>
-                <UserButton.MenuItems>
-                  <UserButton.Link
-                    label="Dashboard"
-                    labelIcon={<MdDashboard />}
-                    href="/dashboard"
+                  <MagicCard
+                    as="button"
+                    p={3}
+                    borderRadius="xl"
+                    bg="transparent"
+                    onClick={() => onOpen()}
+                    _hover={{
+                      bg: "teal.50",
+                      transform: "translateY(-3px)",
+                      boxShadow: "xl"
+                    }}
+                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                  >
+                    <HStack spacing={2}>
+                      <Icon as={RiSlashCommands} color="teal.500" boxSize={4} />
+                      <Text fontWeight="bold" color="teal.600">Commands</Text>
+                      <Badge colorScheme="green" variant="solid" fontSize="xs" borderRadius="full">
+                        New
+                      </Badge>
+                    </HStack>
+                  </MagicCard>
+
+                  <Box
+                    border="2px solid"
+                    borderColor="gray.200"
+                    borderRadius="xl"
+                  >
+                    <MagicCard
+                      as="button"
+                      p={3}
+                      borderRadius="xl"
+                      bgGradient="linear(45deg, teal.500, green.500)"
+                      color="white"
+                      onClick={() => {
+                        window.open(import.meta.env.VITE_BOT_INSTALL, "_blank");
+                      }}
+                      _hover={{
+                        transform: "translateY(-3px)",
+                        boxShadow: "2xl",
+                        bgGradient: "linear(45deg, teal.600, green.600)"
+                      }}
+                      transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                      fontWeight="bold"
+                    >
+                      <HStack spacing={2}>
+                        <Icon as={IoAddOutline} boxSize={4} />
+                        <Text>Add to Server</Text>
+                      </HStack>
+                    </MagicCard>
+                  </Box>
+
+                  <SignedOut>
+                    <Link to="/sign-in">
+                      <Box
+                        border="2px solid"
+                        borderColor="purple.300"
+                        borderRadius="xl"
+                      >
+                        <MagicCard
+                          as="button"
+                          p={3}
+                          borderRadius="xl"
+                          bgGradient="linear(45deg, purple.500, purple.600)"
+                          color="white"
+                          _hover={{
+                            transform: "translateY(-3px)",
+                            boxShadow: "2xl",
+                            bgGradient: "linear(45deg, purple.600, purple.700)"
+                          }}
+                          transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                          fontWeight="bold"
+                        >
+                          <HStack spacing={2}>
+                            <Icon as={FaDiscord} boxSize={4} />
+                            <Text>Login</Text>
+                          </HStack>
+                        </MagicCard>
+                      </Box>
+                    </Link>
+                  </SignedOut>
+
+                  <SignedIn>
+                      <UserButton>
+                        <UserButton.MenuItems>
+                          <UserButton.Link
+                            label="Dashboard"
+                            labelIcon={<MdDashboard />}
+                            href="/dashboard"
+                          />
+                        </UserButton.MenuItems>
+                      </UserButton>
+                    </SignedIn>
+                </HStack>
+              </MagicStagger>
+            )}
+
+            {/* Mobile Navigation */}
+            {isMobile && (
+              <HStack spacing={2}>
+                <Menu>
+                  <MenuButton
+                    as={IconButton}
+                    icon={<Icon as={MdDehaze} />}
+                    variant="ghost"
+                    size="sm"
                   />
-                </UserButton.MenuItems>
-              </UserButton>
-            </SignedIn>
-          </Stack>
-        </Flex>
-        <Divider p="2" />
+                  <Portal>
+                    <MenuList 
+                      zIndex={99999}
+                      position="relative"
+                    >
+                      {/*<MenuItem icon={<SiMaterialdesignicons />} as={Link} to="/huds">
+                        HUDS
+                        <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
+                      </MenuItem>*/}
+                      <MenuItem icon={<BsFillMegaphoneFill />} onClick={() => onNewModalOpen()}>
+                        What's New?
+                      </MenuItem>
+                      <MenuItem icon={<RiSlashCommands />} onClick={() => onOpen()}>
+                        Commands
+                        <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
+                      </MenuItem>
+                      <MenuDivider />
+                      <MenuItem 
+                        icon={<IoAddOutline />} 
+                        onClick={() => window.open(import.meta.env.VITE_BOT_INSTALL, "_blank")}
+                      >
+                        Add to Server
+                      </MenuItem>
+                      <SignedOut>
+                        <MenuItem icon={<FaDiscord />} as={Link} to="/sign-in">
+                          Login with Discord
+                        </MenuItem>
+                      </SignedOut>
+                    </MenuList>
+                  </Portal>
+                </Menu>
+                
+                <SignedIn>
+                  <UserButton>
+                    <UserButton.MenuItems>
+                      <UserButton.Link
+                        label="Dashboard"
+                        labelIcon={<MdDashboard />}
+                        href="/dashboard"
+                      />
+                    </UserButton.MenuItems>
+                  </UserButton>
+                </SignedIn>
+              </HStack>
+            )}
+          </Flex>
+        </Container>
+      </Box>
 
-        <Modal
-          title="Usage and commands"
-          state={{ isOpen, onClose }}
-          isCentered={true}
-          closeOnOverlayClick={true}
-        >
-          {commands && categories ? (
-            <UnorderedList spacing={5}>
-              {categories.map((category: string, index: number) => (
-                <Commands
-                  key={`${category}${index}`}
-                  commandsData={commands}
-                  category={category}
-                />
-              ))}
-            </UnorderedList>
-          ) : (
-            <>
-              <Stack>
-                <Skeleton height="15px" />
-                <Skeleton height="15px" />
-                <Skeleton height="15px" />
-                <Skeleton height="15px" />
-              </Stack>
-            </>
-          )}
-        </Modal>
-
-        <Modal
-          title="What's new?"
-          state={{ isOpen: isNewModalOpen, onClose: onNewModalClose }}
-          isCentered={true}
-          closeOnOverlayClick={true}
-        >
-          <UnorderedList spacing={3}>
-            {changelog.map((changelog: any, index) => (
-              <ListItem key={index}>
-                <span style={{ textDecoration: "underline" }}>
-                  {changelog.date}:
-                </span>
-                <UnorderedList>
-                  {changelog?.changes?.map((change: any) => {
-                    return (
-                      <ListItem key={`${change}${index}`}>
-                        {change}.
-                        <br />
-                      </ListItem>
-                    );
-                  })}
-                </UnorderedList>
-              </ListItem>
+      <Modal
+        title="Usage and commands"
+        state={{ isOpen, onClose }}
+        isCentered={true}
+        closeOnOverlayClick={true}
+      >
+        {commands && categories ? (
+          <UnorderedList spacing={5}>
+            {categories.map((category: string, index: number) => (
+              <Commands
+                key={`${category}${index}`}
+                commandsData={commands}
+                category={category}
+              />
             ))}
           </UnorderedList>
-        </Modal>
-      </Flex>
-    </>
+        ) : (
+          <>
+            <Stack>
+              <Skeleton height="15px" />
+              <Skeleton height="15px" />
+              <Skeleton height="15px" />
+              <Skeleton height="15px" />
+            </Stack>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        title="What's new?"
+        state={{ isOpen: isNewModalOpen, onClose: onNewModalClose }}
+        isCentered={true}
+        closeOnOverlayClick={true}
+      >
+        <UnorderedList spacing={3}>
+          {changelog.map((changelog: any, index) => (
+            <ListItem key={index}>
+              <span style={{ textDecoration: "underline" }}>
+                {changelog.date}:
+              </span>
+              <UnorderedList>
+                {changelog?.changes?.map((change: any) => {
+                  return (
+                    <ListItem key={`${change}${index}`}>
+                      {change}.
+                      <br />
+                    </ListItem>
+                  );
+                })}
+              </UnorderedList>
+            </ListItem>
+          ))}
+        </UnorderedList>
+      </Modal>
+    </motion.div>
   );
 }
 

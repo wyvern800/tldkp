@@ -253,7 +253,7 @@ export const commands = [
     description: "Get help from the bot",
     commandExecution: async (interaction) => {
       const msg = `There is a section in the website where you can see all the commands available and their usage, and also now you can check all of your member's DKPS at our brand new Dashboard.  
-      [Click here to check out!](https://tldkp.online/)
+      [Click here to check out!](https://tldkp.org/)
       `;
       return await interaction.reply({
         content: msg,
@@ -307,6 +307,33 @@ export const commands = [
           {
             name: "20 minutes",
             value: 20,
+          },
+          {
+            name: "25 minutes",
+            value: 25,
+          },
+          {
+            name: "30 minutes",
+            value: 30,
+          },
+          {
+            name: "35 minutes",
+            value: 35,
+          },
+           {
+            name: "40 minutes",
+            value: 40,
+          },
+           {
+            name: "45 minutes",
+            value: 45,
+          },
+           {
+            name: "50 minutes",
+            value: 50,
+           }, {
+            name: "1 hour",
+            value: 60,
           },
         ],
         required: true,
