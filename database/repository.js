@@ -443,11 +443,11 @@ export async function loadAllAuctions(discordBot) {
           }
         }
       } catch (e) {
-        new Logger().logLocal(
+        /*new Logger().logLocal(
           PREFIX,
           `Error loading auction ${auction.id} (deleted?)`,
           e
-        );
+        );*/
       }
     }
   } catch (err) {
@@ -2007,30 +2007,61 @@ export const updateAuction = async ({ _message = null, auction }) => {
       }
 
       // create the thread only if it doesn't exist
-      let thread = await message.startThread({
-        name: `Auction: ${auction?.itemName}'s bids`,
-        reason: "All bids are going to be here!",
-      });
-
-      // set the thread permissions
+      let thread;
       try {
-        await thread.permissionOverwrites.edit(thread.guild.roles.everyone, {
-          SendMessages: false,
-          AttachFiles: false,
+        thread = await message.startThread({
+          name: `Auction: ${auction?.itemName}'s bids`,
+          reason: "All bids are going to be here!",
         });
-        await thread.permissionOverwrites.edit(thread.client.user, {
-          SendMessages: true,
-        });
+        
+        // Verify thread was created successfully
+        if (!thread) {
+          throw new Error("Thread creation returned null/undefined");
+        }
+        
+        // Wait a moment for the thread to be fully initialized
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verify permissionOverwrites exists
+        if (!thread.permissionOverwrites) {
+          new Logger().logLocal(
+            PREFIX,
+            "Thread created but permissionOverwrites is not available. Skipping permission setup."
+          );
+        } else {
+          // set the thread permissions
+          try {
+            await thread.permissionOverwrites.edit(thread.guild.roles.everyone, {
+              SendMessages: false,
+              AttachFiles: false,
+            });
+            await thread.permissionOverwrites.edit(thread.client.user, {
+              SendMessages: true,
+            });
+            new Logger().logLocal(
+              PREFIX,
+              "Thread permissions set successfully"
+            );
+          } catch (permErr) {
+            console.log("Permission error:", permErr);
+            new Logger().logLocal(
+              PREFIX,
+              `Failed to set thread permissions: ${permErr.message}`
+            );
+            // Don't fail the auction creation if permissions fail
+          }
+        }
       } catch (err) {
-        console.log(err);
+        console.log("Thread creation error:", err);
         new Logger().logLocal(
           PREFIX,
-          "An error occurred while setting the thread permissions."
+          `Failed to create thread: ${err.message}`
         );
         await i.reply({
-          content: "An error occurred while setting the thread permissions.",
+          content: "An error occurred while creating the auction thread.",
           ephemeral: true,
         });
+        return; // Exit early if thread creation fails
       }
 
       // send the message to the thread

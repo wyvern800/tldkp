@@ -440,11 +440,11 @@ export const updateAuctions = async () => {
               }
             }
           } catch (e) {
-            new Logger().logLocal(
+            /*new Logger().logLocal(
               PREFIX + "/Auctions",
               `Error loading auction ${auction.id} (deleted?)`,
               e
-            );
+            );*/
           }
         }
       } catch (err) {
