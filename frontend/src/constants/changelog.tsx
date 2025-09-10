@@ -1,5 +1,13 @@
 export const changelog = [
   {
+    version: 'v1.0.3',
+    date: '2025-09-10',
+    changes: [
+      "Added a feature where you can check if the bot has all the required permissions to work properly, this will be needed for the auction system to work properly",
+      "Auction system is now available for everyone, you can create an auction, and people can bid on it. The auction will be closed when you decide, and the winner will be the one with the highest bid. The winner will have the DKP deducted from his account. The auction creator can also cancel it if the auction didn's start yet. The auction creator can also set a minimum bid incremented.",
+    ]
+  },
+  {
     version: 'v1.0.2^4',
     date: '2025-09-09',
     changes: [
