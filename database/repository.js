@@ -297,8 +297,35 @@ export async function processBid(interaction, auction) {
           const formattedMaxTime =
             convertDateObjectToDateString(auctionEndTime);
 
-          const { prefix, status, modal } = statusParser(
-            updatedAuction?.auctionStatus
+          // Calculate dynamic status instead of using stored status
+          const now = new Date();
+          const bidAuctionEndTime = updatedAuction?.auctionMaxTime instanceof admin.firestore.Timestamp
+            ? updatedAuction.auctionMaxTime.toDate()
+            : updatedAuction?.auctionMaxTime;
+          const bidAuctionStartTime = updatedAuction?.startingAt instanceof admin.firestore.Timestamp
+            ? updatedAuction.startingAt.toDate()
+            : updatedAuction?.startingAt;
+
+          let dynamicStatus;
+          if (updatedAuction?.finalized) {
+            dynamicStatus = "finalized";
+          } else if (updatedAuction?.cancelled) {
+            dynamicStatus = "cancelled";
+          } else if (bidAuctionStartTime && isBefore(now, bidAuctionStartTime)) {
+            dynamicStatus = "scheduled";
+          } else if (bidAuctionEndTime && isAfter(now, bidAuctionEndTime)) {
+            dynamicStatus = "finalized";
+          } else if (bidAuctionStartTime && isAfter(now, bidAuctionStartTime)) {
+            dynamicStatus = "started";
+          } else {
+            dynamicStatus = "cancelled";
+          }
+
+          const { prefix, status, modal } = statusParser(dynamicStatus);
+
+          new Logger().logLocal(
+            PREFIX,
+            `Bid processing for ${updatedAuction.itemName}: storedStatus=${updatedAuction.auctionStatus}, dynamicStatus=${dynamicStatus}, finalized=${updatedAuction.finalized}, cancelled=${updatedAuction.cancelled}`
           );
 
           console.log(interaction?.member);
