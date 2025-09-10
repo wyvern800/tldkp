@@ -174,6 +174,53 @@ export const updateAuctions = async () => {
       try {
         // Loop the auctions
         for (const auction of auctions) {
+          // Check if auction has expired and needs to be finalized
+          const now = new Date();
+          const auctionEndTime = auction.auctionMaxTime instanceof admin.firestore.Timestamp
+            ? auction.auctionMaxTime.toDate()
+            : auction.auctionMaxTime;
+          
+          const auctionStartTime = auction.startingAt instanceof admin.firestore.Timestamp
+            ? auction.startingAt.toDate()
+            : auction.startingAt;
+          
+          // If auction has expired and is not already finalized/cancelled, update it
+          if (auctionEndTime && isAfter(now, auctionEndTime) && 
+              !auction.finalized && !auction.cancelled && 
+              auction.auctionStatus !== "finalized") {
+            
+            new Logger().logLocal(
+              PREFIX,
+              `Auction ${auction.itemName} has expired, updating status to finalized`
+            );
+            
+            // Update auction status to finalized
+            const auctionDTO = {
+              ...auction,
+              auctionStatus: "finalized",
+              finalized: true,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            
+            try {
+              await api.updateAuctionConfig(auction.data.messageId, auctionDTO);
+              // Update the auction object with the new status
+              auction.auctionStatus = "finalized";
+              auction.finalized = true;
+              // Add a flag to indicate this was programmatically finalized
+              auction._programmaticallyFinalized = true;
+              new Logger().logLocal(
+                PREFIX,
+                `Auction ${auction.itemName} status updated to finalized`
+              );
+            } catch (updateError) {
+              new Logger().logLocal(
+                PREFIX,
+                `Failed to update auction ${auction.itemName} status: ${updateError.message}`
+              );
+            }
+          }
+          
           // Try to grab the channel by channel Id
           try {
             let channel = await discordBot.channels.fetch(
@@ -182,13 +229,19 @@ export const updateAuctions = async () => {
             let message = await channel.messages.fetch(auction.data.messageId);
 
             if (channel && message) {
+              // Always update the auction embed to reflect current status
+              new Logger().logLocal(
+                PREFIX,
+                `Updating embed for auction ${auction.itemName} with status: ${auction.auctionStatus} (finalized: ${auction.finalized})`
+              );
               await api.updateAuction({ _message: message, auction });
 
-              // Auction thread
+              // Auction thread - handle thread locking immediately after auction update
               if (auction.data?.threadId) {
                 await discordBot.channels
                   .fetch(auction.data?.threadId)
                   .then(async (thread) => {
+                    // Update the auctionsMap with the current auction object
                     auctionsMap.set(auction.data?.threadId, auction);
 
                     const listener = async (interaction) => {
@@ -220,8 +273,12 @@ export const updateAuctions = async () => {
                         await api.processBid(interaction, auction);
                       }
                     };
-                    // set the listener for the thread only if there is an started auction
-                    const auction = auctionsMap.get(interaction.channel.id);
+                    
+                    // Use the current auction object, not the one from auctionsMap
+                    new Logger().logLocal(
+                      PREFIX,
+                      `Processing auction ${auction?.itemName} with status: ${auction?.auctionStatus} (finalized: ${auction?.finalized}, cancelled: ${auction?.cancelled}, programmatically finalized: ${auction?._programmaticallyFinalized})`
+                    );
                     
                     if (
                       auction?.auctionStatus === "scheduled" ||
@@ -229,7 +286,12 @@ export const updateAuctions = async () => {
                     ) {
                       threadListeners.set(thread.id, listener);
                       thread.client.on("interactionCreate", listener);
+                      new Logger().logLocal(
+                        PREFIX,
+                        `Auction ${auction?.itemName} is active, listener added for thread ${thread.name}`
+                      );
                     } else {
+                      // Remove listener for finalized, cancelled, or other non-active auctions
                       const listener = threadListeners.get(thread.id);
                       if (listener) {
                         discordBot.removeListener(
@@ -237,16 +299,68 @@ export const updateAuctions = async () => {
                           listener
                         );
                         threadListeners.delete(thread.id);
-                        console.log('tacaindo aq?')
                         new Logger().logLocal(
                           PREFIX,
                           `Listener removed for thread ${thread.name}`
                         );
                       }
-                      await thread.setLocked(true);
+                      
+                      // Lock the thread if auction is finalized or cancelled
+                      const shouldLock = auction?.auctionStatus === "finalized" || auction?.finalized || auction?.cancelled;
+                      new Logger().logLocal(
+                        PREFIX,
+                        `Thread locking check for ${auction?.itemName}: shouldLock=${shouldLock}, status=${auction?.auctionStatus}, finalized=${auction?.finalized}, cancelled=${auction?.cancelled}`
+                      );
+                      
+                      if (shouldLock) {
+                        try {
+                          const wasLocked = thread.locked;
+                          const wasArchived = thread.archived;
+                          
+                          // Check if bot has permission to manage threads
+                          const botMember = thread.guild.members.cache.get(discordBot.user.id);
+                          const hasManageThreads = botMember?.permissions.has('ManageThreads');
+
+                          console.log(botMember?.permissions)
+                          
+                          if (!hasManageThreads) {
+                            new Logger().logLocal(
+                              PREFIX,
+                              `Bot lacks ManageThreads permission for thread ${thread.name}`
+                            );
+                            return;
+                          }
+                          
+                          // If thread is archived, unarchive it first
+                          if (thread.archived) {
+                            await thread.setArchived(false);
+                            new Logger().logLocal(
+                              PREFIX,
+                              `Unarchived thread ${thread.name} before locking`
+                            );
+                          }
+                          
+                          await thread.setLocked(true);
+                          new Logger().logLocal(
+                            PREFIX,
+                            `Thread locked for ${auction?.auctionStatus} auction: ${auction?.itemName} (was locked: ${wasLocked}, was archived: ${wasArchived}, now locked: ${thread.locked})`
+                          );
+                        } catch (lockError) {
+                          new Logger().logLocal(
+                            PREFIX,
+                            `Failed to lock thread ${thread.name}: ${lockError.message}`
+                          );
+                        }
+                      } else {
+                        new Logger().logLocal(
+                          PREFIX,
+                          `Thread NOT locked for ${auction?.itemName} - conditions not met`
+                        );
+                      }
+                      
                       new Logger().logLocal(
                         "Auctions",
-                        `This auction for ${auction?.itemName} is not running anymore, so no listener is needed`
+                        `Auction ${auction?.itemName} status: ${auction?.auctionStatus} - thread management completed`
                       );
                     }
                   })

@@ -1881,17 +1881,21 @@ export const updateAuction = async ({ _message = null, auction }) => {
   const dynamicAuctionStatus = () => {
     const now = new Date();
 
+    // If auction is explicitly finalized or cancelled, return that status immediately
+    if (auction?.finalized) {
+      return "finalized";
+    }
+    if (auction?.cancelled) {
+      return "cancelled";
+    }
+
     const isScheduled = isBefore(now, firestoreStarting);
     const isFinalized =
       (isEqual(firestoreStarting, firestoreAuctionMaxTime) ||
         isEqual(now, firestoreAuctionMaxTime) ||
-        isAfter(now, firestoreAuctionMaxTime) ||
-        auction?.finalized) &&
-      ((auction?.cancelled && auction?.cancelled === false) ||
-        !auction?.cancelled);
+        isAfter(now, firestoreAuctionMaxTime));
     const isStarted =
-      isAfter(now, firestoreStarting) &&
-      (!auction?.cancelled || auction?.cancelled === false);
+      isAfter(now, firestoreStarting);
 
     if (isFinalized) {
       return "finalized";
@@ -2263,6 +2267,25 @@ export const updateAuction = async ({ _message = null, auction }) => {
             embeds: [embed],
             components: components ? components : [],
           });
+          
+          // Lock the thread when auction is cancelled
+          if (auction.data?.threadId) {
+            try {
+              const thread = await message.guild.channels.fetch(auction.data.threadId);
+              if (thread) {
+                await thread.setLocked(true);
+                new Logger().logLocal(
+                  PREFIX,
+                  `Thread locked for cancelled auction: ${auction.itemName}`
+                );
+              }
+            } catch (threadError) {
+              new Logger().logLocal(
+                PREFIX,
+                `Failed to lock thread for cancelled auction: ${threadError.message}`
+              );
+            }
+          }
       } catch (error) {
         console.error("Error editing message:", error);
         await i.reply({
