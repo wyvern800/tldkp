@@ -11,12 +11,6 @@ export default function RootLayout() {
   const navigate = useNavigate();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  // Debug logging
-  useEffect(() => {
-    console.log("RootLayout mounted");
-    console.log("Clerk key:", import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
-  }, []);
-
   // Show announcement modal on page load
   useEffect(() => {
     // Check if user has already seen the announcement

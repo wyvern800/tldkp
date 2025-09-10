@@ -556,44 +556,76 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
             new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
           }
 
-          const memberDkps = await Promise.all(
-            guild?.memberDkps.map(async (memberDkp) => {
-              let memberData = {};
-              let avatarURL = "";
+           const memberDkps = await Promise.all(
+             guild?.memberDkps.map(async (memberDkp) => {
+               let memberData = {};
+               let avatarURL = "";
 
-              try {
-                memberData = await guildData?.members?.fetch(memberDkp.userId);
-                avatarURL = memberData?.user?.displayAvatarURL({
-                  dynamic: true,
-                  size: 32,
-                });
-              } catch (error) {
-                new Logger().logLocal(PREFIX, `Member not found for guild ${id}`);
-              }
+               try {
+                 memberData = await guildData?.members?.fetch(memberDkp.userId);
+                 avatarURL = memberData?.user?.displayAvatarURL({
+                   dynamic: true,
+                   size: 32,
+                 });
+               } catch (error) {
+                 new Logger().logLocal(PREFIX, `Member not found for guild ${id} - user likely left the server`);
+                 return null; // Return null for members who can't be fetched
+               }
 
-              return {
-                ...memberDkp,
-                discordData: {
-                  displayName: memberData?.user?.globalName ?? "",
-                  preferredColor: memberData?.user?.accentColor ?? "",
-                  avatarURL,
-                },
-              };
-            })
-          );
+               return {
+                 ...memberDkp,
+                 discordData: {
+                   displayName: memberData?.user?.globalName ?? "User not available (Banned or left the server)",
+                   preferredColor: memberData?.user?.accentColor ?? "",
+                   avatarURL,
+                 },
+               };
+             })
+           );
 
-          return {
-            ...guild,
-            guildData: {
-              ...guild?.guildData,
-              ownerDiscordData: {
-                displayName: owner?.user?.globalName ?? "",
-                preferredColor: owner?.user?.accentColor ?? "",
-                avatarURL,
-              },
-            },
-            memberDkps,
-          };
+           // Filter out null values (members who left the server)
+           const validMemberDkps = memberDkps.filter(member => member !== null);
+           
+           // Log how many members were filtered out
+           const filteredCount = memberDkps.length - validMemberDkps.length;
+           if (filteredCount > 0) {
+             new Logger().logLocal(
+               PREFIX,
+               `Filtered out ${filteredCount} members who left the server in guild ${id}`
+             );
+             
+             // Optional: Clean up the database by removing ghost members
+             // Uncomment the following lines if you want to automatically clean up the database
+             /*
+             try {
+               await db.collection("guilds").doc(id).update({
+                 memberDkps: validMemberDkps
+               });
+               new Logger().logLocal(
+                 PREFIX,
+                 `Cleaned up ${filteredCount} ghost members from database for guild ${id}`
+               );
+             } catch (cleanupError) {
+               new Logger().logLocal(
+                 PREFIX,
+                 `Failed to clean up ghost members for guild ${id}: ${cleanupError.message}`
+               );
+             }
+             */
+           }
+
+           return {
+             ...guild,
+             guildData: {
+               ...guild?.guildData,
+               ownerDiscordData: {
+                 displayName: owner?.user?.globalName ?? "Unknown",
+                 preferredColor: owner?.user?.accentColor ?? "",
+                 avatarURL,
+               },
+             },
+             memberDkps: validMemberDkps,
+           };
         })
       );
     };
