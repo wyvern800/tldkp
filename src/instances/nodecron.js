@@ -7,6 +7,7 @@ import { config } from "dotenv";
 import { main as itemGrabber } from "../../database/itemsGrabber.js";
 import { client as discordBot } from "../../src/index.js";
 import { db } from "../../database/firebase.js";
+import { canManageThreads, getPermissionUpdateInstructions } from "../../utils/permissionChecker.js";
 import {
   createOrModifyAuctionEmbed,
   convertDateObjectToDateString,
@@ -318,16 +319,26 @@ export const updateAuctions = async () => {
                           const wasArchived = thread.archived;
                           
                           // Check if bot has permission to manage threads
-                          const botMember = thread.guild.members.cache.get(discordBot.user.id);
-                          const hasManageThreads = botMember?.permissions.has('ManageThreads');
-
-                          console.log(botMember?.permissions)
+                          const permissionCheck = canManageThreads(thread.guild);
                           
-                          if (!hasManageThreads) {
+                          if (!permissionCheck.hasPermissions) {
                             new Logger().logLocal(
                               PREFIX,
-                              `Bot lacks ManageThreads permission for thread ${thread.name}`
+                              `Bot lacks thread management permissions for thread ${thread.name}: ${permissionCheck.message}`
                             );
+                            
+                            // Send helpful message to the channel about missing permissions
+                            try {
+                              await thread.send({
+                                content: getPermissionUpdateInstructions(permissionCheck.missingPermissions),
+                                ephemeral: false
+                              });
+                            } catch (sendError) {
+                              new Logger().logLocal(
+                                PREFIX,
+                                `Failed to send permission update message: ${sendError.message}`
+                              );
+                            }
                             return;
                           }
                           

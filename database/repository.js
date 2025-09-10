@@ -12,6 +12,7 @@ import {
 import { LANGUAGE_EN, LANGUAGE_PT_BR } from "../utils/constants.js";
 import { config } from "dotenv";
 import { isAfter, add, formatDistance, isBefore, isEqual } from "date-fns";
+import { canManageThreads, getPermissionUpdateInstructions } from "../utils/permissionChecker.js";
 import {
   generateClaimCode,
   createOrModifyAuctionEmbed,
@@ -1779,6 +1780,54 @@ export const deleteGuild = async (guildId) => {
   } catch (error) {
     new Logger().error(PREFIX, `Error deleting guild ${guildId}`, error);
     throw error;
+  }
+};
+
+export const checkBotPermissions = async (interaction) => {
+  trackFunctionExecution('checkBotPermissions');
+  
+  try {
+    const { canManageThreads, canManageChannels, getPermissionUpdateInstructions } = await import('../utils/permissionChecker.js');
+    const { PermissionFlagsBits } = await import('discord.js');
+    
+    // Check all required permissions
+    const threadCheck = canManageThreads(interaction.guild);
+    const channelCheck = canManageChannels(interaction.guild);
+    
+    const allRequiredPermissions = [
+      PermissionFlagsBits.ManageThreads,
+      PermissionFlagsBits.ManageChannels, 
+      PermissionFlagsBits.SendMessagesInThreads,
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.UseApplicationCommands
+    ];
+    
+    const botMember = interaction.guild.members.cache.get(interaction.client.user.id);
+    const missingPermissions = allRequiredPermissions.filter(permission => 
+      !botMember?.permissions.has(permission)
+    );
+    
+    if (missingPermissions.length === 0) {
+      await interaction.reply({
+        content: '✅ **Bot has all required permissions!**\n\nThe bot is fully functional and can perform all operations.',
+        ephemeral: true
+      });
+    } else {
+      const instructions = getPermissionUpdateInstructions(missingPermissions);
+      
+      await interaction.reply({
+        content: `❌ **Missing Permissions Detected**\n\n${instructions}`,
+        ephemeral: true
+      });
+    }
+  } catch (error) {
+    new Logger().logLocal(PREFIX, `Error checking permissions: ${error.message}`);
+    await interaction.reply({
+      content: '❌ Error checking bot permissions. Please contact the bot administrator.',
+      ephemeral: true
+    });
   }
 };
 

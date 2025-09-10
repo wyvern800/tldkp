@@ -432,6 +432,14 @@ export const commands = [
     commandCategory: "Auction System",
     new: true,
     noExecution: true
+  },
+  {
+    name: "check-permissions",
+    description: "Check if the bot has all required permissions",
+    commandExecution: api.checkBotPermissions,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "General",
+    new: true
   }
 
   /*{
