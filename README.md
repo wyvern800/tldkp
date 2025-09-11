@@ -9,18 +9,18 @@ The Dragon Kill Points (DKP) system is a method used in MMORPGs (Massively Multi
 
 > NOTE: This project was a nightly build, which means it was coded in speedrun mode, not much focused, but ive put some more effort onto it, so you are good to use it as it is.
 
-## Features:
-- Add command to manage people's DKPs - OK
-- Add command to view my DKPs - OK
-- Create command to add ingame Nick - OK
-- Fix error log - OK
-- Added repo - OK
-- Create language/localization system - WIP
-- Added base, selector/command to change language - OK
-- Add help command - OK
-- Create way to add the bot to the owners' servers - OK
-- Add way to interact with the command only if it is a specific role determined by the site
+## Free Features:
+- Command to manage people's DKPs - OK
+- Command to view my DKPs - OK
+- Command to add ingame Nick - OK
 - Ability to enable/disable an automatic DKP decaying system with some cool features like setting the minimum dkp you can have when decaying and all automatic.
+- Commands that generate claimable expirable DKP tokens (with fantasy names) and audit log for each command generated so admins
+can be apart of the people that's been participating. 
+
+## Premium Features (Insignificant value paid monthly to sponsor the project):
+- Full item auction system (people may participate and spend their points)
+- Data importing from other system you use from a .CSV template
+- More to come
 
 ## Start contributing (Setting up the local dev. environment)
 
