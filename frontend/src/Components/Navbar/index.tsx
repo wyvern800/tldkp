@@ -50,7 +50,7 @@ import { MdDashboard, MdSubdirectoryArrowRight, MdDehaze } from "react-icons/md"
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
-import { RiSlashCommands } from "react-icons/ri";
+import { RiSlashCommands2 } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 import { BsFillMegaphoneFill } from "react-icons/bs";
 import { changelog } from "../../constants/changelog";
@@ -318,7 +318,7 @@ function Navbar() {
                   >
                     <HStack spacing={2}>
                       <Icon as={BsFillMegaphoneFill} color="teal.500" boxSize={4} />
-                      <Text fontWeight="bold" color="teal.600">What's New?</Text>
+                      <Text fontWeight="bold" color="teal.600">Recent Changes</Text>
                     </HStack>
                   </MagicCard>
 
@@ -336,7 +336,7 @@ function Navbar() {
                     transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                   >
                     <HStack spacing={2}>
-                      <Icon as={RiSlashCommands} color="teal.500" boxSize={4} />
+                      <Icon as={RiSlashCommands2} color="teal.500" boxSize={4} />
                       <Text fontWeight="bold" color="teal.600">Commands</Text>
                       <Badge colorScheme="green" variant="solid" fontSize="xs" borderRadius="full">
                         New
@@ -438,9 +438,9 @@ function Navbar() {
                         <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
                       </MenuItem>*/}
                       <MenuItem icon={<BsFillMegaphoneFill />} onClick={() => onNewModalOpen()}>
-                        What's New?
+                        Recent Changes
                       </MenuItem>
-                      <MenuItem icon={<RiSlashCommands />} onClick={() => onOpen()}>
+                      <MenuItem icon={<RiSlashCommands2 />} onClick={() => onOpen()}>
                         Commands
                         <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
                       </MenuItem>
@@ -506,7 +506,7 @@ function Navbar() {
       </Modal>
 
       <Modal
-        title="What's new?"
+        title="Recent Changes"
         state={{ isOpen: isNewModalOpen, onClose: onNewModalClose }}
         isCentered={true}
         closeOnOverlayClick={true}

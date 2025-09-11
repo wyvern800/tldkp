@@ -1,4 +1,4 @@
-# Google Analytics Setup for Discord Bot
+# Google Analytics Setup for TLDKP bot
 
 This guide will help you set up Google Analytics tracking for your Discord bot events.
 
