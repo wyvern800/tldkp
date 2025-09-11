@@ -440,6 +440,102 @@ export const commands = [
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "General",
     new: true
+  },
+  {
+    name: "admin-search-guilds",
+    description: "Search for guilds by name (Admin only)",
+    options: [
+      {
+        name: "search_term",
+        description: "The name or part of the name to search for",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: "limit",
+        description: "Maximum number of results to return (default: 10)",
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+        min_value: 1,
+        max_value: 50,
+      }
+    ],
+    commandExecution: api.searchGuilds,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Admin",
+    new: true
+  },
+  {
+    name: "admin-set-premium",
+    description: "Set premium status for a guild (Admin only)",
+    options: [
+      {
+        name: "guild_id",
+        description: "The ID of the guild to update",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: "is_premium",
+        description: "Whether to enable premium access",
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: "expires_at",
+        description: "When the subscription expires (YYYY-MM-DD format, leave empty for lifetime)",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+      {
+        name: "plan_type",
+        description: "The type of plan",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          {
+            name: "Free",
+            value: "free",
+          },
+          {
+            name: "Premium (Monthly)",
+            value: "premium",
+          },
+          {
+            name: "Lifetime",
+            value: "lifetime",
+          },
+        ],
+      }
+    ],
+    commandExecution: api.setGuildPremium,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Admin",
+    new: true
+  },
+  {
+    name: "admin-check-premium",
+    description: "Check premium status of a guild (Admin only)",
+    options: [
+      {
+        name: "guild_id",
+        description: "The ID of the guild to check",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }
+    ],
+    commandExecution: api.checkGuildPremium,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Admin",
+    new: true
+  },
+  {
+    name: "premium-status",
+    description: "Check your server's premium subscription status",
+    commandExecution: api.checkServerPremiumStatus,
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
+    commandCategory: "General",
+    new: true
   }
 
   /*{

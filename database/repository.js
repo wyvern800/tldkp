@@ -130,6 +130,39 @@ export async function processBid(interaction, auction) {
   const { commandName } = interaction;
 
   if (commandName === "bid") {
+    // Check if guild has premium access for auctions
+    const hasPremiumAccess = await checkAuctionPremiumAccess(interaction.guild.id);
+    if (!hasPremiumAccess) {
+      const subscription = await getGuildSubscription(interaction.guild.id);
+      const embed = {
+        title: "🔒 Premium Feature Required",
+        description: "The auction system is only available to premium servers. Upgrade your server to access this feature and many more!",
+        color: 0xff6b6b,
+        fields: [
+          {
+            name: "Current Status",
+            value: subscription.isPremium ? 
+              (subscription.expiresAt ? `Premium (expires ${subscription.expiresAt.toLocaleDateString()})` : 'Premium (expired)') : 
+              'Free',
+            inline: true
+          },
+          {
+            name: "Available Plans",
+            value: "• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
+            inline: false
+          }
+        ],
+        footer: {
+          text: "Contact an administrator to upgrade your server's subscription"
+        }
+      };
+
+      return await interaction.reply({
+        embeds: [embed],
+        ephemeral: true,
+      });
+    }
+
     const threadId = interaction.channel.id;
 
     if (threadId !== auction?.data?.threadId) {
@@ -724,6 +757,13 @@ export async function guildCreate(guild) {
       dkpSystem: {
         dmNotifications: true,
       },
+    },
+    subscription: {
+      isPremium: false,
+      expiresAt: null,
+      planType: 'free',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     },
   };
 
@@ -1766,6 +1806,438 @@ export async function updateGuildConfig(guildId, guildConfig) {
 }
 
 /**
+ * Search for guilds by name (case-insensitive)
+ *
+ * @param {string} searchTerm The search term to look for in guild names
+ * @param {number} limit Maximum number of results to return (default: 10)
+ * @returns {Array} Array of matching guilds
+ */
+export async function searchGuildsByName(searchTerm, limit = 10) {
+  trackFunctionExecution('searchGuildsByName');
+  
+  if (!searchTerm || searchTerm.trim().length < 2) {
+    return [];
+  }
+
+  const snapshot = await db.collection("guilds").get();
+  
+  if (snapshot.empty) {
+    new Logger().log(PREFIX, `No guilds found for search term: ${searchTerm}`);
+    return [];
+  }
+
+  const searchLower = searchTerm.toLowerCase().trim();
+  const matchingGuilds = [];
+
+  snapshot.forEach((doc) => {
+    const data = doc.data();
+    const guildName = data?.guildData?.name?.toLowerCase() || '';
+    
+    if (guildName.includes(searchLower)) {
+      matchingGuilds.push({
+        id: doc.id,
+        name: data.guildData.name,
+        ownerId: data.guildData.ownerId,
+        subscription: data.subscription || {
+          isPremium: false,
+          expiresAt: null,
+          planType: 'free'
+        }
+      });
+    }
+  });
+
+  // Sort by name and limit results
+  return matchingGuilds
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+/**
+ * Update guild subscription status
+ *
+ * @param {string} guildId The guild ID
+ * @param {boolean} isPremium Whether the guild has premium access
+ * @param {Date|null} expiresAt When the subscription expires (null for lifetime)
+ * @param {string} planType The type of plan (free, premium, lifetime)
+ * @returns {Promise} Update response
+ */
+export async function updateGuildSubscription(guildId, isPremium, expiresAt = null, planType = 'free') {
+  trackFunctionExecution('updateGuildSubscription');
+  
+  const subscriptionData = {
+    subscription: {
+      isPremium,
+      expiresAt: expiresAt ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
+      planType,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const response = await db
+    .collection("guilds")
+    .doc(guildId)
+    .update(subscriptionData);
+
+  new Logger().log(PREFIX, `Updated subscription for guild ${guildId}: Premium=${isPremium}, Expires=${expiresAt}, Plan=${planType}`);
+  return response;
+}
+
+/**
+ * Check if a guild has active premium subscription
+ *
+ * @param {string} guildId The guild ID
+ * @returns {Promise<boolean>} Whether the guild has active premium access
+ */
+export async function isGuildPremium(guildId) {
+  trackFunctionExecution('isGuildPremium');
+  
+  const guildConfig = await getGuildConfig(guildId, 'isGuildPremium');
+  
+  if (!guildConfig || !guildConfig.subscription) {
+    return false;
+  }
+
+  const { isPremium, expiresAt, planType } = guildConfig.subscription;
+
+  // If not premium, return false
+  if (!isPremium) {
+    return false;
+  }
+
+  // If it's a lifetime plan, return true
+  if (planType === 'lifetime') {
+    return true;
+  }
+
+  // If no expiration date, return false (shouldn't happen for premium plans)
+  if (!expiresAt) {
+    return false;
+  }
+
+  // Check if subscription is still valid
+  const now = new Date();
+  const expirationDate = expiresAt.toDate();
+  
+  return expirationDate > now;
+}
+
+/**
+ * Get guild subscription info
+ *
+ * @param {string} guildId The guild ID
+ * @returns {Promise<Object|null>} Subscription information
+ */
+export async function getGuildSubscription(guildId) {
+  trackFunctionExecution('getGuildSubscription');
+  
+  const guildConfig = await getGuildConfig(guildId, 'getGuildSubscription');
+  
+  if (!guildConfig || !guildConfig.subscription) {
+    return {
+      isPremium: false,
+      expiresAt: null,
+      planType: 'free',
+      isActive: false
+    };
+  }
+
+  const { isPremium, expiresAt, planType } = guildConfig.subscription;
+  const isActive = await isGuildPremium(guildId);
+
+  return {
+    isPremium,
+    expiresAt: expiresAt ? expiresAt.toDate() : null,
+    planType,
+    isActive
+  };
+}
+
+/**
+ * Search for guilds by name (Admin command handler)
+ *
+ * @param {any} interaction The Discord interaction
+ * @returns {Promise} Response
+ */
+export const searchGuilds = async (interaction) => {
+  const searchTerm = interaction.options.getString("search_term");
+  const limit = interaction.options.getInteger("limit") || 10;
+
+  try {
+    const guilds = await searchGuildsByName(searchTerm, limit);
+
+    if (guilds.length === 0) {
+      return await interaction.reply({
+        content: `No guilds found matching "${searchTerm}"`,
+        ephemeral: true,
+      });
+    }
+
+    const guildList = guilds.map(guild => {
+      const premiumStatus = guild.subscription?.isPremium ? 
+        (guild.subscription?.planType === 'lifetime' ? '🟢 Lifetime' : 
+         guild.subscription?.expiresAt ? `🟡 Premium (expires ${guild.subscription.expiresAt.toDate().toLocaleDateString()})` : 
+         '🟡 Premium') : 
+        '🔴 Free';
+      
+      return `**${guild.name}** (ID: \`${guild.id}\`)\nOwner: <@${guild.ownerId}>\nStatus: ${premiumStatus}`;
+    }).join('\n\n');
+
+    const embed = {
+      title: `Guild Search Results for "${searchTerm}"`,
+      description: guildList,
+      color: 0x00ff00,
+      footer: {
+        text: `Found ${guilds.length} guild(s)`
+      }
+    };
+
+    return await interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, "Error searching guilds", error);
+    return await interaction.reply({
+      content: "An error occurred while searching for guilds.",
+      ephemeral: true,
+    });
+  }
+};
+
+/**
+ * Set premium status for a guild (Admin command handler)
+ *
+ * @param {any} interaction The Discord interaction
+ * @returns {Promise} Response
+ */
+export const setGuildPremium = async (interaction) => {
+  const guildId = interaction.options.getString("guild_id");
+  const isPremium = interaction.options.getBoolean("is_premium");
+  const expiresAtString = interaction.options.getString("expires_at");
+  const planType = interaction.options.getString("plan_type") || (isPremium ? "premium" : "free");
+
+  try {
+    // Validate guild ID format (Discord guild IDs are 17-19 digits)
+    if (!/^\d{17,19}$/.test(guildId)) {
+      return await interaction.reply({
+        content: "Invalid guild ID format. Guild IDs should be 17-19 digits.",
+        ephemeral: true,
+      });
+    }
+
+    // Parse expiration date if provided
+    let expiresAt = null;
+    if (expiresAtString) {
+      const parsedDate = new Date(expiresAtString);
+      if (isNaN(parsedDate.getTime())) {
+        return await interaction.reply({
+          content: "Invalid date format. Please use YYYY-MM-DD format.",
+          ephemeral: true,
+        });
+      }
+      expiresAt = parsedDate;
+    }
+
+    // For lifetime plans, set expiresAt to null
+    if (planType === 'lifetime') {
+      expiresAt = null;
+    }
+
+    // For premium plans without expiration, set to 1 month from now
+    if (isPremium && planType === 'premium' && !expiresAt) {
+      expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    }
+
+    // Check if guild exists
+    const guildConfig = await getGuildConfig(guildId, 'setGuildPremium');
+    if (!guildConfig) {
+      return await interaction.reply({
+        content: `Guild with ID ${guildId} not found in the database.`,
+        ephemeral: true,
+      });
+    }
+
+    // Update subscription
+    await updateGuildSubscription(guildId, isPremium, expiresAt, planType);
+
+    const statusMessage = isPremium ? 
+      (planType === 'lifetime' ? 'Lifetime Premium' : 
+       `Premium (expires ${expiresAt ? expiresAt.toLocaleDateString() : 'Never'})`) : 
+      'Free';
+
+    return await interaction.reply({
+      content: `✅ Successfully updated subscription for guild **${guildConfig.guildData.name}** (${guildId})\n\n**New Status:** ${statusMessage}`,
+      ephemeral: true,
+    });
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, "Error setting guild premium status", error);
+    return await interaction.reply({
+      content: "An error occurred while updating the guild subscription.",
+      ephemeral: true,
+    });
+  }
+};
+
+/**
+ * Check premium status of a guild (Admin command handler)
+ *
+ * @param {any} interaction The Discord interaction
+ * @returns {Promise} Response
+ */
+export const checkGuildPremium = async (interaction) => {
+  const guildId = interaction.options.getString("guild_id");
+
+  try {
+    // Validate guild ID format
+    if (!/^\d{17,19}$/.test(guildId)) {
+      return await interaction.reply({
+        content: "Invalid guild ID format. Guild IDs should be 17-19 digits.",
+        ephemeral: true,
+      });
+    }
+
+    // Get guild config
+    const guildConfig = await getGuildConfig(guildId, 'checkGuildPremium');
+    if (!guildConfig) {
+      return await interaction.reply({
+        content: `Guild with ID ${guildId} not found in the database.`,
+        ephemeral: true,
+      });
+    }
+
+    // Get subscription info
+    const subscription = await getGuildSubscription(guildId);
+
+    const statusEmoji = subscription.isActive ? '🟢' : '🔴';
+    const statusText = subscription.isActive ? 'Active' : 'Inactive';
+    
+    const embed = {
+      title: `Premium Status for ${guildConfig.guildData.name}`,
+      color: subscription.isActive ? 0x00ff00 : 0xff0000,
+      fields: [
+        {
+          name: "Guild ID",
+          value: guildId,
+          inline: true
+        },
+        {
+          name: "Guild Name",
+          value: guildConfig.guildData.name,
+          inline: true
+        },
+        {
+          name: "Owner",
+          value: `<@${guildConfig.guildData.ownerId}>`,
+          inline: true
+        },
+        {
+          name: "Premium Status",
+          value: `${statusEmoji} ${statusText}`,
+          inline: true
+        },
+        {
+          name: "Plan Type",
+          value: subscription.planType.charAt(0).toUpperCase() + subscription.planType.slice(1),
+          inline: true
+        },
+        {
+          name: "Expires At",
+          value: subscription.expiresAt ? subscription.expiresAt.toLocaleDateString() : 'Never',
+          inline: true
+        }
+      ],
+      timestamp: new Date().toISOString()
+    };
+
+    return await interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, "Error checking guild premium status", error);
+    return await interaction.reply({
+      content: "An error occurred while checking the guild premium status.",
+      ephemeral: true,
+    });
+  }
+};
+
+/**
+ * Check server premium status (User command handler)
+ *
+ * @param {any} interaction The Discord interaction
+ * @returns {Promise} Response
+ */
+export const checkServerPremiumStatus = async (interaction) => {
+  try {
+    const guildId = interaction.guild.id;
+    const subscription = await getGuildSubscription(guildId);
+
+    const statusEmoji = subscription.isActive ? '🟢' : '🔴';
+    const statusText = subscription.isActive ? 'Active' : 'Inactive';
+    const planType = subscription.planType.charAt(0).toUpperCase() + subscription.planType.slice(1);
+    
+    const embed = {
+      title: `Premium Status for ${interaction.guild.name}`,
+      color: subscription.isActive ? 0x00ff00 : 0xff6b6b,
+      fields: [
+        {
+          name: "Premium Status",
+          value: `${statusEmoji} ${statusText}`,
+          inline: true
+        },
+        {
+          name: "Plan Type",
+          value: planType,
+          inline: true
+        },
+        {
+          name: "Expires At",
+          value: subscription.expiresAt ? subscription.expiresAt.toLocaleDateString() : 'Never',
+          inline: true
+        }
+      ],
+      timestamp: new Date().toISOString()
+    };
+
+    // Add premium features info if not premium
+    if (!subscription.isActive) {
+      embed.fields.push({
+        name: "Premium Features",
+        value: "• **Auction System** - Create and manage item auctions\n• **Advanced Analytics** - Detailed DKP reports\n• **Priority Support** - Faster response times\n• **Custom Commands** - Create server-specific commands",
+        inline: false
+      });
+      
+      embed.fields.push({
+        name: "Upgrade Your Server",
+        value: "Contact a server administrator to upgrade your subscription and unlock all premium features!",
+        inline: false
+      });
+    } else {
+      embed.fields.push({
+        name: "Premium Features",
+        value: "✅ **Auction System** - Full access\n✅ **Advanced Analytics** - Available\n✅ **Priority Support** - Active\n✅ **Custom Commands** - Coming soon",
+        inline: false
+      });
+    }
+
+    return await interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, "Error checking server premium status", error);
+    return await interaction.reply({
+      content: "An error occurred while checking the server premium status.",
+      ephemeral: true,
+    });
+  }
+};
+
+/**
  * Deletes a guild and its data from Firebase
  * 
  * @param {string} guildId The ID of the guild to delete
@@ -2593,6 +3065,16 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
 };
 
 /**
+ * Check if guild has premium access for auction features
+ *
+ * @param {string} guildId The guild ID
+ * @returns {Promise<boolean>} Whether the guild has premium access
+ */
+export const checkAuctionPremiumAccess = async (guildId) => {
+  return await isGuildPremium(guildId);
+};
+
+/**
  * Create the auction
  *
  * @param {any} interaction The interaction
@@ -2600,6 +3082,39 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
 export const createAuction = async (interaction) => {
   const itemName = interaction.options.getString("item");
   const itemNote = interaction.options.getString("note");
+
+  // Check if guild has premium access for auctions
+  const hasPremiumAccess = await checkAuctionPremiumAccess(interaction.guild.id);
+  if (!hasPremiumAccess) {
+    const subscription = await getGuildSubscription(interaction.guild.id);
+    const embed = {
+      title: "🔒 Premium Feature Required",
+      description: "The auction system is only available to premium servers. Upgrade your server to access this feature and many more!",
+      color: 0xff6b6b,
+      fields: [
+        {
+          name: "Current Status",
+          value: subscription.isPremium ? 
+            (subscription.expiresAt ? `Premium (expires ${subscription.expiresAt.toLocaleDateString()})` : 'Premium (expired)') : 
+            'Free',
+          inline: true
+        },
+        {
+          name: "Available Plans",
+          value: "• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
+          inline: false
+        }
+      ],
+      footer: {
+        text: "Contact an administrator to upgrade your server's subscription"
+      }
+    };
+
+    return await interaction.reply({
+      embeds: [embed],
+      ephemeral: true,
+    });
+  }
 
   const theItem = await searchItem(itemName?.toLowerCase()?.trim());
 
