@@ -4,6 +4,7 @@ import { loadCommands } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
 import { threadListeners } from "../../database/repository.js";
+import { analytics,  trackBotStatus, trackError } from "../../utils/analytics.js";
 
 const PREFIX = "Discord.js";
 
@@ -35,12 +36,20 @@ export const createBotClient = () => {
          console.log(e);
          new Logger().error(PREFIX, `Failed to load auctions`) 
         })
-    ]).finally(() =>
+    ]).finally(async () => {
       new Logger().log(
-      PREFIX,
-      `Bot is in ${client.guilds.cache.size} guild(s).`
-      )
-    );
+        PREFIX,
+        `Bot is in ${client.guilds.cache.size} guild(s).`
+      );
+      
+      // Track bot startup in Google Analytics
+      await trackBotStatus({
+        status: 'started',
+        guildCount: client.guilds.cache.size,
+        uptime: process.uptime(),
+        version: '1.0.2'
+      });
+    });
   });
 
   // When the bot joins a new guild
@@ -66,6 +75,12 @@ export const createBotClient = () => {
 
     // Fetch the guild configuration
     const guildConfig = await api.getGuildConfig(guildId, 'guildMemberAddEvent from bot.js');
+
+    // Check if guild config exists
+    if (!guildConfig) {
+      new Logger().log(PREFIX, `Guild config not found for ${guildId}, skipping member add`);
+      return;
+    }
 
     // Ensure the guild's DKP array is initialized
     if (!guildConfig.memberDkps) {
@@ -109,7 +124,34 @@ export const createBotClient = () => {
   client.on("interactionCreate", async (interaction) => {
     const { commandName } = interaction;
     if (interaction.isCommand()) {
-      await handleCommands(interaction, commandName?.toLowerCase());
+      // Track command execution in Google Analytics
+      const startTime = Date.now();
+      let success = false;
+      let error = null;
+      
+      try {
+        await handleCommands(interaction, commandName?.toLowerCase());
+        success = true;
+      } catch (err) {
+        error = err.message || 'Unknown error';
+        throw err;
+      } finally {
+        const executionTime = Date.now() - startTime;
+        
+        // Track the command execution in Google Analytics
+        await analytics.trackCommand(
+          interaction.commandName,
+          interaction.guildId,
+          interaction.user?.id,
+          {
+            channelId: interaction.channelId,
+            options: interaction.options?.data || {},
+            success,
+            error,
+            executionTime
+          }
+        );
+      }
     } else if (interaction.type === InteractionType.ModalSubmit){
       const [command,] = interaction.customId.split("#");
       await handleSubmitModal(interaction, command?.toLowerCase());
@@ -134,13 +176,27 @@ export const createBotClient = () => {
   // Handle global issues
   client.on('unhandledRejection', async (reason, _) => {
     try {
-      new Logger().error(`Unhandled Promise Rejection: ${reason} - ${_}`);	
+      new Logger().error(`Unhandled Promise Rejection: ${reason} - ${_}`);
+      
+      // Track error in Google Analytics
+      await trackError({
+        errorType: 'unhandled_rejection',
+        errorMessage: reason?.toString() || 'Unknown rejection',
+        errorStack: reason?.stack || null
+      });
     } catch (error) {}
   });
 
   process.on('uncaughtException', async (error) => {
     try {
-      new Logger().criticalError(`Uncaugth exception: ${error}`);	
+      new Logger().criticalError(`Uncaugth exception: ${error}`);
+      
+      // Track error in Google Analytics
+      await trackError({
+        errorType: 'uncaught_exception',
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
     } catch (err) {}
   });
 

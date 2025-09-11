@@ -1,6 +1,7 @@
 import { db } from "./firebase.js"; // Import Firestore
 import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
+import { trackDkpAction, trackAuctionAction, trackPremiumEvent } from "../utils/analytics.js";
 import {
   updateDkp,
   decreaseDkp,
@@ -1676,10 +1677,6 @@ export async function generateDkpCode(interaction) {
         autoArchiveDuration: 10080, // 7 days
       });
 
-      console.log('Thread created:', auditThread);
-      console.log('Thread type:', auditThread.type);
-      console.log('Has permissionOverwrites:', !!auditThread.permissionOverwrites);
-
       // Verify thread was created successfully
       if (!auditThread) {
         throw new Error("Thread creation returned null/undefined");
@@ -3333,6 +3330,7 @@ export const createAuction = async (interaction) => {
   const itemName = interaction.options.getString("item");
   const itemNote = interaction.options.getString("note");
 
+  // TODO: Re-enable premium checks once all functions are implemented
   // Check if guild has premium access for auctions
   const hasPremiumAccess = await checkAuctionPremiumAccess(interaction.guild.id);
   if (!hasPremiumAccess) {
