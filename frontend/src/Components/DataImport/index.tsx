@@ -295,11 +295,11 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
         </Box>
 
         {/* Template Download */}
-        <Box p={4} border="1px" borderColor="gray.200" borderRadius="md" bg="gray.50">
+        <Box p={4} border="1px" borderColor="gray.600" borderRadius="md" bg="gray.800">
           <HStack justify="space-between">
             <VStack align="start" spacing={2}>
               <Text fontWeight="bold">📋 Download Template</Text>
-              <Text fontSize="sm" color="gray.600">
+              <Text fontSize="sm" color="gray.300">
                 Get the CSV template with the correct format and example data
               </Text>
             </VStack>
@@ -397,7 +397,7 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
         )}
 
         {/* Instructions */}
-        <Box p={4} border="1px" borderColor="blue.200" borderRadius="md" bg="blue.50">
+        <Box p={4} border="1px" borderColor="blue.600" borderRadius="md" bg="blue.900">
           <Text fontWeight="bold" mb={2}>📝 Instructions</Text>
           <VStack align="start" spacing={2} fontSize="sm">
             <Text>1. Download the CSV template above</Text>
