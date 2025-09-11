@@ -17,6 +17,7 @@ import { IoChevronForward } from "react-icons/io5";
 import { useEffect, useState } from "react";
 import api from "../services/axiosInstance";
 import { useAuth } from "@clerk/clerk-react";
+import SubscriptionManagement from "../Components/SubscriptionManagement";
 import Guilds from "../Components/Guilds";
 
 export default function AdminPage() {
@@ -91,12 +92,16 @@ export default function AdminPage() {
           >
             <TabList>
               <Tab>All Guilds {data?.guilds?.length && <Tag marginLeft="8px" colorScheme="gray">{data?.guilds?.length}</Tag>}</Tab>
+              <Tab>Subscription Management</Tab>
               <Tab>Configurations</Tab>
             </TabList>
 
             <TabPanels>
               <TabPanel>
                 <Guilds data={data?.guilds} loaded={loaded} isBackoffice />
+              </TabPanel>
+              <TabPanel>
+                <SubscriptionManagement />
               </TabPanel>
               <TabPanel>
                 <p style={{ marginTop: "20px", marginBottom: "20px" }}>

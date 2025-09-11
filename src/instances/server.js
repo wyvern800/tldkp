@@ -11,6 +11,10 @@ import {
   getAllGuilds,
   getGuildConfig,
   deleteGuild,
+  searchGuildsByName,
+  updateGuildSubscription,
+  getGuildSubscription,
+  isGuildPremium,
 } from "../../database/repository.js";
 import "dotenv/config";
 import rateLimit from "express-rate-limit";
@@ -302,7 +306,205 @@ export const createServer = (client) => {
         return new ResponseBase(res).notAllowed("Unauthorized");
       }
     }
-  });
+  },
+  "Admin endpoint to get all guilds and admin status"
+  );
+
+  // Subscription management endpoints
+  apiRouter.get("/admin/subscriptions/search", async (req, res) => {
+    const { userDiscordId } = req;
+    const { search_term, limit = 10 } = req.query;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          const guilds = await searchGuildsByName(search_term, parseInt(limit));
+          return new ResponseBase(res).success({ guilds });
+        } catch (error) {
+          return new ResponseBase(res).error("Failed to search guilds");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Search guilds by name for subscription management"
+  );
+
+  apiRouter.get("/admin/subscriptions/:guildId", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          const subscription = await getGuildSubscription(guildId);
+          const guildConfig = await getGuildConfig(guildId, 'admin-subscription-check');
+          
+          if (!guildConfig) {
+            return new ResponseBase(res).notFound("Guild not found");
+          }
+
+          return new ResponseBase(res).success({ 
+            subscription,
+            guild: {
+              id: guildConfig.guildData.id,
+              name: guildConfig.guildData.name,
+              ownerId: guildConfig.guildData.ownerId,
+              icon: guildConfig.guildData.icon
+            }
+          });
+        } catch (error) {
+          return new ResponseBase(res).error("Failed to get subscription info");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Get subscription info for a specific guild"
+  );
+
+  apiRouter.put("/admin/subscriptions/:guildId", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+    const { isPremium, expiresAt, planType } = req.body;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          // Validate guild exists
+          const guildConfig = await getGuildConfig(guildId, 'admin-subscription-update');
+          if (!guildConfig) {
+            return new ResponseBase(res).notFound("Guild not found");
+          }
+
+          // Parse expiration date if provided
+          let parsedExpiresAt = null;
+          if (expiresAt) {
+            parsedExpiresAt = new Date(expiresAt);
+            if (isNaN(parsedExpiresAt.getTime())) {
+              return new ResponseBase(res).badRequest("Invalid date format");
+            }
+          }
+
+          // Update subscription
+          await updateGuildSubscription(guildId, isPremium, parsedExpiresAt, planType);
+
+          // Get updated subscription info
+          const updatedSubscription = await getGuildSubscription(guildId);
+
+          return new ResponseBase(res).success({ 
+            message: "Subscription updated successfully",
+            subscription: updatedSubscription,
+            guild: {
+              id: guildConfig.guildData.id,
+              name: guildConfig.guildData.name,
+              ownerId: guildConfig.guildData.ownerId,
+              icon: guildConfig.guildData.icon
+            }
+          });
+        } catch (error) {
+          return new ResponseBase(res).error("Failed to update subscription");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Update subscription for a specific guild"
+  );
+
+  apiRouter.get("/admin/subscriptions", async (req, res) => {
+    const { userDiscordId } = req;
+    const { page = 1, limit = 20, search = "", status = "all" } = req.query;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          let guilds = await getAllGuilds();
+          
+          // Filter by search term if provided
+          if (search) {
+            const searchLower = search.toLowerCase();
+            guilds = guilds.filter(guild => 
+              guild.guildData?.name?.toLowerCase().includes(searchLower)
+            );
+          }
+
+          // Filter by subscription status
+          if (status !== "all") {
+            guilds = guilds.filter(guild => {
+              const subscription = guild.subscription || { isPremium: false, expiresAt: null, planType: 'free' };
+              
+              if (status === "premium") {
+                return subscription.isPremium && (subscription.planType === 'lifetime' || 
+                  (subscription.expiresAt && subscription.expiresAt.toDate() > new Date()));
+              } else if (status === "expired") {
+                return subscription.isPremium && subscription.expiresAt && 
+                  subscription.expiresAt.toDate() <= new Date();
+              } else if (status === "free") {
+                return !subscription.isPremium;
+              }
+              return true;
+            });
+          }
+
+          // Pagination
+          const startIndex = (parseInt(page) - 1) * parseInt(limit);
+          const endIndex = startIndex + parseInt(limit);
+          const paginatedGuilds = guilds.slice(startIndex, endIndex);
+
+          // Add subscription status to each guild
+          const guildsWithStatus = paginatedGuilds.map(guild => ({
+            ...guild,
+            subscriptionStatus: guild.subscription ? {
+              isPremium: guild.subscription.isPremium,
+              expiresAt: guild.subscription.expiresAt ? guild.subscription.expiresAt.toDate() : null,
+              planType: guild.subscription.planType,
+              isActive: guild.subscription.isPremium && (
+                guild.subscription.planType === 'lifetime' || 
+                (guild.subscription.expiresAt && guild.subscription.expiresAt.toDate() > new Date())
+              )
+            } : {
+              isPremium: false,
+              expiresAt: null,
+              planType: 'free',
+              isActive: false
+            }
+          }));
+
+          return new ResponseBase(res).success({
+            guilds: guildsWithStatus,
+            pagination: {
+              page: parseInt(page),
+              limit: parseInt(limit),
+              total: guilds.length,
+              totalPages: Math.ceil(guilds.length / parseInt(limit))
+            }
+          });
+        } catch (error) {
+          return new ResponseBase(res).error("Failed to get subscriptions");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Get all guilds with subscription status and pagination"
+  );
 
   apiRouter.use((err, req, res, next) => {
     return new ResponseBase(res).notAllowed("Unauthenticated!");
