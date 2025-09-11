@@ -1923,15 +1923,33 @@ export async function redeemDkpCode(interaction) {
 
           // Update the initial audit message with current redeemer count
           console.log('Updating initial audit message...');
-          const messages = await auditThread.messages.fetch({ limit: 1 });
-          const initialMessage = messages.first();
-          if (initialMessage && initialMessage.embeds.length > 0) {
-            const embed = initialMessage.embeds[0];
-            embed.fields[2].value = `${copyRedeemers.length} user${copyRedeemers.length === 1 ? '' : 's'}`;
-            await initialMessage.edit({ embeds: [embed] });
-            console.log('Initial audit message updated successfully');
-          } else {
-            console.log('Could not find initial audit message to update');
+          try {
+            const messages = await auditThread.messages.fetch({ limit: 10 });
+            console.log('Fetched messages:', messages.size);
+            
+            const initialMessage = messages.find(msg => 
+              msg.embeds.length > 0 && 
+              msg.embeds[0].title === '🔐 DKP Code Audit Trail'
+            );
+            
+            console.log('Found initial message:', !!initialMessage);
+            
+            if (initialMessage && initialMessage.embeds.length > 0) {
+              const embed = initialMessage.embeds[0];
+              // Find the redeemers field and update it
+              const redeemersFieldIndex = embed.fields.findIndex(field => field.name === '🎯 Redeemers');
+              if (redeemersFieldIndex !== -1) {
+                embed.fields[redeemersFieldIndex].value = `${copyRedeemers.length} user${copyRedeemers.length === 1 ? '' : 's'}`;
+                await initialMessage.edit({ embeds: [embed] });
+                console.log('Initial audit message updated successfully');
+              } else {
+                console.log('Could not find redeemers field in initial message');
+              }
+            } else {
+              console.log('Could not find initial audit message to update');
+            }
+          } catch (updateError) {
+            console.log('Error updating initial message:', updateError);
           }
         } else {
           console.log('Audit thread not found in cache');
