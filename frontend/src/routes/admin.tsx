@@ -50,15 +50,23 @@ export default function AdminPage() {
     <div
       style={{
         display: "flex",
-        justifyItems: "space-between",
-        width: "60%",
-        minHeight: "75vh",
-        flexDirection: "column",
-        borderRadius: "10px",
-        backgroundColor: "rgba(0, 0, 0, 0.1)",
-        border: "linear(to-r, green.500, teal.500)",
+        justifyContent: "center",
+        alignItems: "center",
+        width: "100%",
+        padding: "20px",
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          width: "60%",
+          minHeight: "75vh",
+          flexDirection: "column",
+          borderRadius: "10px",
+          backgroundColor: "rgba(0, 0, 0, 0.1)",
+          border: "linear(to-r, green.500, teal.500)",
+        }}
+      >
       {loaded && (
         <>
           <Breadcrumb
@@ -112,6 +120,7 @@ export default function AdminPage() {
           </Tabs>
         </>
       )}
+      </div>
     </div>
   );
 }
