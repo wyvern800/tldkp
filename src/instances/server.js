@@ -287,7 +287,10 @@ export const createServer = (client) => {
         return new ResponseBase(res).notAllowed("You don't have access to this guild");
       }
 
-      return new ResponseBase(res).success(guildData);
+      return new ResponseBase(res).success({
+        ...guildData,
+        userDiscordId: userDiscordId
+      });
     } catch (error) {
       console.error('Error fetching guild data:', error);
       return new ResponseBase(res).error("Failed to fetch guild data");
@@ -550,6 +553,12 @@ export const createServer = (client) => {
 
       if (isAdmin) {
         try {
+          // Check if guild is premium
+          const isPremium = await isGuildPremium(guildId);
+          if (!isPremium) {
+            return new ResponseBase(res).error("Data importing is a premium feature. This guild does not have an active premium subscription.");
+          }
+
           if (!req.file) {
             return new ResponseBase(res).error("No file provided");
           }

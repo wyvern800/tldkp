@@ -3819,6 +3819,15 @@ export async function importMemberData(interaction) {
   trackFunctionExecution('importMemberData');
   
   try {
+    // Check if guild is premium
+    const isPremium = await checkAuctionPremiumAccess(interaction);
+    if (!isPremium) {
+      return await interaction.reply({
+        content: '❌ **Premium Required**\n\nData importing is a premium feature. Your guild needs an active premium subscription to use this command.\n\nContact an administrator to upgrade your guild\'s subscription.',
+        ephemeral: true
+      });
+    }
+
     const attachment = interaction.options.getAttachment('file');
     
     if (!attachment) {
