@@ -58,6 +58,10 @@ const router = createBrowserRouter([
         path: "/knowledge-base"
       },
       {
+        element: <KnowledgeBasePage />,
+        path: "/knowledgebase"
+      },
+      {
         element: <GuildImportPage />,
         path: "/guild/:guildId/import"
       },

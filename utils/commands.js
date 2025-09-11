@@ -150,14 +150,16 @@ export const commands = [
     ],
     commandExecution: api.setMemberIgn,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
-    commandCategory: "DKP System"
+    commandCategory: "DKP System",
+    new: true
   },
   {
     name: "view-igns",
     description: "View all member IGNs in the guild",
     commandExecution: api.viewMemberIgns,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
-    commandCategory: "DKP System"
+    commandCategory: "DKP System",
+    new: true
   },
   {
     name: "nickname",

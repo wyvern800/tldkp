@@ -151,15 +151,16 @@ export async function trackPremiumEvent(event, guildId, data) {
 
 /**
  * Track bot status
- * @param {string} status - Bot status
- * @param {Object} data - Status data
+ * @param {Object} statusData - Bot status data object
  */
-export async function trackBotStatus(status, data) {
-  new Logger().logLocal(PREFIX, `Bot Status: ${status}`, data);
+export async function trackBotStatus(statusData) {
+  const status = statusData.status || 'unknown';
+  const dataString = JSON.stringify(statusData, null, 2);
+  new Logger().logLocal(PREFIX, `Bot Status: ${status} - ${dataString}`);
   
   await sendToGoogleAnalytics('bot_status', 'system', {
     eventType: status,
-    ...data,
+    ...statusData,
     success: true
   }, 'system', 'global');
 }
@@ -170,7 +171,8 @@ export async function trackBotStatus(status, data) {
  * @param {Object} data - Error data
  */
 export async function trackError(error, data) {
-  new Logger().logLocal(PREFIX, `Error: ${error}`, data);
+  const dataString = data ? JSON.stringify(data, null, 2) : 'No data';
+  new Logger().logLocal(PREFIX, `Error: ${error} - ${dataString}`);
   
   await sendToGoogleAnalytics('bot_error', 'errors', {
     eventType: 'error',
@@ -188,7 +190,8 @@ export async function trackError(error, data) {
  * @param {Object} data - Command data
  */
 export async function trackCommand(command, guildId, userId, data) {
-  new Logger().logLocal(PREFIX, `Command: ${command} - Guild: ${guildId}, User: ${userId}`, data);
+  const dataString = data ? JSON.stringify(data, null, 2) : 'No data';
+  new Logger().logLocal(PREFIX, `Command: ${command} - Guild: ${guildId}, User: ${userId} - ${dataString}`);
   
   await sendToGoogleAnalytics('discord_command', 'commands', {
     eventType: command,

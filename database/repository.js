@@ -45,7 +45,7 @@ function trackFunctionExecution(functionName, calledBy) {
     functionExecutionCount[functionName] = 0;
   }
   functionExecutionCount[functionName]++;
-  new Logger().log('repository.js', `Function ${functionName} executed ${functionExecutionCount[functionName]} times ${calledBy ? `(Called last time by ${calledBy})` : ''}`);
+  // new Logger().log('repository.js', `Function ${functionName} executed ${functionExecutionCount[functionName]} times ${calledBy ? `(Called last time by ${calledBy})` : ''}`);
 }
 
 /**

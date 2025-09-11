@@ -57,15 +57,24 @@ export default function KnowledgeBasePage() {
     <div
       style={{
         display: "flex",
-        justifyItems: "space-between",
-        width: "60%",
-        minHeight: "75vh",
-        flexDirection: "column",
-        borderRadius: "10px",
-        backgroundColor: "rgba(0, 0, 0, 0.1)",
-        border: "linear(to-r, green.500, teal.500)",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh",
+        padding: "20px",
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          justifyItems: "space-between",
+          width: "60%",
+          minHeight: "75vh",
+          flexDirection: "column",
+          borderRadius: "10px",
+          backgroundColor: "rgba(0, 0, 0, 0.1)",
+          border: "linear(to-r, green.500, teal.500)",
+        }}
+      >
       <>
         <HStack
           width={"100%"}
@@ -89,7 +98,7 @@ export default function KnowledgeBasePage() {
             </BreadcrumbItem>
 
             <BreadcrumbItem>
-              <BreadcrumbLink as={Link} to="/Huds">
+              <BreadcrumbLink as={Link} to="/knowledge-base">
                 Knowledge Base
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -153,6 +162,7 @@ export default function KnowledgeBasePage() {
           )}
         </main>
       </>
+      </div>
     </div>
   );
 }
