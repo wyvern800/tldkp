@@ -1653,9 +1653,115 @@ export async function generateDkpCode(interaction) {
 
   try {
     // Save the code document to Firestore
-    await db.collection("codes").add(codeData);
+    const codeDocRef = await db.collection("codes").add(codeData);
 
-    const msg = `Code generated successfully: **${code}**\n- NOTE: It will expire in ${expiration} minutes.`;
+    // Create a private thread for audit trail
+    let auditThread = null;
+    try {
+      // Find a suitable channel to create the thread in (preferably a logs/audit channel)
+      const auditChannel = interaction.guild.channels.cache.find(
+        channel => 
+          channel.type === 0 && // Text channel
+          (channel.name.includes('log') || 
+           channel.name.includes('audit') || 
+           channel.name.includes('admin') ||
+           channel.name.includes('mod'))
+      ) || interaction.channel; // Fallback to current channel
+
+      // Create the private thread
+      auditThread = await auditChannel.threads.create({
+        name: `🔐 Code Audit: ${code}`,
+        type: 12, // Private thread
+        reason: `Audit trail for DKP code: ${code}`,
+        autoArchiveDuration: 10080, // 7 days
+      });
+
+      console.log('Thread created:', auditThread);
+      console.log('Thread type:', auditThread.type);
+      console.log('Has permissionOverwrites:', !!auditThread.permissionOverwrites);
+
+      // Verify thread was created successfully
+      if (!auditThread) {
+        throw new Error("Thread creation returned null/undefined");
+      }
+
+      // Wait a moment for the thread to be fully initialized
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Set thread permissions - only admins and the creator can see it
+      try {
+        if (auditThread.permissionOverwrites) {
+          const adminRole = interaction.guild.roles.cache.find(role => role.permissions.has('Administrator'));
+          if (adminRole) {
+            await auditThread.permissionOverwrites.edit(adminRole, {
+              ViewChannel: true,
+              SendMessages: true,
+              ReadMessageHistory: true,
+            });
+          }
+
+          // Allow the code creator to see the thread
+          await auditThread.permissionOverwrites.edit(interaction.user, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true,
+          });
+
+          // Deny everyone else
+          await auditThread.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+            ViewChannel: false,
+          });
+        } else {
+          console.log('Thread created but permissionOverwrites not available, skipping permission setup');
+        }
+      } catch (permError) {
+        console.log('Permission setup error:', permError);
+        // Don't fail thread creation if permissions fail
+      }
+
+      // Send initial audit message
+      const auditEmbed = {
+        title: `🔐 DKP Code Audit Trail`,
+        description: `**Code:** \`${code}\`\n**Amount:** +${amount} DKP\n**Expires:** <t:${Math.floor(expirationDate.getTime() / 1000)}:R>\n**Created by:** <@${userId}>`,
+        color: 0x00ff00,
+        fields: [
+          {
+            name: "📝 Note",
+            value: note || "No note provided",
+            inline: false
+          },
+          {
+            name: "⏰ Created",
+            value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+            inline: true
+          },
+          {
+            name: "🎯 Redeemers",
+            value: "None yet",
+            inline: true
+          }
+        ],
+        footer: {
+          text: "This thread will log all claims for this code"
+        }
+      };
+
+      await auditThread.send({ embeds: [auditEmbed] });
+
+      // Update the code document with thread ID
+      await codeDocRef.update({
+        auditThreadId: auditThread.id,
+        auditChannelId: auditChannel.id
+      });
+
+      console.log(`Created audit thread for code ${code}: ${auditThread.id}`);
+      new Logger().logLocal(PREFIX, `Created audit thread for code ${code}: ${auditThread.id}`);
+    } catch (threadError) {
+      new Logger().logLocal(PREFIX, `Failed to create audit thread for code ${code}: ${threadError.message}`);
+      // Don't fail the code generation if thread creation fails
+    }
+
+    const msg = `Code generated successfully: **${code}**\n- NOTE: It will expire in ${expiration} minutes.\n${auditThread ? `- 📋 Audit thread created: <#${auditThread.id}>` : ''}`;
     new Logger(interaction).log(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
   } catch (error) {
@@ -1754,6 +1860,90 @@ export async function redeemDkpCode(interaction) {
     await db.collection("codes").doc(codeDoc.id).update({
       redeemers: copyRedeemers,
     });
+
+    // Log the claim to the audit thread if it exists
+    try {
+      console.log('Code data:', codeData);
+      console.log('Audit thread ID:', codeData.auditThreadId);
+      
+      if (codeData.auditThreadId) {
+        let auditThread = interaction.client.channels.cache.get(codeData.auditThreadId);
+        console.log('Found audit thread in cache:', auditThread);
+        
+        // If not in cache, try to fetch it
+        if (!auditThread) {
+          try {
+            auditThread = await interaction.client.channels.fetch(codeData.auditThreadId);
+            console.log('Fetched audit thread:', auditThread);
+          } catch (fetchError) {
+            console.log('Failed to fetch audit thread:', fetchError);
+          }
+        }
+        
+        if (auditThread) {
+          // Get user's IGN if available
+          const guildData = await getGuildConfig(guildId, 'audit-log-claim');
+          const memberData = guildData?.memberDkps?.find(member => member.userId === userId);
+          const userIGN = memberData?.ign || 'Not set';
+
+          const claimEmbed = {
+            title: `✅ Code Claimed`,
+            description: `**User:** <@${userId}>\n**IGN:** ${userIGN}\n**Amount:** +${codeData.amount} DKP`,
+            color: 0x00ff00,
+            fields: [
+              {
+                name: "🕐 Claimed At",
+                value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+                inline: true
+              },
+              {
+                name: "📊 Total Claims",
+                value: `${copyRedeemers.length}`,
+                inline: true
+              },
+              {
+                name: "💰 New DKP Total",
+                value: `${newGuildData?.memberDkps?.find(member => member.userId === userId)?.dkp || 0}`,
+                inline: true
+              }
+            ],
+            footer: {
+              text: `Claim #${copyRedeemers.length}`
+            },
+            timestamp: new Date().toISOString()
+          };
+
+          console.log('Sending claim embed to audit thread...');
+          console.log('Thread type:', auditThread.type);
+          console.log('Thread name:', auditThread.name);
+          console.log('Can send messages:', auditThread.permissionsFor(interaction.client.user).has('SendMessages'));
+          
+          await auditThread.send({ embeds: [claimEmbed] });
+          console.log('Claim embed sent successfully');
+
+          // Update the initial audit message with current redeemer count
+          console.log('Updating initial audit message...');
+          const messages = await auditThread.messages.fetch({ limit: 1 });
+          const initialMessage = messages.first();
+          if (initialMessage && initialMessage.embeds.length > 0) {
+            const embed = initialMessage.embeds[0];
+            embed.fields[2].value = `${copyRedeemers.length} user${copyRedeemers.length === 1 ? '' : 's'}`;
+            await initialMessage.edit({ embeds: [embed] });
+            console.log('Initial audit message updated successfully');
+          } else {
+            console.log('Could not find initial audit message to update');
+          }
+        } else {
+          console.log('Audit thread not found in cache');
+        }
+      } else {
+        console.log('No audit thread ID found in code data');
+      }
+    } catch (auditError) {
+      console.error('Audit logging error:', auditError);
+      new Logger().logLocal(PREFIX, `Failed to log claim to audit thread: ${auditError.message}`);
+      // Don't fail the redemption if audit logging fails
+    }
 
     const msg = `Code of **+${codeData.amount}** was redeemed successfully! Your DKP has been updated.`;
     new Logger(interaction).log(PREFIX, msg);
@@ -3427,4 +3617,101 @@ export async function viewMemberIgns(interaction) {
 
   new Logger(interaction).log(PREFIX, `Displayed ${membersWithIgns.length} member IGNs`);
   return await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/**
+ * View the audit thread for a specific DKP code - UNUSED
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function viewCodeAudit(interaction) {
+  trackFunctionExecution('viewCodeAudit');
+  const code = interaction.options.getString("code");
+
+  if (!code) {
+    const msg = `Code is required.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  try {
+    // Query the code document from Firestore
+    const codeSnapshot = await db
+      .collection("codes")
+      .where("code", "==", code)
+      .where("guildId", "==", interaction.guild.id)
+      .get();
+
+    if (codeSnapshot.empty) {
+      const msg = `Code not found or doesn't belong to this guild.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    const codeDoc = codeSnapshot.docs[0];
+    const codeData = codeDoc.data();
+
+    if (!codeData.auditThreadId) {
+      const msg = `No audit thread found for this code. This code was created before audit logging was implemented.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    // Check if the audit thread still exists
+    const auditThread = interaction.client.channels.cache.get(codeData.auditThreadId);
+    if (!auditThread) {
+      const msg = `Audit thread not found. It may have been deleted.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    // Create a summary embed
+    const summaryEmbed = {
+      title: `🔐 Code Audit Summary`,
+      description: `**Code:** \`${code}\`\n**Amount:** +${codeData.amount} DKP\n**Total Claims:** ${codeData.redeemers?.length || 0}`,
+      color: 0x0099ff,
+      fields: [
+        {
+          name: "📋 Audit Thread",
+          value: `<#${codeData.auditThreadId}>`,
+          inline: true
+        },
+        {
+          name: "⏰ Expires",
+          value: codeData.expirationDate ? `<t:${Math.floor(codeData.expirationDate.toDate().getTime() / 1000)}:R>` : 'Unknown',
+          inline: true
+        },
+        {
+          name: "📝 Note",
+          value: codeData.note || 'No note provided',
+          inline: false
+        }
+      ],
+      footer: {
+        text: "Click the thread link above to view detailed claim history"
+      }
+    };
+
+    // If there are redeemers, show them
+    if (codeData.redeemers && codeData.redeemers.length > 0) {
+      const redeemersList = codeData.redeemers.map((redeemer, index) => {
+        const redeemedAt = redeemer.redeemedAt?.toDate ? redeemer.redeemedAt.toDate() : new Date(redeemer.redeemedAt);
+        return `${index + 1}. <@${redeemer.userId}> - <t:${Math.floor(redeemedAt.getTime() / 1000)}:R>`;
+      }).join('\n');
+
+      summaryEmbed.fields.push({
+        name: "🎯 Claim History",
+        value: redeemersList.length > 1000 ? redeemersList.substring(0, 1000) + '...' : redeemersList,
+        inline: false
+      });
+    }
+
+    new Logger(interaction).log(PREFIX, `Displayed audit info for code ${code}`);
+    return await interaction.reply({ embeds: [summaryEmbed], ephemeral: true });
+  } catch (error) {
+    const msg = "Error retrieving code audit information";
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
 }
