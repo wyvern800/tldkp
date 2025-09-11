@@ -2,6 +2,13 @@ import { Logger } from "./logger.js";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "dotenv";
 import { admin } from "../database/firebase.js";
+import { items } from "../database/allItems.js";
+import {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from "discord.js";
 
 config();
 
@@ -35,7 +42,7 @@ export async function updateDkp(
     dkpArray[userIndex].dkp = newDkpValue < 0 ? 0 : newDkpValue;
   } else {
     // Create a new DKP object and add it to the array
-    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount };
+    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount, ign: null };
     dkpArray.push(newDKPObject);
   }
 
@@ -87,7 +94,7 @@ export async function decreaseDkp(
     dkpArray[userIndex].dkp = newDkpValue < 0 ? 0 : newDkpValue;
   } else {
     // Create a new DKP object and add it to the array
-    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount };
+    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount, ign: null };
     dkpArray.push(newDKPObject);
   }
 
@@ -137,7 +144,7 @@ export async function setDkp(
     dkpArray[userIndex].dkp = amount;
   } else {
     // If the user doesn't exist, create a new DKP object and add it to the array
-    const newDKPObject = { userId, dkp: amount };
+    const newDKPObject = { userId, dkp: amount, ign: null };
     dkpArray.push(newDKPObject);
   }
 
@@ -225,4 +232,141 @@ export async function uploadFile(directory, file) {
       })
       .end(file.buffer);
   });
+}
+
+/**
+ * Create or modify auction embed
+ *
+ * @param { highestBidder: {  name: string, bid: number }, modalColor: string } data Data
+ * 
+ */
+export function createOrModifyAuctionEmbed(data) {
+  let newEmbed = new EmbedBuilder();
+
+  // Create buttons
+  let components = null;
+
+  /*const bidComponent = new ButtonBuilder()
+    .setCustomId("bid")
+    .setLabel("Bid")
+    .setEmoji("🤑")
+    .setStyle(ButtonStyle.Secondary);*/
+  const startAuctionComponent = new ButtonBuilder()
+    .setCustomId("start_auction")
+    .setLabel("Start Auction now!")
+    .setEmoji("💸")
+    .setStyle(ButtonStyle.Success);
+  const cancelAuctionComponent = new ButtonBuilder()
+    .setCustomId("stop_auction")
+    .setLabel("Cancel auction now")
+    .setEmoji("✖️")
+    .setStyle(ButtonStyle.Danger);
+
+  // The buttons
+  if (data?.auctionStatus === "scheduled") {
+    components = [startAuctionComponent, cancelAuctionComponent];
+  /*} else if (data?.auctionStatus === "started") {
+    components = [bidComponent];*/
+  } else {
+    components = null;
+  }
+
+  let row = null;
+
+  if (components?.length) {
+    row = new ActionRowBuilder().addComponents(components);
+  }
+
+  let theEmbed = newEmbed
+  .setTitle(
+    `An auction for ${data?.itemName?.trim()} ${data?.auctionPrefix} ${
+      data?.auctionStatus
+    }!`
+  )
+  .setDescription(
+    `With the minimum price starting at: **${data?.startingPrice?.toString()} DKP**!`
+  )
+  .addFields(
+    { name: "Item", value: `${data?.itemName?.trim()} (${data?.itemNote})` },
+    {
+      name: "Starting price",
+      value: `${data?.startingPrice?.toString()} DKP`,
+      inline: true,
+    },
+    {
+      name: "Gap between bids",
+      value: `${data?.gapBetweenBids} DKP`,
+      inline: true,
+    },
+    { name: '\u200b', value: '\u200b', inline: true }
+  )
+  .addFields(
+    { name: "Starting at", value: `${data?.startingAt?.replace('-', ' ')} **(UTC-3)**`, inline: true },
+    {
+      name: "Auction valid until",
+      value: `${data?.auctionMaxTime?.replace('-', ' ')} **(UTC-3)**`,
+      inline: true,
+    },
+    {
+      name: "How to bid",
+      value: `[Click to Learn](https://tldkp.online?knowledge-base?read=how-do-i-bid 'Click here to learn how to bid')`,
+      inline: true,
+    }
+  )
+  .setColor(data?.modalColor ?? 0x0099ff)
+  .setThumbnail(
+    items.find((item) => item.name.trim() === data?.itemName.trim())?.icon
+  );
+
+  // Only show bidders if the auction is not scheduled or cancelled
+  if (data?.auctionStatus !== "scheduled" && data?.auctionStatus !== "cancelled") {
+    const hasBidder = data?.highestBidder?.name !== undefined && data?.highestBidder?.bid !== 0;
+    let textBidder = `Winning bid (Highest): Nobody has bidded yet!`;
+    if (hasBidder) {
+      textBidder = `Winning bid (Highest): ${data?.highestBidder?.name} with a bid of ${data?.highestBidder?.bid} DKP!`;
+    }
+    newEmbed.setFooter({
+      text: textBidder,
+      iconURL: "https://i.imgur.com/pvlqPKu.png",
+    });
+  }
+
+  const toReturn = {
+    embed: theEmbed,
+    components: (row === null ? null : [row]),
+  }
+
+  return toReturn;
+}
+
+
+export function convertFirestoreTimestamp(timestamp) {
+  // Convert Firestore _seconds and _nanoseconds to milliseconds
+  const date = new Date(timestamp._seconds * 1000 + timestamp._nanoseconds / 1000000);
+  return date;
+}
+
+export function convertDateStringToDateObject(time) {
+  const parsed = new Date(
+    time.replace(
+      /(\d{2})\/(\d{2})\/(\d{4})-(\d{2}):(\d{2}):(\d{2})/,
+      "$3-$2-$1T$4:$5:$6"
+    )
+  );
+  return parsed;
+}
+
+export function convertDateObjectToDateString(date) {
+  const formattedStartingNew = date
+          .toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+          .replace(",", "")
+          .replace(" ", "-");
+  return formattedStartingNew;
 }
