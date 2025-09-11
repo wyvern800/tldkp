@@ -263,6 +263,37 @@ export const createServer = (client) => {
     }
   });
 
+  apiRouter.get("/guilds/:guildId", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("Unauthorized");
+    }
+
+    try {
+      // Get guild data
+      const guildData = await getGuildConfig(guildId);
+      
+      if (!guildData) {
+        return new ResponseBase(res).notFound("Guild not found");
+      }
+
+      // Check if user is owner or member
+      const isOwner = guildData.guildData?.ownerId === userDiscordId;
+      const isMember = guildData.memberDkps?.some(member => member.userId === userDiscordId);
+      
+      if (!isOwner && !isMember) {
+        return new ResponseBase(res).notAllowed("You don't have access to this guild");
+      }
+
+      return new ResponseBase(res).success(guildData);
+    } catch (error) {
+      console.error('Error fetching guild data:', error);
+      return new ResponseBase(res).error("Failed to fetch guild data");
+    }
+  });
+
   apiRouter.delete("/guilds/:guildId", async (req, res) => {
     const { userDiscordId } = req;
     const { guildId } = req.params;
@@ -506,6 +537,155 @@ export const createServer = (client) => {
     }
   },
   "Get all guilds with subscription status and pagination"
+  );
+
+  // Data import endpoint
+  apiRouter.post("/admin/import/:guildId", upload.single('file'), async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          if (!req.file) {
+            return new ResponseBase(res).error("No file provided");
+          }
+
+          // Check file type
+          if (!req.file.originalname.toLowerCase().endsWith('.csv')) {
+            return new ResponseBase(res).error("Please provide a CSV file (.csv extension)");
+          }
+
+          // Parse CSV content
+          const csvContent = req.file.buffer.toString('utf8');
+          const lines = csvContent.split('\n').filter(line => line.trim());
+          
+          if (lines.length < 2) {
+            return new ResponseBase(res).error("CSV file is empty or invalid");
+          }
+
+          // Validate header
+          const header = lines[0].toLowerCase().trim();
+          const expectedHeader = 'discord_user_id,ign,dkp';
+          if (header !== expectedHeader) {
+            return new ResponseBase(res).error(`Invalid CSV format. Expected header: ${expectedHeader}, Found: ${header}`);
+          }
+
+          // Parse data rows
+          const members = [];
+          const errors = [];
+          
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const columns = line.split(',');
+            if (columns.length !== 3) {
+              errors.push(`Row ${i + 1}: Invalid number of columns (expected 3, found ${columns.length})`);
+              continue;
+            }
+
+            const [discordUserId, ign, dkpStr] = columns.map(col => col.trim());
+            
+            // Validate Discord User ID
+            if (!discordUserId || !/^\d{17,19}$/.test(discordUserId)) {
+              errors.push(`Row ${i + 1}: Invalid Discord User ID: ${discordUserId}`);
+              continue;
+            }
+
+            // Validate DKP
+            const dkp = parseInt(dkpStr);
+            if (isNaN(dkp) || dkp < 0) {
+              errors.push(`Row ${i + 1}: Invalid DKP amount: ${dkpStr}`);
+              continue;
+            }
+
+            // Validate IGN (optional)
+            const cleanIGN = ign && ign !== '' ? ign.trim() : null;
+            if (cleanIGN && (cleanIGN.length < 2 || cleanIGN.length > 20)) {
+              errors.push(`Row ${i + 1}: Invalid IGN length: ${cleanIGN} (must be 2-20 characters)`);
+              continue;
+            }
+
+            members.push({
+              userId: discordUserId,
+              ign: cleanIGN,
+              dkp: dkp
+            });
+          }
+
+          // Check limits
+          if (members.length > 100) {
+            return new ResponseBase(res).error("Too many members. Maximum 100 members per import");
+          }
+
+          if (members.length === 0) {
+            return new ResponseBase(res).error("No valid member data found in the CSV file");
+          }
+
+          // Show errors if any
+          if (errors.length > 0) {
+            return new ResponseBase(res).error(`Found ${errors.length} error(s) in the CSV file: ${errors.slice(0, 5).join(', ')}${errors.length > 5 ? `... and ${errors.length - 5} more errors` : ''}`);
+          }
+
+          // Get current guild data
+          const guildDataResponse = await getGuildConfig(guildId, 'web-import-member-data');
+          const currentMemberDkps = guildDataResponse.memberDkps || [];
+
+          // Process imports
+          let updatedCount = 0;
+          let addedCount = 0;
+          const newMemberDkps = [...currentMemberDkps];
+
+          for (const member of members) {
+            const existingIndex = newMemberDkps.findIndex(m => m.userId === member.userId);
+            
+            if (existingIndex !== -1) {
+              // Update existing member
+              newMemberDkps[existingIndex].dkp = member.dkp;
+              if (member.ign) {
+                newMemberDkps[existingIndex].ign = member.ign;
+              }
+              updatedCount++;
+            } else {
+              // Add new member
+              newMemberDkps.push({
+                userId: member.userId,
+                dkp: member.dkp,
+                ign: member.ign || null
+              });
+              addedCount++;
+            }
+          }
+
+          // Update guild data
+          const newGuildData = {
+            ...guildDataResponse,
+            memberDkps: newMemberDkps,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+
+          await db.collection("guilds").doc(guildId).update(newGuildData);
+
+          return new ResponseBase(res).success({
+            addedCount,
+            updatedCount,
+            totalProcessed: members.length
+          });
+
+        } catch (error) {
+          console.error('Import error:', error);
+          return new ResponseBase(res).error("Failed to import member data");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Import member data from CSV file"
   );
 
   apiRouter.use((err, req, res, next) => {

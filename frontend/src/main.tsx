@@ -17,6 +17,7 @@ import SignInPage from "./routes/sign-in";
 import SignUpPage from "./routes/sign-up";
 import DashboardPage from "./routes/dashboard";
 import AdminPage from "./routes/admin";
+import GuildImportPage from "./routes/guild-import";
 import NotFoundPage from "./routes/not-found";
 import KnowledgeBasePage from "./routes/knowledgebase";
 
@@ -55,6 +56,10 @@ const router = createBrowserRouter([
       {
         element: <KnowledgeBasePage />,
         path: "/knowledge-base"
+      },
+      {
+        element: <GuildImportPage />,
+        path: "/guild/:guildId/import"
       },
     ],
     errorElement: <NotFoundPage />

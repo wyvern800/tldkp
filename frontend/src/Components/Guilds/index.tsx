@@ -28,10 +28,12 @@ import {
 } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
 import { DeleteIcon } from "@chakra-ui/icons";
+import { FaUpload } from "react-icons/fa";
 import styled from "styled-components";
 import unknown from "../../assets/unknown.png";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/axiosInstance";
 
 const Logo = styled.img`
@@ -41,6 +43,7 @@ const Logo = styled.img`
 const Guilds = ({ data: initialData, loaded, isBackoffice = false }: any): React.ReactNode => {
 const { isLoaded, user } = useUser();
 const { getToken } = useAuth();
+const navigate = useNavigate();
   const [myDiscordId, setMyDiscordId] = useState<string | undefined>("");
   const [data, setData] = useState(initialData);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -145,6 +148,20 @@ const { getToken } = useAuth();
                             </HStack>
                           </HStack>
                           <HStack spacing={2}>
+                            {guild?.guildData?.ownerId === myDiscordId && !isBackoffice && (
+                              <IconButton
+                                aria-label="Import data"
+                                icon={<FaUpload />}
+                                size="sm"
+                                colorScheme="blue"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/guild/${guild.guildData.id}/import`);
+                                }}
+                                title="Import member data from CSV"
+                              />
+                            )}
                             {guild?.guildData?.ownerId === myDiscordId && (
                               <IconButton
                                 aria-label="Delete guild"

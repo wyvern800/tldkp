@@ -3725,10 +3725,285 @@ export async function viewCodeAudit(interaction) {
       });
     }
 
-    new Logger(interaction).log(PREFIX, `Displayed audit info for code ${code}`);
-    return await interaction.reply({ embeds: [summaryEmbed], ephemeral: true });
+  new Logger(interaction).log(PREFIX, `Displayed audit info for code ${code}`);
+  return await interaction.reply({ embeds: [summaryEmbed], ephemeral: true });
+} catch (error) {
+  const msg = "Error retrieving code audit information";
+  new Logger(interaction).log(PREFIX, msg);
+  return await interaction.reply({ content: msg, ephemeral: true });
+}
+}
+
+/**
+ * Get the CSV template for importing member data
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function getImportTemplate(interaction) {
+  trackFunctionExecution('getImportTemplate');
+  
+  try {
+    // Create CSV template content
+    const csvContent = `discord_user_id,ign,dkp
+123456789012345678,PlayerName1,100
+987654321098765432,PlayerName2,250
+555666777888999000,PlayerName3,75`;
+
+    // Create a buffer from the CSV content
+    const buffer = Buffer.from(csvContent, 'utf8');
+    
+    // Create attachment
+    const attachment = {
+      attachment: buffer,
+      name: 'member_import_template.csv',
+      description: 'CSV template for importing member data'
+    };
+
+    const embed = {
+      title: '📋 Member Data Import Template',
+      description: 'Download the CSV template below and fill it with your member data:',
+      color: 0x00ff00,
+      fields: [
+        {
+          name: '📝 Instructions',
+          value: `1. Download the CSV file below
+2. Fill in your member data:
+   - **discord_user_id**: Discord User ID (right-click user → Copy User ID)
+   - **ign**: In-Game Name (optional, can be left empty)
+   - **dkp**: Current DKP amount
+3. Save the file
+4. Use \`/import-data\` command to upload the file`,
+          inline: false
+        },
+        {
+          name: '⚠️ Important Notes',
+          value: `• Make sure Discord User IDs are correct
+• DKP amounts should be numbers only
+• IGN field is optional
+• Maximum 100 members per import
+• Existing members will be updated, not duplicated`,
+          inline: false
+        },
+        {
+          name: '📊 Example Data',
+          value: 'The template includes 3 example entries. Replace them with your actual member data.',
+          inline: false
+        }
+      ],
+      footer: {
+        text: 'Need help? Contact an administrator'
+      }
+    };
+
+    new Logger(interaction).log(PREFIX, 'Sent import template');
+    return await interaction.reply({ 
+      embeds: [embed], 
+      files: [attachment],
+      ephemeral: true 
+    });
   } catch (error) {
-    const msg = "Error retrieving code audit information";
+    const msg = "Error generating import template";
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Import member data from a CSV file
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function importMemberData(interaction) {
+  trackFunctionExecution('importMemberData');
+  
+  try {
+    const attachment = interaction.options.getAttachment('file');
+    
+    if (!attachment) {
+      return await interaction.reply({ 
+        content: 'Please provide a CSV file to import.', 
+        ephemeral: true 
+      });
+    }
+
+    // Check file type
+    if (!attachment.name.toLowerCase().endsWith('.csv')) {
+      return await interaction.reply({ 
+        content: 'Please provide a CSV file (.csv extension).', 
+        ephemeral: true 
+      });
+    }
+
+    // Check file size (max 1MB)
+    if (attachment.size > 1024 * 1024) {
+      return await interaction.reply({ 
+        content: 'File is too large. Maximum size is 1MB.', 
+        ephemeral: true 
+      });
+    }
+
+    // Fetch the CSV content
+    const response = await fetch(attachment.url);
+    const csvContent = await response.text();
+    
+    // Parse CSV
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+      return await interaction.reply({ 
+        content: 'CSV file is empty or invalid. Please check the format.', 
+        ephemeral: true 
+      });
+    }
+
+    // Validate header
+    const header = lines[0].toLowerCase().trim();
+    const expectedHeader = 'discord_user_id,ign,dkp';
+    if (header !== expectedHeader) {
+      return await interaction.reply({ 
+        content: `Invalid CSV format. Expected header: \`${expectedHeader}\`\nFound: \`${header}\``, 
+        ephemeral: true 
+      });
+    }
+
+    // Parse data rows
+    const members = [];
+    const errors = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      const columns = line.split(',');
+      if (columns.length !== 3) {
+        errors.push(`Row ${i + 1}: Invalid number of columns (expected 3, found ${columns.length})`);
+        continue;
+      }
+
+      const [discordUserId, ign, dkpStr] = columns.map(col => col.trim());
+      
+      // Validate Discord User ID
+      if (!discordUserId || !/^\d{17,19}$/.test(discordUserId)) {
+        errors.push(`Row ${i + 1}: Invalid Discord User ID: ${discordUserId}`);
+        continue;
+      }
+
+      // Validate DKP
+      const dkp = parseInt(dkpStr);
+      if (isNaN(dkp) || dkp < 0) {
+        errors.push(`Row ${i + 1}: Invalid DKP amount: ${dkpStr}`);
+        continue;
+      }
+
+      // Validate IGN (optional)
+      const cleanIGN = ign && ign !== '' ? ign.trim() : null;
+      if (cleanIGN && (cleanIGN.length < 2 || cleanIGN.length > 20)) {
+        errors.push(`Row ${i + 1}: Invalid IGN length: ${cleanIGN} (must be 2-20 characters)`);
+        continue;
+      }
+
+      members.push({
+        userId: discordUserId,
+        ign: cleanIGN,
+        dkp: dkp
+      });
+    }
+
+    // Check limits
+    if (members.length > 100) {
+      return await interaction.reply({ 
+        content: 'Too many members. Maximum 100 members per import.', 
+        ephemeral: true 
+      });
+    }
+
+    if (members.length === 0) {
+      return await interaction.reply({ 
+        content: 'No valid member data found in the CSV file.', 
+        ephemeral: true 
+      });
+    }
+
+    // Show errors if any
+    if (errors.length > 0) {
+      const errorMessage = `Found ${errors.length} error(s) in the CSV file:\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? `\n... and ${errors.length - 10} more errors` : ''}`;
+      return await interaction.reply({ 
+        content: errorMessage, 
+        ephemeral: true 
+      });
+    }
+
+    // Get current guild data
+    const guildDataResponse = await getGuildConfig(interaction.guild.id, 'import-member-data');
+    const currentMemberDkps = guildDataResponse.memberDkps || [];
+
+    // Process imports
+    let updatedCount = 0;
+    let addedCount = 0;
+    const newMemberDkps = [...currentMemberDkps];
+
+    for (const member of members) {
+      const existingIndex = newMemberDkps.findIndex(m => m.userId === member.userId);
+      
+      if (existingIndex !== -1) {
+        // Update existing member
+        newMemberDkps[existingIndex].dkp = member.dkp;
+        if (member.ign) {
+          newMemberDkps[existingIndex].ign = member.ign;
+        }
+        updatedCount++;
+      } else {
+        // Add new member
+        newMemberDkps.push({
+          userId: member.userId,
+          dkp: member.dkp,
+          ign: member.ign || null
+        });
+        addedCount++;
+      }
+    }
+
+    // Update guild data
+    const newGuildData = {
+      ...guildDataResponse,
+      memberDkps: newMemberDkps,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+
+    // Create success embed
+    const successEmbed = {
+      title: '✅ Import Successful',
+      description: `Successfully imported ${members.length} members from CSV file.`,
+      color: 0x00ff00,
+      fields: [
+        {
+          name: '📊 Import Summary',
+          value: `• **Added:** ${addedCount} new members\n• **Updated:** ${updatedCount} existing members\n• **Total processed:** ${members.length} members`,
+          inline: false
+        },
+        {
+          name: '📋 Next Steps',
+          value: '• Use `/view-igns` to see all member IGNs\n• Use `/check` to verify member DKP\n• Members can now use `/check` to see their DKP',
+          inline: false
+        }
+      ],
+      footer: {
+        text: 'Import completed successfully'
+      }
+    };
+
+    new Logger(interaction).log(PREFIX, `Imported ${members.length} members: ${addedCount} added, ${updatedCount} updated`);
+    return await interaction.reply({ 
+      embeds: [successEmbed], 
+      ephemeral: true 
+    });
+
+  } catch (error) {
+    console.error('Import error:', error);
+    const msg = "Error importing member data. Please check the file format and try again.";
     new Logger(interaction).log(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
   }
