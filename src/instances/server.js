@@ -109,7 +109,9 @@ export const createServer = (client) => {
     "/commands",
     (req, res) => {
       return new ResponseBase(res).success(
-        commands.map((command) => ({
+        commands
+          .filter((command) => !command.isHidden) // Filter out hidden commands
+          .map((command) => ({
           name: command.name,
           description: command.description,
           options: command.options,

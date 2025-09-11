@@ -463,7 +463,8 @@ export const commands = [
     commandExecution: api.searchGuilds,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "Admin",
-    new: true
+    new: true,
+    isHidden: true
   },
   {
     name: "admin-set-premium",
@@ -511,7 +512,8 @@ export const commands = [
     commandExecution: api.setGuildPremium,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "Admin",
-    new: true
+    new: true,
+    isHidden: true
   },
   {
     name: "admin-check-premium",
@@ -527,7 +529,8 @@ export const commands = [
     commandExecution: api.checkGuildPremium,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "Admin",
-    new: true
+    new: true,
+    isHidden: true
   },
   {
     name: "premium-status",

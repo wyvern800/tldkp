@@ -1961,6 +1961,14 @@ export async function getGuildSubscription(guildId) {
  * @returns {Promise} Response
  */
 export const searchGuilds = async (interaction) => {
+  // Check if user is admin
+  if (!isUserAdmin(interaction.user.id)) {
+    return await interaction.reply({
+      content: "❌ You don't have permission to use this command. This command is restricted to administrators only.",
+      ephemeral: true,
+    });
+  }
+
   const searchTerm = interaction.options.getString("search_term");
   const limit = interaction.options.getInteger("limit") || 10;
 
@@ -2013,6 +2021,14 @@ export const searchGuilds = async (interaction) => {
  * @returns {Promise} Response
  */
 export const setGuildPremium = async (interaction) => {
+  // Check if user is admin
+  if (!isUserAdmin(interaction.user.id)) {
+    return await interaction.reply({
+      content: "❌ You don't have permission to use this command. This command is restricted to administrators only.",
+      ephemeral: true,
+    });
+  }
+
   const guildId = interaction.options.getString("guild_id");
   const isPremium = interaction.options.getBoolean("is_premium");
   const expiresAtString = interaction.options.getString("expires_at");
@@ -2088,6 +2104,14 @@ export const setGuildPremium = async (interaction) => {
  * @returns {Promise} Response
  */
 export const checkGuildPremium = async (interaction) => {
+  // Check if user is admin
+  if (!isUserAdmin(interaction.user.id)) {
+    return await interaction.reply({
+      content: "❌ You don't have permission to use this command. This command is restricted to administrators only.",
+      ephemeral: true,
+    });
+  }
+
   const guildId = interaction.options.getString("guild_id");
 
   try {
@@ -3072,6 +3096,17 @@ export const handleSubmitModalCreateAuction = async (interaction) => {
  */
 export const checkAuctionPremiumAccess = async (guildId) => {
   return await isGuildPremium(guildId);
+};
+
+/**
+ * Check if a user is an admin based on Discord ID
+ *
+ * @param {string} userId The Discord user ID
+ * @returns {boolean} Whether the user is an admin
+ */
+export const isUserAdmin = (userId) => {
+  const adminDiscordIds = process.env.ADMINS?.split(",") || [];
+  return adminDiscordIds.includes(userId);
 };
 
 /**
