@@ -499,6 +499,10 @@ export const commands = [
             value: "free",
           },
           {
+            name: "Trial (7 days)",
+            value: "trial",
+          },
+          {
             name: "Premium (Monthly)",
             value: "premium",
           },

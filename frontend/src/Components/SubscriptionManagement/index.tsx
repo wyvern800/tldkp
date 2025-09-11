@@ -68,7 +68,11 @@ interface Pagination {
   totalPages: number;
 }
 
-const SubscriptionManagement: React.FC = () => {
+interface SubscriptionManagementProps {
+  onSubscriptionUpdate?: () => void;
+}
+
+const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ onSubscriptionUpdate }) => {
   const { getToken } = useAuth();
   const toast = useToast();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
@@ -165,6 +169,11 @@ const SubscriptionManagement: React.FC = () => {
         });
         onEditClose();
         fetchGuilds(pagination.page, searchTerm, statusFilter);
+        
+        // Notify parent component to refresh premium count
+        if (onSubscriptionUpdate) {
+          onSubscriptionUpdate();
+        }
       }
     } catch (error) {
       console.error('Error updating subscription:', error);
@@ -212,6 +221,7 @@ const SubscriptionManagement: React.FC = () => {
   const getPlanTypeBadge = (planType: string) => {
     const colors = {
       free: 'gray',
+      trial: 'orange',
       premium: 'blue',
       lifetime: 'purple'
     };
@@ -389,12 +399,13 @@ const SubscriptionManagement: React.FC = () => {
                   onChange={(e) => setEditForm({ ...editForm, planType: e.target.value })}
                 >
                   <option value="free">Free</option>
+                  <option value="trial">Trial (7 days)</option>
                   <option value="premium">Premium (Monthly)</option>
                   <option value="lifetime">Lifetime</option>
                 </Select>
               </FormControl>
 
-              {editForm.isPremium && editForm.planType === 'premium' && (
+              {editForm.isPremium && (editForm.planType === 'premium' || editForm.planType === 'trial') && (
                 <FormControl>
                   <FormLabel>Expiration Date</FormLabel>
                   <Input
@@ -402,6 +413,11 @@ const SubscriptionManagement: React.FC = () => {
                     value={editForm.expiresAt}
                     onChange={(e) => setEditForm({ ...editForm, expiresAt: e.target.value })}
                   />
+                  {editForm.planType === 'trial' && (
+                    <Text fontSize="sm" color="gray.500" mt={1}>
+                      Trial plans automatically expire after 7 days if no date is set
+                    </Text>
+                  )}
                 </FormControl>
               )}
 

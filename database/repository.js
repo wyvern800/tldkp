@@ -148,7 +148,7 @@ export async function processBid(interaction, auction) {
           },
           {
             name: "Available Plans",
-            value: "• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
+            value: "• **Trial (7 days)** - Full access for 7 days\n• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
             inline: false
           }
         ],
@@ -2061,6 +2061,12 @@ export const setGuildPremium = async (interaction) => {
       expiresAt = null;
     }
 
+    // For trial plans, set to 7 days from now
+    if (isPremium && planType === 'trial' && !expiresAt) {
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+    }
+
     // For premium plans without expiration, set to 1 month from now
     if (isPremium && planType === 'premium' && !expiresAt) {
       expiresAt = new Date();
@@ -2081,6 +2087,7 @@ export const setGuildPremium = async (interaction) => {
 
     const statusMessage = isPremium ? 
       (planType === 'lifetime' ? 'Lifetime Premium' : 
+       planType === 'trial' ? `Trial Premium (expires ${expiresAt ? expiresAt.toLocaleDateString() : 'Never'})` :
        `Premium (expires ${expiresAt ? expiresAt.toLocaleDateString() : 'Never'})`) : 
       'Free';
 
@@ -3136,7 +3143,7 @@ export const createAuction = async (interaction) => {
         },
         {
           name: "Available Plans",
-          value: "• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
+          value: "• **Trial (7 days)** - Full access for 7 days\n• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
           inline: false
         }
       ],
