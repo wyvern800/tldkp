@@ -377,7 +377,7 @@ export const commands = [
     commandExecution: api.generateDkpCode,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System",
-    new: true
+    new: false
   },
   {
     name: "claim",
@@ -393,7 +393,7 @@ export const commands = [
     commandExecution: api.redeemDkpCode,
     permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "DKP System",
-    new: true
+    new: false
   },
   {
     name: "set-on-member-join",
@@ -416,7 +416,7 @@ export const commands = [
     commandExecution: api.setRoleOnJoin,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System",
-    new: true
+    new: false
   },
   {
     name: "auction-create",
