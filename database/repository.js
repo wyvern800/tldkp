@@ -3297,3 +3297,134 @@ export const createAuction = async (interaction) => {
     });
   }
 };
+
+/**
+ * Set a member's In-Game Name (IGN)
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function setMemberIgn(interaction) {
+  trackFunctionExecution('setMemberIgn');
+  const user = interaction.options.getUser("user");
+  const ign = interaction.options.getString("ign");
+
+  if (!user || !ign) {
+    const msg = `Please provide both user and IGN.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  // Validate IGN length
+  if (ign.length < 2 || ign.length > 20) {
+    const msg = `IGN must be between 2 and 20 characters long.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const { memberDkps } = guildDataResponse;
+
+  if (!memberDkps) {
+    const msg = `No member data found for this guild.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  // Initialize memberDkps as a copy of the existing array
+  let updatedMemberDkps = [...memberDkps];
+
+  // Find the user in the memberDkps array
+  const userIndex = updatedMemberDkps.findIndex(
+    (memberDkp) => memberDkp?.userId === user.id
+  );
+
+  if (userIndex !== -1) {
+    // If the user exists, update their IGN
+    updatedMemberDkps[userIndex].ign = ign;
+  } else {
+    // If the user doesn't exist, create a new member object with default DKP and the IGN
+    const newMemberObject = { 
+      userId: user.id, 
+      dkp: 0, 
+      ign: ign 
+    };
+    updatedMemberDkps.push(newMemberObject);
+  }
+
+  // Update the guild data with the new memberDkps array
+  const newGuildData = {
+    ...guildDataResponse,
+    memberDkps: updatedMemberDkps,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+
+  const msg = `<@${user.id}>'s IGN has been set to **${ign}**!`;
+  new Logger(interaction).log(PREFIX, msg);
+  return await interaction.reply({ content: msg, ephemeral: true });
+}
+
+/**
+ * View all member IGNs in the guild
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function viewMemberIgns(interaction) {
+  trackFunctionExecution('viewMemberIgns');
+  
+  const guildDataResponse = await getGuildConfig(interaction.guild.id);
+  const { memberDkps } = guildDataResponse;
+
+  if (!memberDkps || memberDkps.length === 0) {
+    const msg = `No member data found for this guild.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  // Filter members who have IGNs set
+  const membersWithIgns = memberDkps.filter(member => member.ign && member.ign.trim() !== '');
+  
+  if (membersWithIgns.length === 0) {
+    const msg = `No members have IGNs set yet. Use \`/set-ign\` to set member IGNs.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  // Create embed with member IGNs
+  const embed = {
+    title: `Member IGNs - ${interaction.guild.name}`,
+    color: 0x00ff00,
+    fields: [],
+    timestamp: new Date().toISOString(),
+    footer: {
+      text: `Total members with IGNs: ${membersWithIgns.length}`
+    }
+  };
+
+  // Group members by pages (Discord embed field limit is 25)
+  const membersPerPage = 20;
+  const totalPages = Math.ceil(membersWithIgns.length / membersPerPage);
+  
+  for (let page = 0; page < totalPages; page++) {
+    const startIndex = page * membersPerPage;
+    const endIndex = Math.min(startIndex + membersPerPage, membersWithIgns.length);
+    const pageMembers = membersWithIgns.slice(startIndex, endIndex);
+    
+    let fieldValue = '';
+    pageMembers.forEach(member => {
+      fieldValue += `<@${member.userId}> - **${member.ign}**\n`;
+    });
+    
+    embed.fields.push({
+      name: `Page ${page + 1} of ${totalPages}`,
+      value: fieldValue || 'No IGNs on this page',
+      inline: false
+    });
+  }
+
+  new Logger(interaction).log(PREFIX, `Displayed ${membersWithIgns.length} member IGNs`);
+  return await interaction.reply({ embeds: [embed], ephemeral: true });
+}

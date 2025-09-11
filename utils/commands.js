@@ -132,6 +132,34 @@ export const commands = [
     commandCategory: "DKP System"
   },
   {
+    name: "set-ign",
+    description: "Set a member's In-Game Name (IGN)",
+    options: [
+      {
+        name: "user",
+        description: "The member whose IGN you want to set",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: "ign",
+        description: "The In-Game Name to set",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+    commandExecution: api.setMemberIgn,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System"
+  },
+  {
+    name: "view-igns",
+    description: "View all member IGNs in the guild",
+    commandExecution: api.viewMemberIgns,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System"
+  },
+  {
     name: "nickname",
     description: "Sets your ingame name",
     options: [

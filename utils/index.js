@@ -42,7 +42,7 @@ export async function updateDkp(
     dkpArray[userIndex].dkp = newDkpValue < 0 ? 0 : newDkpValue;
   } else {
     // Create a new DKP object and add it to the array
-    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount };
+    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount, ign: null };
     dkpArray.push(newDKPObject);
   }
 
@@ -94,7 +94,7 @@ export async function decreaseDkp(
     dkpArray[userIndex].dkp = newDkpValue < 0 ? 0 : newDkpValue;
   } else {
     // Create a new DKP object and add it to the array
-    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount };
+    const newDKPObject = { userId, dkp: amount < 0 ? 0 : amount, ign: null };
     dkpArray.push(newDKPObject);
   }
 
@@ -144,7 +144,7 @@ export async function setDkp(
     dkpArray[userIndex].dkp = amount;
   } else {
     // If the user doesn't exist, create a new DKP object and add it to the array
-    const newDKPObject = { userId, dkp: amount };
+    const newDKPObject = { userId, dkp: amount, ign: null };
     dkpArray.push(newDKPObject);
   }
 
