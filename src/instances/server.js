@@ -26,6 +26,7 @@ import Clerk from "../../utils/clerk.js";
 import { uploadFile } from "../../utils/index.js";
 import { getPermissionVerbose } from "../../utils/commands.js";
 import { Logger } from "../../utils/logger.js";
+import { db, admin } from "../../database/firebase.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -543,7 +544,8 @@ export const createServer = (client) => {
   );
 
   // Data import endpoint
-  apiRouter.post("/admin/import/:guildId", upload.single('file'), async (req, res) => {
+  apiRouter.use("/admin/import/:guildId", upload.single('file'));
+  apiRouter.post("/admin/import/:guildId", async (req, res) => {
     const { userDiscordId } = req;
     const { guildId } = req.params;
 
@@ -692,6 +694,8 @@ export const createServer = (client) => {
       } else {
         return new ResponseBase(res).notAllowed("Unauthorized");
       }
+    } else {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
     }
   },
   "Import member data from CSV file"

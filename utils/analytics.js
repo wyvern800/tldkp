@@ -63,8 +63,11 @@ async function sendToGoogleAnalytics(eventName, eventCategory, parameters, userI
     };
 
     // Debug: Log the event data being sent
+    const fullUrl = `https://www.google-analytics.com/mp/collect?measurement_id=${MEASUREMENT_ID}&api_secret=${API_SECRET}`;
     new Logger().logLocal(PREFIX, `Sending GA event data:`, {
-      url: `https://www.google-analytics.com/mp/collect?measurement_id=${MEASUREMENT_ID}&api_secret=${API_SECRET.substring(0, 8)}...`,
+      url: fullUrl,
+      measurementId: MEASUREMENT_ID,
+      apiSecretLength: API_SECRET ? API_SECRET.length : 0,
       eventData: eventData
     });
 

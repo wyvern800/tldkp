@@ -30,6 +30,7 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { FaDownload, FaUpload, FaCheck, FaTimes } from 'react-icons/fa';
+import { useAuth } from '@clerk/clerk-react';
 import api from '../../services/axiosInstance';
 
 interface ImportMember {
@@ -46,6 +47,7 @@ interface DataImportProps {
 }
 
 export default function DataImport({ guildId, onImportComplete }: DataImportProps) {
+  const { getToken } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ImportMember[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -230,6 +232,7 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
       const response = await api.post(`/admin/import/${guildId}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${await getToken()}`,
         },
       });
 

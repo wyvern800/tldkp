@@ -43,10 +43,10 @@ export default function GuildImportPage() {
         setLoading(true);
         setError(null);
 
-        const token = await getToken();
+
         const response = await api.get(`/guilds/${guildId}`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${await getToken()}`,
           },
         });
 
@@ -67,9 +67,32 @@ export default function GuildImportPage() {
     fetchGuildData();
   }, [isLoaded, guildId, getToken]);
 
-  const handleImportComplete = () => {
+  const handleImportComplete = async () => {
     // Refresh guild data after import
-    window.location.reload();
+    if (!isLoaded || !guildId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await api.get(`/guilds/${guildId}`, {
+        headers: {
+          Authorization: `Bearer ${await getToken()}`,
+        },
+      });
+
+      if (response.data.status === 200) {
+        setGuildData(response.data.data);
+        setUserDiscordId(response.data.data.userDiscordId);
+      } else {
+        setError('Failed to load guild data');
+      }
+    } catch (err) {
+      console.error('Error fetching guild data:', err);
+      setError('Failed to load guild data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isGuildPremium = () => {
