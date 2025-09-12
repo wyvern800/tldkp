@@ -500,10 +500,10 @@ export async function loadAllAuctions(discordBot) {
                   new Logger().logLocal(PREFIX, `Listener removed for thread ${thread.name}`);
               }
               await thread.setLocked(true);
-              new Logger().logLocal(
+              /*new Logger().logLocal(
                 "Auctions",
                 `This auction for ${auction?.itemName} is not running, so no listener is needed`
-              );
+              );*/
             }
           }
         }

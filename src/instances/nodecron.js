@@ -20,6 +20,9 @@ const PREFIX = "Cron";
 const auctionsMap = api.auctionsMap;
 const threadListeners = api.threadListeners;
 
+// Map to store last known auction status to avoid unnecessary API calls
+const lastKnownStatus = new Map();
+
 /**
  * Schedules a cron job to run once per day at midnight.
  * The job retrieves all guilds, processes each guild's DKP decay system,
@@ -212,6 +215,21 @@ export const updateAuctions = async () => {
               // Add a flag to indicate this was programmatically finalized
               auction._programmaticallyFinalized = true;
               
+              // Update the status tracking to reflect the change
+              const auctionKey = `${auction.data.channelId}-${auction.data.messageId}`;
+              lastKnownStatus.set(auctionKey, {
+                auctionStatus: auction.auctionStatus,
+                finalized: auction.finalized,
+                cancelled: auction.cancelled,
+                _programmaticallyFinalized: auction._programmaticallyFinalized,
+                // Track bidder information
+                bidCount: auction.bidCount || 0,
+                highestBidder: auction.highestBidder || null,
+                highestBid: auction.highestBid || 0,
+                currentBid: auction.currentBid || 0,
+                startingBid: auction.startingBid || 0
+              });
+              
               new Logger().logLocal(
                 PREFIX,
                 `Auction ${auction.itemName} status updated to finalized`
@@ -255,12 +273,59 @@ export const updateAuctions = async () => {
             let message = await channel.messages.fetch(auction.data.messageId);
 
             if (channel && message) {
-              // Always update the auction embed to reflect current status
-              new Logger().logLocal(
-                PREFIX,
-                `Updating embed for auction ${auction.itemName} with status: ${auction.auctionStatus} (finalized: ${auction.finalized})`
-              );
-              await api.updateAuction({ _message: message, auction });
+              // Check if auction status has changed to avoid unnecessary API calls
+              const auctionKey = `${auction.data.channelId}-${auction.data.messageId}`;
+              const lastStatus = lastKnownStatus.get(auctionKey);
+              const currentStatus = {
+                auctionStatus: auction.auctionStatus,
+                finalized: auction.finalized,
+                cancelled: auction.cancelled,
+                _programmaticallyFinalized: auction._programmaticallyFinalized,
+                // Track bidder information
+                bidCount: auction.bidCount || 0,
+                highestBidder: auction.highestBidder || null,
+                highestBid: auction.highestBid || 0,
+                // Track other relevant data that affects the embed
+                currentBid: auction.currentBid || 0,
+                startingBid: auction.startingBid || 0
+              };
+              
+              // Only update embed if status has changed
+              if (!lastStatus || 
+                  lastStatus.auctionStatus !== currentStatus.auctionStatus ||
+                  lastStatus.finalized !== currentStatus.finalized ||
+                  lastStatus.cancelled !== currentStatus.cancelled ||
+                  lastStatus._programmaticallyFinalized !== currentStatus._programmaticallyFinalized ||
+                  lastStatus.bidCount !== currentStatus.bidCount ||
+                  lastStatus.highestBidder !== currentStatus.highestBidder ||
+                  lastStatus.highestBid !== currentStatus.highestBid ||
+                  lastStatus.currentBid !== currentStatus.currentBid ||
+                  lastStatus.startingBid !== currentStatus.startingBid) {
+                
+                // Log what changed for better debugging
+                const changes = [];
+                if (lastStatus) {
+                  if (lastStatus.auctionStatus !== currentStatus.auctionStatus) changes.push(`status: ${lastStatus.auctionStatus} → ${currentStatus.auctionStatus}`);
+                  if (lastStatus.bidCount !== currentStatus.bidCount) changes.push(`bids: ${lastStatus.bidCount} → ${currentStatus.bidCount}`);
+                  if (lastStatus.highestBidder !== currentStatus.highestBidder) changes.push(`highest bidder: ${lastStatus.highestBidder} → ${currentStatus.highestBidder}`);
+                  if (lastStatus.highestBid !== currentStatus.highestBid) changes.push(`highest bid: ${lastStatus.highestBid} → ${currentStatus.highestBid}`);
+                  if (lastStatus.finalized !== currentStatus.finalized) changes.push(`finalized: ${lastStatus.finalized} → ${currentStatus.finalized}`);
+                }
+                
+                new Logger().logLocal(
+                  PREFIX,
+                  `Updating embed for auction ${auction.itemName} - ${changes.length > 0 ? changes.join(', ') : 'initial update'}`
+                );
+                await api.updateAuction({ _message: message, auction });
+                
+                // Update the last known status
+                lastKnownStatus.set(auctionKey, currentStatus);
+              } else {
+                /*new Logger().logLocal(
+                  PREFIX,
+                  `Skipping embed update for auction ${auction.itemName} - status unchanged (${auction.auctionStatus})`
+                );*/
+              }
 
               // Auction thread - handle thread locking immediately after auction update
               if (auction.data?.threadId) {
@@ -340,8 +405,6 @@ export const updateAuctions = async () => {
                       
                       if (shouldLock) {
                         try {
-                          const wasLocked = thread.locked;
-                          const wasArchived = thread.archived;
                           
                           // Check if bot has permission to manage threads
                           const permissionCheck = canManageThreads(thread.guild);
@@ -377,10 +440,10 @@ export const updateAuctions = async () => {
                           }
                           
                           await thread.setLocked(true);
-                          new Logger().logLocal(
+                          /*new Logger().logLocal(
                             PREFIX,
                             `Thread locked for ${auction?.auctionStatus} auction: ${auction?.itemName} (was locked: ${wasLocked}, was archived: ${wasArchived}, now locked: ${thread.locked})`
-                          );
+                          );*/
                         } catch (lockError) {
                           new Logger().logLocal(
                             PREFIX,
@@ -394,10 +457,10 @@ export const updateAuctions = async () => {
                         );
                       }
                       
-                      new Logger().logLocal(
+                      /*new Logger().logLocal(
                         "Auctions",
                         `Auction ${auction?.itemName} status: ${auction?.auctionStatus} - thread management completed`
-                      );
+                      );*/
                     }
                   })
                   .catch(() => {
