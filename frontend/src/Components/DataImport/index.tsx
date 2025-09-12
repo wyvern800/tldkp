@@ -47,7 +47,7 @@ interface DataImportProps {
 }
 
 export default function DataImport({ guildId, onImportComplete }: DataImportProps) {
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ImportMember[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -56,6 +56,24 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
   const [errors, setErrors] = useState<string[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
+
+  const trackImportEvent = async (eventType: 'import_started' | 'import_success' | 'import_failed', data: any) => {
+    try {
+      await api.post('/analytics/track', {
+        event: eventType,
+        category: 'data_import',
+        guildId,
+        userId,
+        data
+      }, {
+        headers: {
+          Authorization: `Bearer ${await getToken()}`,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to track analytics event:', error);
+    }
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -218,6 +236,13 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
 
     setIsImporting(true);
 
+    // Track import started
+    await trackImportEvent('import_started', {
+      memberCount: validMembers.length,
+      fileSize: file?.size,
+      fileName: file?.name
+    });
+
     try {
       // Convert to CSV format for the API
       const csvContent = [
@@ -238,6 +263,15 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
 
       if (response.data.status === 200) {
         setImportResults(response.data.data);
+        
+        // Track successful import
+        await trackImportEvent('import_success', {
+          addedCount: response.data.data.addedCount,
+          updatedCount: response.data.data.updatedCount,
+          totalProcessed: response.data.data.totalProcessed,
+          memberCount: validMembers.length
+        });
+        
         toast({
           title: 'Import Successful',
           description: `Successfully imported ${validMembers.length} members`,
@@ -253,6 +287,15 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
       }
     } catch (error) {
       console.error('Import error:', error);
+      
+      // Track failed import
+      await trackImportEvent('import_failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        memberCount: validMembers.length,
+        fileSize: file?.size,
+        fileName: file?.name
+      });
+      
       toast({
         title: 'Import Failed',
         description: 'Failed to import member data. Please try again.',

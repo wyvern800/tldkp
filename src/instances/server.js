@@ -27,6 +27,7 @@ import { uploadFile } from "../../utils/index.js";
 import { getPermissionVerbose } from "../../utils/commands.js";
 import { Logger } from "../../utils/logger.js";
 import { db, admin } from "../../database/firebase.js";
+import { trackPremiumEvent } from "../../utils/analytics.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -541,6 +542,33 @@ export const createServer = (client) => {
     }
   },
   "Get all guilds with subscription status and pagination"
+  );
+
+  // Analytics tracking endpoint
+  apiRouter.post("/analytics/track", async (req, res) => {
+    const { userDiscordId } = req;
+    const { event, category, guildId, userId, data } = req.body;
+
+    if (userDiscordId) {
+      try {
+        // Track the analytics event
+        await trackPremiumEvent(event, guildId, {
+          userId: userId || userDiscordId,
+          category: category,
+          ...data,
+          success: event.includes('success')
+        });
+
+        return new ResponseBase(res).success("Analytics event tracked");
+      } catch (error) {
+        console.error('Analytics tracking error:', error);
+        return new ResponseBase(res).error("Failed to track analytics event");
+      }
+    } else {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+  },
+  "Track analytics events"
   );
 
   // Data import endpoint

@@ -185,6 +185,7 @@ export const updateAuctions = async () => {
             ? auction.startingAt.toDate()
             : auction.startingAt;
           
+
           // If auction has expired and is not already finalized/cancelled, update it
           if (auctionEndTime && isAfter(now, auctionEndTime) && 
               !auction.finalized && !auction.cancelled && 
@@ -210,10 +211,34 @@ export const updateAuctions = async () => {
               auction.finalized = true;
               // Add a flag to indicate this was programmatically finalized
               auction._programmaticallyFinalized = true;
+              
               new Logger().logLocal(
                 PREFIX,
                 `Auction ${auction.itemName} status updated to finalized`
               );
+
+              // Immediately update the Discord embed to reflect the finalized status
+              try {
+                const channel = discordBot.channels.cache.get(auction.data.channelId);
+                if (channel) {
+                  const message = await channel.messages.fetch(auction.data.messageId);
+                  if (message) {
+                    // Use the existing updateAuction function to update the embed
+                    // Pass the complete auction object with updated status
+                    const updatedAuction = { ...auction, ...auctionDTO };
+                    await api.updateAuction({ _message: message, auction: updatedAuction });
+                    new Logger().logLocal(
+                      PREFIX,
+                      `Auction ${auction.itemName} embed updated to finalized status`
+                    );
+                  }
+                }
+              } catch (embedError) {
+                new Logger().logLocal(
+                  PREFIX,
+                  `Failed to update embed for auction ${auction.itemName}: ${embedError.message}`
+                );
+              }
             } catch (updateError) {
               new Logger().logLocal(
                 PREFIX,

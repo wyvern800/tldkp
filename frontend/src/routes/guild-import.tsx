@@ -159,7 +159,7 @@ export default function GuildImportPage() {
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbItem>
-            <BreadcrumbLink onClick={() => navigate('/guilds')}>
+            <BreadcrumbLink onClick={() => navigate('/dashboard')}>
               My Guilds
             </BreadcrumbLink>
           </BreadcrumbItem>
