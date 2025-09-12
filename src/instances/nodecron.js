@@ -189,6 +189,12 @@ export const updateAuctions = async () => {
             : auction.startingAt;
           
 
+          // Debug logging for auction expiration check
+          new Logger().logLocal(
+            PREFIX,
+            `Checking auction ${auction.itemName}: endTime=${auctionEndTime}, now=${now}, isAfter=${auctionEndTime ? isAfter(now, auctionEndTime) : 'N/A'}, finalized=${auction.finalized}, cancelled=${auction.cancelled}, status=${auction.auctionStatus}, hasBids=${auction.bidCount > 0}, data=${JSON.stringify(auction.data)}`
+          );
+
           // If auction has expired and is not already finalized/cancelled, update it
           if (auctionEndTime && isAfter(now, auctionEndTime) && 
               !auction.finalized && !auction.cancelled && 
@@ -440,10 +446,10 @@ export const updateAuctions = async () => {
                           }
                           
                           await thread.setLocked(true);
-                          /*new Logger().logLocal(
-                            PREFIX,
-                            `Thread locked for ${auction?.auctionStatus} auction: ${auction?.itemName} (was locked: ${wasLocked}, was archived: ${wasArchived}, now locked: ${thread.locked})`
-                          );*/
+                           new Logger().logLocal(
+                              PREFIX,
+                              `Thread locked for ${auction?.auctionStatus} auction: ${auction?.itemName}`
+                           );
                         } catch (lockError) {
                           new Logger().logLocal(
                             PREFIX,
@@ -457,10 +463,10 @@ export const updateAuctions = async () => {
                         );
                       }
                       
-                      /*new Logger().logLocal(
-                        "Auctions",
-                        `Auction ${auction?.itemName} status: ${auction?.auctionStatus} - thread management completed`
-                      );*/
+                       new Logger().logLocal(
+                          PREFIX,
+                          `Auction ${auction?.itemName} status: ${auction?.auctionStatus} - thread management completed`
+                       );
                     }
                   })
                   .catch(() => {
@@ -491,7 +497,7 @@ export const updateAuctions = async () => {
                     })
                     .then(async (thread) => {
                       // set the thread permissions
-                      /*try {
+                       try {
                     await thread.permissionOverwrites.edit(
                       thread.guild.roles.everyone,
                       {
@@ -502,18 +508,16 @@ export const updateAuctions = async () => {
                     await thread.permissionOverwrites.edit(thread.client.user, {
                       SendMessages: true,
                     });
-                  } catch (err) {
-                    console.log(err);
                     new Logger().logLocal(
                       PREFIX,
-                      "An error occurred while setting the thread permissions."
+                      `Thread permissions updated for auction: ${auction?.itemName}`
                     );
-                    await i.reply({
-                      content:
-                        "An error occurred while setting the thread permissions.",
-                      ephemeral: true,
-                    });
-                  }*/
+                  } catch (err) {
+                    new Logger().logLocal(
+                      PREFIX,
+                      `Error setting thread permissions for auction ${auction?.itemName}: ${err.message}`
+                    );
+                  }
 
                       // send the message to the thread
                       try {

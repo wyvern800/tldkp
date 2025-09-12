@@ -794,6 +794,8 @@ export async function updateAuctionConfig(messageId, auction) {
     .where("data.messageId", "==", messageId)
     .get();
 
+  const updatePromises = [];
+  
   querySnapshot.forEach((doc) => {
     const existingData = doc.data();
     const updatedData = {};
@@ -806,10 +808,13 @@ export async function updateAuctionConfig(messageId, auction) {
     }
 
     if (Object.keys(updatedData).length > 0) {
-      doc.ref.update(updatedData);
+      updatePromises.push(doc.ref.update(updatedData));
     }
   });
 
+  // Wait for all updates to complete
+  await Promise.all(updatePromises);
+  
   return querySnapshot;
 }
 
