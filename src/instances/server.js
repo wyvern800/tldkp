@@ -29,6 +29,7 @@ import { Logger } from "../../utils/logger.js";
 import { db, admin } from "../../database/firebase.js";
 import { trackPremiumEvent } from "../../utils/analytics.js";
 import StripeService from "../../utils/stripe.js";
+import { checkExportPermission, logExportEvent, getExportHistory } from "../../utils/exportLimiter.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -1120,6 +1121,168 @@ export const createServer = (client) => {
     }
   },
   "Get subscription info for a specific guild (user access)"
+  );
+
+  // Data Export Routes (protected)
+  apiRouter.get("/guilds/:guildId/export/status", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    try {
+      // Check if user has access to this guild
+      const userGuilds = await getGuildsByOwnerOrUser(userDiscordId);
+      const allUserGuilds = [...userGuilds.ownerGuilds, ...userGuilds.memberGuilds];
+      const hasAccess = allUserGuilds.some(guild => guild.guildData.id === guildId);
+      
+      if (!hasAccess) {
+        return new ResponseBase(res).notAllowed("You don't have access to this guild");
+      }
+
+      // Get guild subscription status
+      const subscription = await getGuildSubscription(guildId);
+      const isPremium = subscription.isPremium && subscription.isActive;
+
+      // Check export permission
+      const exportPermission = await checkExportPermission(userDiscordId, guildId, isPremium);
+      
+      // Get export history
+      const exportHistory = await getExportHistory(userDiscordId, guildId);
+
+      return new ResponseBase(res).success({
+        canExport: exportPermission.canExport,
+        nextExportDate: exportPermission.nextExportDate,
+        reason: exportPermission.reason,
+        isPremium,
+        exportHistory
+      });
+    } catch (error) {
+      new Logger().error('Export', `Error getting export status: ${error.message}`);
+      return new ResponseBase(res).error("Failed to get export status");
+    }
+  },
+  "Get export status and history for a guild"
+  );
+
+  apiRouter.post("/guilds/:guildId/export", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+    const { format = 'csv' } = req.body;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    try {
+      // Check if user has access to this guild
+      const userGuilds = await getGuildsByOwnerOrUser(userDiscordId);
+      const allUserGuilds = [...userGuilds.ownerGuilds, ...userGuilds.memberGuilds];
+      const hasAccess = allUserGuilds.some(guild => guild.guildData.id === guildId);
+      
+      if (!hasAccess) {
+        return new ResponseBase(res).notAllowed("You don't have access to this guild");
+      }
+
+      // Get guild data
+      const guildConfig = await getGuildConfig(guildId, 'export-data');
+      if (!guildConfig) {
+        return new ResponseBase(res).notFound("Guild not found");
+      }
+
+      // Get subscription status
+      const subscription = await getGuildSubscription(guildId);
+      const isPremium = subscription.isPremium && subscription.isActive;
+
+      // Check export permission
+      const exportPermission = await checkExportPermission(userDiscordId, guildId, isPremium);
+      
+      if (!exportPermission.canExport) {
+        return new ResponseBase(res).badRequest(exportPermission.reason, {
+          nextExportDate: exportPermission.nextExportDate
+        });
+      }
+
+      // Prepare export data
+      const memberDkps = guildConfig.memberDkps || [];
+      const exportData = {
+        guildInfo: {
+          id: guildConfig.guildData.id,
+          name: guildConfig.guildData.name,
+          ownerId: guildConfig.guildData.ownerId,
+          exportedAt: new Date().toISOString(),
+          exportedBy: userDiscordId
+        },
+        members: memberDkps.map(member => ({
+          userId: member.userId,
+          displayName: member.discordData?.displayName || 'Unknown User',
+          ign: member.ign || '',
+          dkp: member.dkp || 0,
+          avatarURL: member.discordData?.avatarURL || ''
+        }))
+      };
+
+      // Generate export based on format
+      let exportContent;
+      let contentType;
+      let filename;
+
+      if (format === 'csv') {
+        // Generate CSV
+        const csvHeaders = 'User ID,Display Name,IGN,DKP,Avatar URL\n';
+        const csvRows = exportData.members.map(member => 
+          `"${member.userId}","${member.displayName}","${member.ign}","${member.dkp}","${member.avatarURL}"`
+        ).join('\n');
+        exportContent = csvHeaders + csvRows;
+        contentType = 'text/csv';
+        filename = `guild-${guildId}-members-${new Date().toISOString().split('T')[0]}.csv`;
+      } else if (format === 'json') {
+        // Generate JSON
+        exportContent = JSON.stringify(exportData, null, 2);
+        contentType = 'application/json';
+        filename = `guild-${guildId}-members-${new Date().toISOString().split('T')[0]}.json`;
+      } else {
+        return new ResponseBase(res).badRequest("Unsupported export format. Use 'csv' or 'json'");
+      }
+
+      // Log the export event
+      try {
+        await logExportEvent(userDiscordId, guildId, format);
+      } catch (logError) {
+        new Logger().error('Export', `Error logging export event: ${logError.message}`);
+        // Continue with export even if logging fails
+      }
+
+      // Track analytics
+      try {
+        await trackPremiumEvent({
+          event: 'data_exported',
+          guildId: guildId,
+          exportFormat: format,
+          memberCount: memberDkps.length
+        });
+      } catch (analyticsError) {
+        new Logger().error('Export', `Error tracking analytics: ${analyticsError.message}`);
+        // Continue with export even if analytics fails
+      }
+
+      // Set response headers for file download
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', Buffer.byteLength(exportContent, 'utf8'));
+
+      res.send(exportContent);
+    } catch (error) {
+      new Logger().error('Export', `Error exporting data: ${error.message}`);
+      new Logger().error('Export', `Stack trace: ${error.stack}`);
+      if (!res.headersSent) {
+        return new ResponseBase(res).error(`Failed to export data: ${error.message}`);
+      }
+    }
+  },
+  "Export guild member data"
   );
 
   // Stripe Routes (protected)

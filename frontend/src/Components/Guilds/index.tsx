@@ -36,6 +36,7 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/axiosInstance";
+import DataExport from "../DataExport";
 
 const Logo = styled.img`
   width: 20%;
@@ -193,6 +194,13 @@ const navigate = useNavigate();
                                   navigate(`/guild/${guild.guildData.id}/import`);
                                 }}
                                 title="Import member data from CSV"
+                              />
+                            )}
+                            {!isBackoffice && (
+                              <DataExport
+                                guildId={guild.guildData.id}
+                                guildName={name}
+                                isPremium={isGuildPremium}
                               />
                             )}
                             {guild?.guildData?.ownerId === myDiscordId && isOwnedGuilds && (
