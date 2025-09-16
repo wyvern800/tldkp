@@ -20,7 +20,6 @@
     "@clerk/shared": "2.12.1",
     "@google-analytics/data": "^5.2.0",
     "@google-cloud/storage": "^7.14.0",
-    "@rollup/rollup-linux-x64-gnu": "^4.50.2",
     "@types/react-slick": "^0.23.13",
     "ajv": "^8.17.1",
     "axios": "1.7.7",
