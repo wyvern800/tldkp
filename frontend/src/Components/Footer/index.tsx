@@ -130,7 +130,7 @@ function Footer({ complete = true }: FooterProps) {
                         textTransform="uppercase"
                         letterSpacing="wide"
                       >
-                        Dragon Kill Points
+                        <abbr title="Throne and Liberty">T&L</abbr> Dragon Kill Points
                       </Text>
                     </VStack>
                   </HStack>

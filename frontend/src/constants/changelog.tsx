@@ -1,5 +1,13 @@
 export const changelog = [
   {
+    version: 'v1.0.4',
+    date: '2025-09-16',
+    changes: [
+      "Added a feature where you can export your data to a JSON or CSV file, to download your data",
+      "Added subscription system, so you can now subscribe to the bot to get more features",
+    ]
+  },
+  {
     version: 'v1.0.3',
     date: '2025-09-10',
     changes: [
