@@ -196,7 +196,7 @@ const navigate = useNavigate();
                                 title="Import member data from CSV"
                               />
                             )}
-                            {!isBackoffice && (
+                            {!isBackoffice && isOwnedGuilds && (
                               <DataExport
                                 guildId={guild.guildData.id}
                                 guildName={name}
