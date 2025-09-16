@@ -102,23 +102,66 @@ export const createServer = (client) => {
   // Webhook handler functions
   async function handleCheckoutCompleted(session) {
     const guildId = session.metadata.guildId;
+    const planType = session.metadata.planType;
     if (!guildId) return;
 
     try {
-      const subscription = await StripeService.getSubscription(session.subscription);
-      const expiresAt = new Date(subscription.current_period_end * 1000);
-      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+      if (planType === 'lifetime') {
+        // Handle one-time payment (lifetime subscription)
+        await updateGuildSubscription(guildId, true, null, 'lifetime');
 
-      // Track analytics
-      await trackPremiumEvent({
-        event: 'subscription_created',
-        guildId: guildId,
-        subscriptionId: subscription.id
-      });
+        // Track analytics
+        await trackPremiumEvent({
+          event: 'lifetime_purchase',
+          guildId: guildId,
+          paymentIntentId: session.payment_intent
+        });
 
-      new Logger().log('Stripe', `Checkout completed for guild ${guildId}`);
+        new Logger().log('Stripe', `Lifetime purchase completed for guild ${guildId}`);
+      } else {
+        // Handle recurring subscription
+        const subscription = await StripeService.getSubscription(session.subscription);
+        const expiresAt = new Date(subscription.current_period_end * 1000);
+        await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+
+        // Track analytics
+        await trackPremiumEvent({
+          event: 'subscription_created',
+          guildId: guildId,
+          subscriptionId: subscription.id
+        });
+
+        new Logger().log('Stripe', `Checkout completed for guild ${guildId}`);
+      }
     } catch (error) {
       new Logger().error('Stripe', `Error handling checkout completion: ${error.message}`);
+    }
+  }
+
+  async function handlePaymentIntentSucceeded(paymentIntent) {
+    // This is a backup handler for one-time payments
+    // The main handling should be done in checkout.session.completed
+    // but this provides additional reliability
+    try {
+      // Get the checkout session from the payment intent
+      const stripe = StripeService.getInstance();
+      const sessions = await stripe.checkout.sessions.list({
+        payment_intent: paymentIntent.id,
+        limit: 1
+      });
+
+      if (sessions.data.length > 0) {
+        const session = sessions.data[0];
+        const guildId = session.metadata.guildId;
+        const planType = session.metadata.planType;
+
+        if (guildId && planType === 'lifetime') {
+          await updateGuildSubscription(guildId, true, null, 'lifetime');
+          new Logger().log('Stripe', `Lifetime purchase confirmed via payment_intent for guild ${guildId}`);
+        }
+      }
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling payment intent success: ${error.message}`);
     }
   }
 
@@ -308,6 +351,10 @@ export const createServer = (client) => {
         case 'checkout.session.completed':
           new Logger().log('Stripe', 'Handling checkout.session.completed');
           await handleCheckoutCompleted(event.data.object);
+          break;
+        case 'payment_intent.succeeded':
+          new Logger().log('Stripe', 'Handling payment_intent.succeeded');
+          await handlePaymentIntentSucceeded(event.data.object);
           break;
         case 'customer.subscription.created':
           new Logger().log('Stripe', 'Handling customer.subscription.created');
@@ -1106,13 +1153,19 @@ export const createServer = (client) => {
         customer = await StripeService.createCustomer(email, userDiscordId, guildId);
       }
 
+      // Check if this is a lifetime product by fetching the price details
+      const stripe = StripeService.getInstance();
+      const price = await stripe.prices.retrieve(priceId);
+      const isLifetime = !price.recurring; // One-time payments don't have recurring data
+
       // Create checkout session
       const session = await StripeService.createCheckoutSession(
         priceId,
         customer.id,
         guildId,
         successUrl,
-        cancelUrl
+        cancelUrl,
+        isLifetime
       );
 
       return new ResponseBase(res).success({

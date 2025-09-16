@@ -281,7 +281,7 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
                 leftIcon={<Icon as={FaCrown} />}
                 isDisabled={!product.default_price}
               >
-                {product.default_price ? 'Subscribe Now' : 'Price Not Available'}
+                {product.default_price ? 'Subscribe now' : 'Price not available'}
               </Button>
             </VStack>
           </Box>

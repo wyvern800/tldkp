@@ -24,19 +24,20 @@ class StripeService {
   }
 
   /**
-   * Create a checkout session for subscription
+   * Create a checkout session for subscription or one-time payment
    * @param {string} priceId - Stripe price ID
    * @param {string} customerId - Stripe customer ID
    * @param {string} guildId - Discord guild ID
    * @param {string} successUrl - Success redirect URL
    * @param {string} cancelUrl - Cancel redirect URL
+   * @param {boolean} isLifetime - Whether this is a lifetime (one-time) payment
    * @returns {Promise<Object>} Checkout session
    */
-  static async createCheckoutSession(priceId, customerId, guildId, successUrl, cancelUrl) {
+  static async createCheckoutSession(priceId, customerId, guildId, successUrl, cancelUrl, isLifetime = false) {
     const stripe = StripeService.getInstance();
     
     try {
-      const session = await stripe.checkout.sessions.create({
+      const sessionConfig = {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [
@@ -45,20 +46,27 @@ class StripeService {
             quantity: 1,
           },
         ],
-        mode: 'subscription',
+        mode: isLifetime ? 'payment' : 'subscription',
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata: {
           guildId: guildId,
+          planType: isLifetime ? 'lifetime' : 'subscription',
         },
-        subscription_data: {
+      };
+
+      // Add subscription_data only for recurring subscriptions
+      if (!isLifetime) {
+        sessionConfig.subscription_data = {
           metadata: {
             guildId: guildId,
           },
-        },
-      });
+        };
+      }
 
-      new Logger().log('Stripe', `Checkout session created: ${session.id}`);
+      const session = await stripe.checkout.sessions.create(sessionConfig);
+
+      new Logger().log('Stripe', `Checkout session created: ${session.id} (${isLifetime ? 'lifetime' : 'subscription'})`);
       return session;
     } catch (error) {
       new Logger().error('Stripe', `Error creating checkout session: ${error.message}`);
