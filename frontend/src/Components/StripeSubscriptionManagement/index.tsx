@@ -149,19 +149,20 @@ const StripeSubscriptionManagement: React.FC<StripeSubscriptionManagementProps> 
           borderWidth={1}
           borderRadius="lg"
           p={6}
-          bg="white"
-          shadow="sm"
+          bg="gray.800"
+          borderColor="gray.700"
+          shadow="lg"
         >
           <VStack spacing={4} align="stretch">
             <HStack justify="space-between" align="start">
               <VStack align="start" spacing={2}>
                 <HStack>
                   <Icon as={FaCrown} color="yellow.500" />
-                  <Text fontSize="lg" fontWeight="bold">
+                  <Text fontSize="lg" fontWeight="bold" color="white">
                     Premium Subscription
                   </Text>
                 </HStack>
-                <Text color="gray.600" fontSize="sm">
+                <Text color="gray.300" fontSize="sm">
                   {getStatusText()}
                 </Text>
               </VStack>
@@ -172,12 +173,12 @@ const StripeSubscriptionManagement: React.FC<StripeSubscriptionManagementProps> 
 
             <VStack spacing={3} align="stretch">
               <HStack justify="space-between">
-                <Text fontSize="sm" color="gray.600">
+                <Text fontSize="sm" color="gray.300">
                   Status
                 </Text>
                 <HStack>
                   {getStatusIcon()}
-                  <Text fontSize="sm" fontWeight="medium">
+                  <Text fontSize="sm" fontWeight="medium" color="white">
                     {subscription.isPremium ? 'Premium' : 'Free'}
                   </Text>
                 </HStack>
@@ -185,10 +186,10 @@ const StripeSubscriptionManagement: React.FC<StripeSubscriptionManagementProps> 
 
               {subscription.isPremium && subscription.expiresAt && (
                 <HStack justify="space-between">
-                  <Text fontSize="sm" color="gray.600">
+                  <Text fontSize="sm" color="gray.300">
                     {subscription.planType === 'lifetime' ? 'Type' : 'Expires'}
                   </Text>
-                  <Text fontSize="sm" fontWeight="medium">
+                  <Text fontSize="sm" fontWeight="medium" color="white">
                     {subscription.planType === 'lifetime' 
                       ? 'Lifetime' 
                       : formatDate(subscription.expiresAt)
@@ -198,10 +199,10 @@ const StripeSubscriptionManagement: React.FC<StripeSubscriptionManagementProps> 
               )}
 
               <HStack justify="space-between">
-                <Text fontSize="sm" color="gray.600">
+                <Text fontSize="sm" color="gray.300">
                   Plan Type
                 </Text>
-                <Text fontSize="sm" fontWeight="medium">
+                <Text fontSize="sm" fontWeight="medium" color="white">
                   {subscription.planType.charAt(0).toUpperCase() + subscription.planType.slice(1)}
                 </Text>
               </HStack>
@@ -219,7 +220,7 @@ const StripeSubscriptionManagement: React.FC<StripeSubscriptionManagementProps> 
                   Upgrade to Premium
                 </Button>
               ) : subscription.planType === 'lifetime' ? (
-                <Text fontSize="sm" color="gray.600" textAlign="center" py={2}>
+                <Text fontSize="sm" color="gray.300" textAlign="center" py={2}>
                   Lifetime Premium - No billing management needed
                 </Text>
               ) : (
@@ -259,10 +260,10 @@ const StripeSubscriptionManagement: React.FC<StripeSubscriptionManagementProps> 
         )}
       </VStack>
 
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+      <Modal isOpen={isOpen} onClose={onClose} size="6xl">
         <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Upgrade to Premium</ModalHeader>
+        <ModalContent bg="gray.800" borderColor="gray.700">
+          <ModalHeader color="white">Upgrade to Premium</ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={6}>
             <StripeCheckout

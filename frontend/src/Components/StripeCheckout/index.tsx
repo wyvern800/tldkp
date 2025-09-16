@@ -185,15 +185,20 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
   return (
     <VStack spacing={6} align="stretch">
       <Box textAlign="center">
-        <Text fontSize="2xl" fontWeight="bold" mb={2}>
+        <Text fontSize="2xl" fontWeight="bold" mb={2} color="white">
           Upgrade to Premium
         </Text>
-        <Text color="gray.600">
+        <Text color="gray.300">
           Unlock advanced features for your Discord server
         </Text>
       </Box>
 
-      <VStack spacing={4}>
+      <Box
+        display="grid"
+        gridTemplateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
+        gap={4}
+        w="full"
+      >
         {products.map((product) => (
           <Box
             key={product.id}
@@ -201,10 +206,10 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
             borderRadius="lg"
             p={6}
             w="full"
-            maxW="md"
-            bg="white"
-            shadow="md"
-            _hover={{ shadow: 'lg' }}
+            bg="gray.800"
+            borderColor="gray.700"
+            shadow="lg"
+            _hover={{ shadow: 'xl', borderColor: 'teal.500' }}
             transition="all 0.2s"
           >
             <VStack spacing={4} align="stretch">
@@ -212,11 +217,11 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
                 <VStack align="start" spacing={1}>
                   <HStack>
                     <Icon as={FaCrown} color="yellow.500" />
-                    <Text fontSize="xl" fontWeight="bold">
+                    <Text fontSize="xl" fontWeight="bold" color="white">
                       {product.name}
                     </Text>
                   </HStack>
-                  <Text color="gray.600" fontSize="sm">
+                  <Text color="gray.300" fontSize="sm">
                     {product.description}
                   </Text>
                 </VStack>
@@ -235,7 +240,7 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
                       product.default_price.currency
                     ) : 'Price not available'}
                   </Text>
-                  <Text color="gray.500">
+                  <Text color="gray.400">
                     {product.default_price?.recurring ? 
                       `/ ${formatInterval(
                         product.default_price.recurring.interval,
@@ -249,19 +254,19 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
                 <VStack spacing={2} align="start" fontSize="sm">
                   <HStack>
                     <Icon as={FaCheck} color="green.500" />
-                    <Text>Advanced auction features</Text>
+                    <Text color="gray.300">Advanced auction features</Text>
                   </HStack>
                   <HStack>
                     <Icon as={FaCheck} color="green.500" />
-                    <Text>Priority support</Text>
+                    <Text color="gray.300">Priority support</Text>
                   </HStack>
                   <HStack>
                     <Icon as={FaCheck} color="green.500" />
-                    <Text>Custom bot settings</Text>
+                    <Text color="gray.300">Custom bot settings</Text>
                   </HStack>
                   <HStack>
                     <Icon as={FaCheck} color="green.500" />
-                    <Text>Analytics dashboard</Text>
+                    <Text color="gray.300">Analytics dashboard</Text>
                   </HStack>
                 </VStack>
               </VStack>
@@ -281,9 +286,9 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
             </VStack>
           </Box>
         ))}
-      </VStack>
+      </Box>
 
-      <Box textAlign="center" fontSize="sm" color="gray.500">
+      <Box textAlign="center" fontSize="sm" color="gray.400">
         <Text>
           Secure payment processing by Stripe. Cancel anytime.
         </Text>

@@ -21,9 +21,9 @@ const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const subscription = searchParams.get('subscription');
   
-  const bg = useColorModeValue("gray.50", "gray.900");
-  const cardBg = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const bg = useColorModeValue("gray.50", "gray.900");// Dark background as per guidelines
+  const cardBg = "#1F2937"; // Slightly lighter dark for cards
+  const borderColor = "#374151"; // Subtle border color
 
   const isSubscriptionSuccess = subscription === 'success';
 
@@ -46,14 +46,14 @@ const SuccessPage: React.FC = () => {
               <Icon
                 as={isSubscriptionSuccess ? FaCrown : FaCheckCircle}
                 boxSize={20}
-                color={isSubscriptionSuccess ? "yellow.500" : "green.500"}
+                color={isSubscriptionSuccess ? "#F59E0B" : "#0F766E"}
               />
               
               <VStack spacing={2}>
-                <Heading size="lg" color={isSubscriptionSuccess ? "yellow.600" : "green.600"}>
+                <Heading size="lg" color={isSubscriptionSuccess ? "#F59E0B" : "#0F766E"}>
                   {isSubscriptionSuccess ? 'Subscription Successful!' : 'Success!'}
                 </Heading>
-                <Text color="gray.600" fontSize="lg">
+                <Text color="#D1D5DB" fontSize="lg">
                   {isSubscriptionSuccess 
                     ? 'Your premium subscription has been activated successfully!' 
                     : 'Your request has been processed successfully.'
@@ -76,7 +76,9 @@ const SuccessPage: React.FC = () => {
 
               <VStack spacing={4} w="full">
                 <Button
-                  colorScheme={isSubscriptionSuccess ? "yellow" : "green"}
+                  bg={isSubscriptionSuccess ? "#F59E0B" : "#0F766E"}
+                  color="white"
+                  _hover={{ bg: isSubscriptionSuccess ? "#D97706" : "#0D6B5F" }}
                   size="lg"
                   w="full"
                   onClick={() => navigate('/dashboard')}
@@ -86,6 +88,9 @@ const SuccessPage: React.FC = () => {
                 
                 <Button
                   variant="outline"
+                  borderColor="#6B7280"
+                  color="#D1D5DB"
+                  _hover={{ bg: "#374151", borderColor: "#9CA3AF" }}
                   size="md"
                   w="full"
                   onClick={() => navigate('/')}
@@ -107,10 +112,10 @@ const SuccessPage: React.FC = () => {
               w="full"
             >
               <VStack spacing={4} align="start">
-                <Heading size="md" color="gray.700">
+                <Heading size="md" color="#F59E0B">
                   What's Next?
                 </Heading>
-                <VStack spacing={2} align="start" fontSize="sm" color="gray.600">
+                <VStack spacing={2} align="start" fontSize="sm" color="#D1D5DB">
                   <Text>• Your Discord server now has premium access</Text>
                   <Text>• Advanced auction features are now available</Text>
                   <Text>• You can manage your subscription anytime</Text>

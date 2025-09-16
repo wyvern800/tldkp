@@ -16,6 +16,7 @@ import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
+  Container,
 } from '@chakra-ui/react';
 import { IoChevronForward } from 'react-icons/io5';
 import { useAuth } from '@clerk/clerk-react';
@@ -149,7 +150,7 @@ export default function GuildImportPage() {
   }
 
   return (
-    <Box p={6}>
+    <Container maxW="container.xl" py={8}>
       <VStack spacing={6} align="stretch">
         {/* Breadcrumb */}
         <Breadcrumb separator={<IoChevronForward color="gray.500" />}>
@@ -243,6 +244,6 @@ export default function GuildImportPage() {
           </Button>
         </HStack>
       </VStack>
-    </Box>
+    </Container>
   );
 }
