@@ -355,15 +355,7 @@ export const createServer = (client) => {
 
   // Serve static files from the React app build
   const __dirname = path.resolve();
-  app.use(express.static(path.join(__dirname, 'frontend", "build'), {
-    setHeaders: (res, path) => {
-      if (path.endsWith('.js')) {
-        res.set('Content-Type', 'application/javascript');
-      } else if (path.endsWith('.css')) {
-        res.set('Content-Type', 'text/css');
-      }
-    }
-  }));
+  app.use(express.static(path.join(__dirname, "frontend", "build")));
 
   // Create a router for your /api routes
   const apiRouter = express.Router();
