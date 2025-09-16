@@ -28,6 +28,7 @@ import { getPermissionVerbose } from "../../utils/commands.js";
 import { Logger } from "../../utils/logger.js";
 import { db, admin } from "../../database/firebase.js";
 import { trackPremiumEvent } from "../../utils/analytics.js";
+import StripeService from "../../utils/stripe.js";
 
 export const createServer = (client) => {
   const app = express();
@@ -49,6 +50,23 @@ export const createServer = (client) => {
 
   // test
   app.set("trust proxy", parseInt(process.env.TRUST_PROXY, 10));
+
+  // Mount webhook routes BEFORE any JSON parsing middleware
+  // This ensures raw body is available for signature verification
+  app.use("/api/stripe/webhook", (req, res, next) => {
+    let rawBody = '';
+    
+    req.on('data', (chunk) => {
+      rawBody += chunk.toString();
+    });
+    
+    req.on('end', () => {
+      // Store the raw body as a Buffer for signature verification
+      req.rawBody = Buffer.from(rawBody, 'utf8');
+      webhookRouter(req, res, next);
+    });
+  });
+
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
@@ -78,9 +96,274 @@ export const createServer = (client) => {
     })
   );
 
+  // Create webhook router and define routes BEFORE mounting
+  const webhookRouter = express.Router();
+
+  // Webhook handler functions
+  async function handleCheckoutCompleted(session) {
+    const guildId = session.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      const subscription = await StripeService.getSubscription(session.subscription);
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+
+      // Track analytics
+      await trackPremiumEvent({
+        event: 'subscription_created',
+        guildId: guildId,
+        subscriptionId: subscription.id
+      });
+
+      new Logger().log('Stripe', `Checkout completed for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling checkout completion: ${error.message}`);
+    }
+  }
+
+  async function handleSubscriptionCreated(subscription) {
+    const guildId = subscription.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+
+      new Logger().log('Stripe', `Subscription created for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling subscription creation: ${error.message}`);
+    }
+  }
+
+  async function handleSubscriptionUpdated(subscription) {
+    const guildId = subscription.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      const isActive = subscription.status === 'active';
+      const isCanceled = subscription.status === 'canceled' || subscription.status === 'cancelled';
+      
+      if (isCanceled) {
+        // Handle subscription cancellation
+        await updateGuildSubscription(guildId, false, null, 'free');
+        
+        // Track analytics
+        await trackPremiumEvent({
+          event: 'subscription_cancelled',
+          guildId: guildId,
+          subscriptionId: subscription.id
+        });
+        
+        new Logger().log('Stripe', `Subscription cancelled for guild ${guildId}`);
+      } else {
+        // Handle active subscription
+        const expiresAt = isActive ? new Date(subscription.current_period_end * 1000) : null;
+        await updateGuildSubscription(guildId, isActive, expiresAt, 'premium');
+        
+        new Logger().log('Stripe', `Subscription updated for guild ${guildId}: ${subscription.status}`);
+      }
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling subscription update: ${error.message}`);
+    }
+  }
+
+  async function handleSubscriptionDeleted(subscription) {
+    const guildId = subscription.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      await updateGuildSubscription(guildId, false, null, 'free');
+
+      // Track analytics
+      await trackPremiumEvent({
+        event: 'subscription_cancelled',
+        guildId: guildId,
+        subscriptionId: subscription.id
+      });
+
+      new Logger().log('Stripe', `Subscription cancelled for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling subscription deletion: ${error.message}`);
+    }
+  }
+
+  async function handlePaymentSucceeded(invoice) {
+    const subscription = await StripeService.getSubscription(invoice.subscription);
+    const guildId = subscription.metadata.guildId;
+    
+    if (!guildId) return;
+
+    try {
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+
+      new Logger().log('Stripe', `Payment succeeded for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling payment success: ${error.message}`);
+    }
+  }
+
+  async function handlePaymentFailed(invoice) {
+    const subscription = await StripeService.getSubscription(invoice.subscription);
+    const guildId = subscription.metadata.guildId;
+    
+    if (!guildId) return;
+
+    try {
+      // Track analytics
+      await trackPremiumEvent({
+        event: 'payment_failed',
+        guildId: guildId,
+        subscriptionId: subscription.id
+      });
+
+      new Logger().log('Stripe', `Payment failed for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling payment failure: ${error.message}`);
+    }
+  }
+
+  // Webhook debug endpoint (for testing signature verification)
+  webhookRouter.post("/debug", async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const rawBody = req.rawBody;
+    const rawBodyString = rawBody ? rawBody.toString('utf8') : '';
+
+    return new ResponseBase(res).success({
+      hasSignature: !!sig,
+      hasSecret: !!endpointSecret,
+      bodyType: typeof rawBody,
+      isBuffer: Buffer.isBuffer(rawBody),
+      bodyLength: rawBody ? rawBody.length : 0,
+      bodyStringLength: rawBodyString.length,
+      bodyPreview: rawBodyString.substring(0, 100),
+      signature: sig,
+      headers: req.headers,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Simple test endpoint that returns immediately
+  webhookRouter.post("/test", async (req, res) => {
+    new Logger().log('Stripe', 'Webhook test endpoint called');
+    return res.json({ 
+      message: 'Webhook test endpoint working',
+      timestamp: new Date().toISOString()
+    });
+  });
+  
+  webhookRouter.post("/", async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    new Logger().log('Stripe', `Webhook received: ${req.method} ${req.url}`);
+    new Logger().log('Stripe', `Signature header: ${sig}`);
+    new Logger().log('Stripe', `Content-Type: ${req.headers['content-type']}`);
+
+    if (!endpointSecret) {
+      new Logger().error('Stripe', 'Webhook secret not configured');
+      return res.status(400).send('Webhook secret not configured');
+    }
+
+    if (!sig) {
+      new Logger().error('Stripe', 'No Stripe signature found in headers');
+      return res.status(400).send('No Stripe signature found');
+    }
+
+    // Get raw body for signature verification
+    const rawBody = req.rawBody;
+    new Logger().log('Stripe', `Raw body type: ${typeof rawBody}, isBuffer: ${Buffer.isBuffer(rawBody)}, length: ${rawBody ? rawBody.length : 'undefined'}`);
+    
+    // Convert Buffer to string for Stripe signature verification
+    const rawBodyString = rawBody.toString('utf8');
+    new Logger().log('Stripe', `Raw body string length: ${rawBodyString.length}`);
+
+    let event;
+
+    try {
+      event = StripeService.getInstance().webhooks.constructEvent(rawBodyString, sig, endpointSecret);
+      new Logger().log('Stripe', `Webhook event verified: ${event.type}`);
+    } catch (err) {
+      new Logger().error('Stripe', `Webhook signature verification failed: ${err.message}`);
+      new Logger().error('Stripe', `Signature: ${sig}`);
+      new Logger().error('Stripe', `Body length: ${rawBodyString.length}`);
+      new Logger().error('Stripe', `Body preview: ${rawBodyString.substring(0, 100)}...`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Set a timeout for the webhook processing
+    const timeout = setTimeout(() => {
+      new Logger().error('Stripe', 'Webhook processing timeout');
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Webhook processing timeout' });
+      }
+    }, 10000); // 10 second timeout
+
+    try {
+      // Handle the event
+      new Logger().log('Stripe', `Processing webhook event: ${event.type}`);
+      switch (event.type) {
+        case 'checkout.session.completed':
+          new Logger().log('Stripe', 'Handling checkout.session.completed');
+          await handleCheckoutCompleted(event.data.object);
+          break;
+        case 'customer.subscription.created':
+          new Logger().log('Stripe', 'Handling customer.subscription.created');
+          await handleSubscriptionCreated(event.data.object);
+          break;
+        case 'customer.subscription.updated':
+          new Logger().log('Stripe', 'Handling customer.subscription.updated');
+          await handleSubscriptionUpdated(event.data.object);
+          break;
+        case 'customer.subscription.deleted':
+          new Logger().log('Stripe', 'Handling customer.subscription.deleted');
+          await handleSubscriptionDeleted(event.data.object);
+          break;
+        case 'customer.subscription.cancelled':
+          new Logger().log('Stripe', 'Handling customer.subscription.cancelled');
+          await handleSubscriptionDeleted(event.data.object);
+          break;
+        case 'invoice.payment_succeeded':
+          new Logger().log('Stripe', 'Handling invoice.payment_succeeded');
+          await handlePaymentSucceeded(event.data.object);
+          break;
+        case 'invoice.payment_failed':
+          new Logger().log('Stripe', 'Handling invoice.payment_failed');
+          await handlePaymentFailed(event.data.object);
+          break;
+        default:
+          new Logger().log('Stripe', `Unhandled event type: ${event.type}`);
+          new Logger().log('Stripe', `Event data: ${JSON.stringify(event.data, null, 2)}`);
+      }
+
+      clearTimeout(timeout);
+      new Logger().log('Stripe', `Webhook processed successfully: ${event.type}`);
+      res.json({ received: true });
+    } catch (error) {
+      clearTimeout(timeout);
+      new Logger().error('Stripe', `Webhook handler error: ${error.message}`);
+      new Logger().error('Stripe', `Error stack: ${error.stack}`);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Webhook handler failed' });
+      }
+    }
+  });
+
+  // Webhook middleware is now mounted earlier in the middleware chain
+
   // Serve static files from the React app build
   const __dirname = path.resolve();
-  app.use(express.static(path.join(__dirname, "frontend", "build")));
+  app.use(express.static(path.join(__dirname, 'frontend", "build'), {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.js')) {
+        res.set('Content-Type', 'application/javascript');
+      } else if (path.endsWith('.css')) {
+        res.set('Content-Type', 'text/css');
+      }
+    }
+  }));
 
   // Create a router for your /api routes
   const apiRouter = express.Router();
@@ -160,6 +443,33 @@ export const createServer = (client) => {
     },
     "Endpoint that shows bot status"
   );
+
+  // Public Stripe endpoints (no authentication required)
+  apiRouter.get("/stripe/products", async (req, res) => {
+    try {
+      const products = await StripeService.getProducts();
+      return new ResponseBase(res).success(products);
+    } catch (error) {
+      new Logger().error('Stripe', `Error getting products: ${error.message}`);
+      return new ResponseBase(res).error("Failed to get products");
+    }
+  },
+  "Get available Stripe products and prices"
+  );
+
+  // Test webhook endpoint (no authentication required)
+  apiRouter.get("/stripe/webhook-test", async (req, res) => {
+    new Logger().log('Stripe', 'Webhook test endpoint accessed');
+    return new ResponseBase(res).success({ 
+      message: 'Webhook endpoint is accessible',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  },
+  "Test webhook endpoint accessibility"
+  );
+
+  // Duplicate webhook routes removed - now defined earlier in the middleware chain
 
   apiRouter.use(limiter);
 
@@ -728,6 +1038,297 @@ export const createServer = (client) => {
   },
   "Import member data from CSV file"
   );
+
+  // User subscription endpoint (non-admin)
+  apiRouter.get("/subscription/:guildId", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    try {
+      // Check if user has access to this guild
+      const userGuilds = await getGuildsByOwnerOrUser(userDiscordId);
+      const allUserGuilds = [...userGuilds.ownerGuilds, ...userGuilds.memberGuilds];
+      const hasAccess = allUserGuilds.some(guild => guild.guildData.id === guildId);
+      
+      if (!hasAccess) {
+        return new ResponseBase(res).notAllowed("You don't have access to this guild");
+      }
+
+      const subscription = await getGuildSubscription(guildId);
+      return new ResponseBase(res).success(subscription);
+    } catch (error) {
+      new Logger().error('Subscription', `Error getting subscription: ${error.message}`);
+      return new ResponseBase(res).error("Failed to get subscription info");
+    }
+  },
+  "Get subscription info for a specific guild (user access)"
+  );
+
+  // Stripe Routes (protected)
+
+  apiRouter.post("/stripe/create-checkout-session", async (req, res) => {
+    const { userDiscordId } = req;
+    const { priceId, guildId, successUrl, cancelUrl } = req.body;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    if (!priceId || !guildId || !successUrl || !cancelUrl) {
+      return new ResponseBase(res).badRequest("Missing required fields");
+    }
+
+    try {
+      // Get user info from Clerk
+      const clerk = Clerk.getInstance();
+      const { users } = clerk;
+      const user = await users.getUser(req.auth.userId);
+      const email = user.emailAddresses[0]?.emailAddress;
+
+      if (!email) {
+        return new ResponseBase(res).badRequest("User email not found");
+      }
+
+      // Get or create customer
+      let customer = await StripeService.getCustomerByEmail(email);
+      if (!customer) {
+        customer = await StripeService.createCustomer(email, userDiscordId, guildId);
+      }
+
+      // Create checkout session
+      const session = await StripeService.createCheckoutSession(
+        priceId,
+        customer.id,
+        guildId,
+        successUrl,
+        cancelUrl
+      );
+
+      return new ResponseBase(res).success({
+        sessionId: session.id,
+        url: session.url
+      });
+    } catch (error) {
+      new Logger().error('Stripe', `Error creating checkout session: ${error.message}`);
+      return new ResponseBase(res).error("Failed to create checkout session");
+    }
+  },
+  "Create Stripe checkout session for subscription"
+  );
+
+  apiRouter.post("/stripe/create-billing-portal-session", async (req, res) => {
+    const { userDiscordId } = req;
+    const { returnUrl } = req.body;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    if (!returnUrl) {
+      return new ResponseBase(res).badRequest("Missing return URL");
+    }
+
+    try {
+      // Get user info from Clerk
+      const clerk = Clerk.getInstance();
+      const { users } = clerk;
+      const user = await users.getUser(req.auth.userId);
+      const email = user.emailAddresses[0]?.emailAddress;
+
+      if (!email) {
+        return new ResponseBase(res).badRequest("User email not found");
+      }
+
+      // Get customer
+      const customer = await StripeService.getCustomerByEmail(email);
+      if (!customer) {
+        return new ResponseBase(res).notFound("No subscription found");
+      }
+
+      // Create billing portal session
+      const session = await StripeService.createBillingPortalSession(customer.id, returnUrl);
+
+      return new ResponseBase(res).success({
+        url: session.url
+      });
+    } catch (error) {
+      new Logger().error('Stripe', `Error creating billing portal session: ${error.message}`);
+      return new ResponseBase(res).error("Failed to create billing portal session");
+    }
+  },
+  "Create Stripe billing portal session"
+  );
+
+  // Test endpoint to manually update subscription (for debugging)
+  apiRouter.post("/stripe/test-update-subscription", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId, isPremium = true, planType = 'premium' } = req.body;
+
+    if (!userDiscordId) {
+      return new ResponseBase(res).notAllowed("User is not authenticated");
+    }
+
+    if (!guildId) {
+      return new ResponseBase(res).badRequest("Guild ID is required");
+    }
+
+    try {
+      // Check if user has access to this guild
+      const userGuilds = await getGuildsByOwnerOrUser(userDiscordId);
+      const allUserGuilds = [...userGuilds.ownerGuilds, ...userGuilds.memberGuilds];
+      const hasAccess = allUserGuilds.some(guild => guild.guildData.id === guildId);
+      
+      if (!hasAccess) {
+        return new ResponseBase(res).notAllowed("You don't have access to this guild");
+      }
+
+      // Update subscription
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+      await updateGuildSubscription(guildId, isPremium, expiresAt, planType);
+
+      // Get updated subscription
+      const subscription = await getGuildSubscription(guildId);
+
+      return new ResponseBase(res).success({
+        message: "Subscription updated successfully",
+        subscription
+      });
+    } catch (error) {
+      new Logger().error('Stripe', `Error updating subscription: ${error.message}`);
+      return new ResponseBase(res).error("Failed to update subscription");
+    }
+  },
+  "Test endpoint to manually update subscription"
+  );
+
+  // Webhook handlers
+  async function handleCheckoutSessionCompleted(session) {
+    new Logger().log('Stripe', `handleCheckoutSessionCompleted called with session: ${JSON.stringify(session)}`);
+    
+    const guildId = session.metadata?.guildId;
+    if (!guildId) {
+      new Logger().error('Stripe', 'No guildId found in session metadata');
+      return;
+    }
+
+    new Logger().log('Stripe', `Processing checkout completion for guild: ${guildId}`);
+
+    try {
+      // Get subscription details
+      const subscription = await StripeService.getSubscription(session.subscription);
+      new Logger().log('Stripe', `Retrieved subscription: ${JSON.stringify(subscription)}`);
+      
+      // Update guild subscription in Firebase
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      new Logger().log('Stripe', `Updating guild subscription: guildId=${guildId}, isPremium=true, expiresAt=${expiresAt}, planType=premium`);
+      
+      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+      new Logger().log('Stripe', `Successfully updated guild subscription in Firebase`);
+
+      // Track analytics
+      await trackPremiumEvent({
+        event: 'subscription_created',
+        guildId: guildId,
+        subscriptionId: subscription.id,
+        planType: 'premium'
+      });
+
+      new Logger().log('Stripe', `Checkout completed successfully for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling checkout completion: ${error.message}`);
+      new Logger().error('Stripe', `Error stack: ${error.stack}`);
+    }
+  }
+
+  async function handleSubscriptionCreated(subscription) {
+    const guildId = subscription.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+
+      new Logger().log('Stripe', `Subscription created for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling subscription creation: ${error.message}`);
+    }
+  }
+
+  async function handleSubscriptionUpdated(subscription) {
+    const guildId = subscription.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      const isActive = subscription.status === 'active';
+      const expiresAt = isActive ? new Date(subscription.current_period_end * 1000) : null;
+      
+      await updateGuildSubscription(guildId, isActive, expiresAt, 'premium');
+
+      new Logger().log('Stripe', `Subscription updated for guild ${guildId}: ${subscription.status}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling subscription update: ${error.message}`);
+    }
+  }
+
+  async function handleSubscriptionDeleted(subscription) {
+    const guildId = subscription.metadata.guildId;
+    if (!guildId) return;
+
+    try {
+      await updateGuildSubscription(guildId, false, null, 'free');
+
+      // Track analytics
+      await trackPremiumEvent({
+        event: 'subscription_cancelled',
+        guildId: guildId,
+        subscriptionId: subscription.id
+      });
+
+      new Logger().log('Stripe', `Subscription cancelled for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling subscription deletion: ${error.message}`);
+    }
+  }
+
+  async function handlePaymentSucceeded(invoice) {
+    const subscription = await StripeService.getSubscription(invoice.subscription);
+    const guildId = subscription.metadata.guildId;
+    
+    if (!guildId) return;
+
+    try {
+      const expiresAt = new Date(subscription.current_period_end * 1000);
+      await updateGuildSubscription(guildId, true, expiresAt, 'premium');
+
+      new Logger().log('Stripe', `Payment succeeded for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling payment success: ${error.message}`);
+    }
+  }
+
+  async function handlePaymentFailed(invoice) {
+    const subscription = await StripeService.getSubscription(invoice.subscription);
+    const guildId = subscription.metadata.guildId;
+    
+    if (!guildId) return;
+
+    try {
+      // Track analytics
+      await trackPremiumEvent({
+        event: 'payment_failed',
+        guildId: guildId,
+        subscriptionId: subscription.id
+      });
+
+      new Logger().log('Stripe', `Payment failed for guild ${guildId}`);
+    } catch (error) {
+      new Logger().error('Stripe', `Error handling payment failure: ${error.message}`);
+    }
+  }
 
   apiRouter.use((err, req, res, next) => {
     return new ResponseBase(res).notAllowed("Unauthenticated!");

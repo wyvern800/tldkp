@@ -11,7 +11,8 @@
     "dev:client": "npm --prefix frontend run dev",
     "dev:api": "nodemon src/startExpress.js",
     "dev:site": "concurrently \"npm run dev:client\" \"npm run dev:api\"",
-    "build": "npm --prefix frontend install && npm --prefix frontend run build && npm install"
+    "build": "npm --prefix frontend install && npm --prefix frontend run build && npm install",
+    "stripe:webhook": "stripe listen --forward-to localhost:3000/api/stripe/webhook"
   },
   "dependencies": {
     "@clerk/backend": "1.16.1",
@@ -19,6 +20,8 @@
     "@clerk/shared": "2.12.1",
     "@google-analytics/data": "^5.2.0",
     "@google-cloud/storage": "^7.14.0",
+    "@rollup/rollup-linux-x64-gnu": "^4.50.2",
+    "@types/react-slick": "^0.23.13",
     "ajv": "^8.17.1",
     "axios": "1.7.7",
     "cors": "2.8.5",
@@ -34,7 +37,10 @@
     "node-cache": "5.1.2",
     "node-cron": "3.0.3",
     "react-icons": "^5.3.0",
+    "react-slick": "^0.31.0",
     "rollbar": "^2.26.4",
+    "slick-carousel": "^1.8.1",
+    "stripe": "^18.5.0",
     "uuid": "^11.0.3",
     "winston": "^3.17.0"
   },

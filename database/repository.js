@@ -2075,6 +2075,8 @@ export async function searchGuildsByName(searchTerm, limit = 10) {
 export async function updateGuildSubscription(guildId, isPremium, expiresAt = null, planType = 'free') {
   trackFunctionExecution('updateGuildSubscription');
   
+  new Logger().log(PREFIX, `updateGuildSubscription called: guildId=${guildId}, isPremium=${isPremium}, expiresAt=${expiresAt}, planType=${planType}`);
+  
   const subscriptionData = {
     subscription: {
       isPremium,
@@ -2085,13 +2087,20 @@ export async function updateGuildSubscription(guildId, isPremium, expiresAt = nu
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  const response = await db
-    .collection("guilds")
-    .doc(guildId)
-    .update(subscriptionData);
+  new Logger().log(PREFIX, `Updating Firebase with data: ${JSON.stringify(subscriptionData)}`);
 
-  new Logger().log(PREFIX, `Updated subscription for guild ${guildId}: Premium=${isPremium}, Expires=${expiresAt}, Plan=${planType}`);
-  return response;
+  try {
+    const response = await db
+      .collection("guilds")
+      .doc(guildId)
+      .update(subscriptionData);
+
+    new Logger().log(PREFIX, `Successfully updated subscription for guild ${guildId}: Premium=${isPremium}, Expires=${expiresAt}, Plan=${planType}`);
+    return response;
+  } catch (error) {
+    new Logger().error(PREFIX, `Failed to update subscription for guild ${guildId}: ${error.message}`);
+    throw error;
+  }
 }
 
 /**

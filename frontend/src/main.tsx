@@ -20,6 +20,8 @@ import AdminPage from "./routes/admin";
 import GuildImportPage from "./routes/guild-import";
 import NotFoundPage from "./routes/not-found";
 import KnowledgeBasePage from "./routes/knowledgebase";
+import SubscriptionPage from "./routes/subscription";
+import SuccessPage from "./routes/success";
 
 const config = {
   initialColorMode: "dark",
@@ -33,7 +35,7 @@ const router = createBrowserRouter([
       { path: "/sign-in", element: <SignInPage /> },
       { path: "/sign-up", element: <SignUpPage /> },
       { path: "/thanks", element: <div>Thanks page</div> },
-      { path: "/success", element: <div>Success page</div> },
+      { path: "/success", element: <SuccessPage /> },
       { path: "/cancel", element: <div>Cancel page</div> },
       /*{
         element: <HudsPage />,
@@ -64,6 +66,10 @@ const router = createBrowserRouter([
       {
         element: <GuildImportPage />,
         path: "/guild/:guildId/import"
+      },
+      {
+        element: <SubscriptionPage />,
+        path: "/guild/:guildId/subscription"
       },
     ],
     errorElement: <NotFoundPage />

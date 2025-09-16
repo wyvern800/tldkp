@@ -28,7 +28,7 @@ import {
 } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
 import { DeleteIcon } from "@chakra-ui/icons";
-import { FaUpload } from "react-icons/fa";
+import { FaUpload, FaCrown } from "react-icons/fa";
 import styled from "styled-components";
 import unknown from "../../assets/unknown.png";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -117,7 +117,9 @@ const navigate = useNavigate();
           <Accordion allowToggle w="full">
             {data?.map((guild: any, index: number) => {
               const { icon, name, alias } = guild?.guildData ?? {};
-              const { memberDkps } = guild ?? [];
+              const { memberDkps, subscription } = guild ?? {};
+              const isGuildOwner = guild?.guildData?.ownerId === myDiscordId;
+              const isGuildPremium = subscription?.isPremium || false;
 
               return (
                 <AccordionItem
@@ -145,9 +147,28 @@ const navigate = useNavigate();
                               ) : (
                                 <>{name}</>
                               )}
+                              {isGuildOwner && !isGuildPremium && (
+                                <Tag size="sm" colorScheme="gray" variant="outline">
+                                  Free
+                                </Tag>
+                              )}
                             </HStack>
                           </HStack>
                           <HStack spacing={2}>
+                            {isGuildOwner && !isBackoffice && (
+                              <IconButton
+                                aria-label={isGuildPremium ? "Manage Subscription" : "Upgrade to Premium"}
+                                icon={<FaCrown />}
+                                size="sm"
+                                colorScheme={isGuildPremium ? "green" : "yellow"}
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/guild/${guild.guildData.id}/subscription`);
+                                }}
+                                title={isGuildPremium ? "Manage Subscription" : "Upgrade to Premium"}
+                              />
+                            )}
                             {guild?.guildData?.ownerId === myDiscordId && !isBackoffice && (
                               <IconButton
                                 aria-label="Import data"

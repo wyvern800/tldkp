@@ -1,5 +1,5 @@
 # Use the official Node.js image.
-FROM node:18
+FROM node:20-bullseye
 
 # Create and change to the app directory.
 WORKDIR /usr/src/app
@@ -23,4 +23,4 @@ USER root
 EXPOSE 3000
 
 # Run the web service on container startup.
-CMD [ "npm", "run", "dev:bot" ]
+CMD [ "npm", "run", "dev" ]
