@@ -15,8 +15,8 @@ Add the following environment variables to your `.env` file:
 
 ```bash
 # Stripe Configuration
-STRIPE_SECRET_KEY=sk_test_51R8g7N2Y1z6m8xzYOMqI3iPJkYTlUAzrKShBUrK53eHoNSDOcgSmta76lmJBMDqEnIE1mDFrocaRKDn81eQdX7Q800cfeatE2D
-STRIPE_PUBLISHABLE_KEY=pk_test_51R8g7N2Y1z6m8xzYJj6DaGuVmxRSE0d3gpG3109yaL82FP8RSxcvB9ztgsIDKRp1fYZ4t8kFlp9ve87xODOMQnLF0swJKEQVN
+STRIPE_SECRET_KEY=
+STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 ```
 
