@@ -176,7 +176,7 @@ export default function GuildImportPage() {
           <Text fontSize="2xl" fontWeight="bold">
             📥 Import Member Data
           </Text>
-          <Text color="gray.600" mt={2}>
+          <Text color="gray.400" mt={2}>
             Import your existing member DKP and IGN data from a CSV file to quickly set up your guild.
           </Text>
         </Box>
@@ -211,21 +211,21 @@ export default function GuildImportPage() {
               <strong>Guild Name:</strong> {guildData.guildData?.name || 'Unknown'}
             </Text>
             <Text fontSize="sm" color="gray.300">
-              <strong>Guild ID:</strong> {guildId}
+              <strong>Guild ID (Discord):</strong> {guildId}
             </Text>
             <Text fontSize="sm" color="gray.300">
-              <strong>Current Members:</strong> {guildData.memberDkps?.length || 0}
+              <strong>Members:</strong> {guildData.memberDkps?.length || 0}
             </Text>
             <Text fontSize="sm" color="gray.300">
               <strong>Premium Status:</strong> {isGuildPremium() ? (
-                <Text as="span" color="green.300">⭐ Premium Active</Text>
+                <Text as="span" color="green.300">Active</Text>
               ) : (
-                <Text as="span" color="red.300">❌ Not Premium</Text>
+                <Text as="span" color="red.300">Not Premium</Text>
               )}
             </Text>
             <Text fontSize="sm" color="gray.300">
               <strong>Your Role:</strong> {isGuildOwner() ? (
-                <Text as="span" color="blue.300">👑 Guild Owner</Text>
+                <Text as="span" color="blue.300">👑 Owner</Text>
               ) : (
                 <Text as="span" color="gray.400">👤 Member</Text>
               )}
@@ -236,7 +236,7 @@ export default function GuildImportPage() {
         {/* Back Button */}
         <HStack justify="center">
           <Button
-            onClick={() => navigate('/guilds')}
+            onClick={() => navigate('/dashboard')}
             variant="outline"
             colorScheme="gray"
           >

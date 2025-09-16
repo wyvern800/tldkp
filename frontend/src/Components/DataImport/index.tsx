@@ -331,15 +331,6 @@ export default function DataImport({ guildId, onImportComplete }: DataImportProp
   return (
     <Box>
       <VStack spacing={6} align="stretch">
-        <Box>
-          <Text fontSize="xl" fontWeight="bold" mb={4}>
-            📥 Import Member Data
-          </Text>
-          <Text color="gray.600" mb={4}>
-            Import member DKP and IGN data from a CSV file to quickly set up your guild.
-          </Text>
-        </Box>
-
         {/* Template Download */}
         <Box p={4} border="1px" borderColor="gray.600" borderRadius="md" bg="gray.800">
           <HStack justify="space-between">
