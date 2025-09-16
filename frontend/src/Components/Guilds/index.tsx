@@ -29,7 +29,7 @@ import {
 } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
 import { DeleteIcon } from "@chakra-ui/icons";
-import { FaUpload, FaCrown } from "react-icons/fa";
+import { FaUpload, FaCrown, FaStar } from "react-icons/fa";
 import styled from "styled-components";
 import unknown from "../../assets/unknown.png";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -149,7 +149,7 @@ const navigate = useNavigate();
                                 <>{name}</>
                               )}
                               {isGuildPremium && (
-                                <FaCrown color="#10B981" size={16} />
+                                <FaStar color="#10B981" size={16} />
                               )}
                               {isGuildOwner && !isGuildPremium && (
                                 <Tag size="sm" colorScheme="gray" variant="outline">
@@ -240,9 +240,16 @@ const navigate = useNavigate();
                                 const { displayName } =
                                   player?.discordData ?? {};
                                 const { userId, dkp, ign } = player;
+                                const isPlayerOwner = guild?.guildData?.ownerId === userId;
                                 return (
                                   <Tr key={`${userId}${index}`} color="#81E6D9" bgColor={"#26c0ab24"}>                                   
-                                    <Td><HStack display="flex" alignItems={"center"}><Logo style={{ width: "25px", borderRadius: "50px" }} src={player?.discordData?.avatarURL ?? ""} /> <strong>{displayName}</strong></HStack></Td>
+                                    <Td>
+                                      <HStack display="flex" alignItems={"center"}>
+                                        <Logo style={{ width: "25px", borderRadius: "50px" }} src={player?.discordData?.avatarURL ?? ""} /> 
+                                        <strong>{displayName}</strong>
+                                        {isPlayerOwner && <FaCrown color="#FFD700" size={12} />}
+                                      </HStack>
+                                    </Td>
                                     <Td><strong>{ign ?? ""}</strong></Td>
                                     <Td isNumeric><strong>{dkp}</strong></Td>
                                   </Tr>
@@ -255,9 +262,16 @@ const navigate = useNavigate();
                                 const { displayName } =
                                   player?.discordData ?? {};
                                 const { userId, dkp, ign } = player;
+                                const isPlayerOwner = guild?.guildData?.ownerId === userId;
                                 return (
                                   <Tr key={`${userId}${index}`}>
-                                    <Td><HStack display="flex" alignItems={"center"}><Logo style={{ width: "25px", borderRadius: "50px" }} src={player?.discordData?.avatarURL ?? ""} /> <span>{displayName}</span></HStack></Td>
+                                    <Td>
+                                      <HStack display="flex" alignItems={"center"}>
+                                        <Logo style={{ width: "25px", borderRadius: "50px" }} src={player?.discordData?.avatarURL ?? ""} /> 
+                                        <span>{displayName}</span>
+                                        {isPlayerOwner && <FaCrown color="#FFD700" size={12} />}
+                                      </HStack>
+                                    </Td>
                                     <Td>{ign ?? ""}</Td>
                                     <Td isNumeric>{dkp}</Td>
                                   </Tr>
