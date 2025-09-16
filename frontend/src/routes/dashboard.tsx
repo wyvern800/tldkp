@@ -224,7 +224,7 @@ export default function DashboardPage() {
                       you have access to administrative controls and settings that regular members don't have.
                     </Text>
                     <Divider />
-                    <Guilds data={data?.ownerGuilds} loaded={loaded} />
+                    <Guilds data={data?.ownerGuilds} loaded={loaded} isOwnedGuilds={true} />
                   </VStack>
                 </TabPanel>
                 <TabPanel p={6}>
@@ -234,7 +234,7 @@ export default function DashboardPage() {
                       and participate in the DKP system, but don't have administrative privileges.
                     </Text>
                     <Divider />
-                    <Guilds data={data?.memberGuilds} loaded={loaded} />
+                    <Guilds data={data?.memberGuilds} loaded={loaded} isOwnedGuilds={false} />
                   </VStack>
                 </TabPanel>
               </TabPanels>

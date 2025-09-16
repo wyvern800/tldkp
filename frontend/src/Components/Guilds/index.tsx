@@ -17,6 +17,7 @@ import {
   HStack,
   Text,
   IconButton,
+  Badge,
   useToast,
   AlertDialog,
   AlertDialogBody,
@@ -40,7 +41,7 @@ const Logo = styled.img`
   width: 20%;
 `;
 
-const Guilds = ({ data: initialData, loaded, isBackoffice = false }: any): React.ReactNode => {
+const Guilds = ({ data: initialData, loaded, isBackoffice = false, isOwnedGuilds = true }: any): React.ReactNode => {
 const { isLoaded, user } = useUser();
 const { getToken } = useAuth();
 const navigate = useNavigate();
@@ -147,6 +148,9 @@ const navigate = useNavigate();
                               ) : (
                                 <>{name}</>
                               )}
+                              {isGuildPremium && (
+                                <FaCrown color="#10B981" size={16} />
+                              )}
                               {isGuildOwner && !isGuildPremium && (
                                 <Tag size="sm" colorScheme="gray" variant="outline">
                                   Free
@@ -155,21 +159,29 @@ const navigate = useNavigate();
                             </HStack>
                           </HStack>
                           <HStack spacing={2}>
-                            {isGuildOwner && !isBackoffice && (
-                              <IconButton
-                                aria-label={isGuildPremium ? "Manage Subscription" : "Upgrade to Premium"}
-                                icon={<FaCrown />}
-                                size="sm"
+                            {isGuildOwner && !isBackoffice && isOwnedGuilds && (
+                              <Badge
+                                as="button"
                                 colorScheme={isGuildPremium ? "green" : "yellow"}
-                                variant="ghost"
+                                variant="outline"
+                                cursor="pointer"
+                                _hover={{ opacity: 0.8 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate(`/guild/${guild.guildData.id}/subscription`);
                                 }}
                                 title={isGuildPremium ? "Manage Subscription" : "Upgrade to Premium"}
-                              />
+                                px={3}
+                                py={1}
+                                borderRadius="md"
+                                fontSize="sm"
+                                fontWeight="medium"
+                                bg="transparent"
+                              >
+                                {isGuildPremium ? "Manage Subscription" : "Upgrade to Premium"}
+                              </Badge>
                             )}
-                            {guild?.guildData?.ownerId === myDiscordId && !isBackoffice && (
+                            {guild?.guildData?.ownerId === myDiscordId && !isBackoffice && isOwnedGuilds && (
                               <IconButton
                                 aria-label="Import data"
                                 icon={<FaUpload />}
@@ -183,7 +195,7 @@ const navigate = useNavigate();
                                 title="Import member data from CSV"
                               />
                             )}
-                            {guild?.guildData?.ownerId === myDiscordId && (
+                            {guild?.guildData?.ownerId === myDiscordId && isOwnedGuilds && (
                               <IconButton
                                 aria-label="Delete guild"
                                 icon={<DeleteIcon />}
