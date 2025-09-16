@@ -24,6 +24,18 @@ export function parseRoutes(apiRouter) {
     captureRoute("POST", path, description || "No description provided");
     return originalRouterPost(path, handler);
   };
+
+  const originalRouterPut = apiRouter.put.bind(apiRouter);
+  apiRouter.put = (path, handler, description) => {
+    captureRoute("PUT", path, description || "No description provided");
+    return originalRouterPut(path, handler);
+  };
+
+  const originalRouterDelete = apiRouter.delete.bind(apiRouter);
+  apiRouter.delete = (path, handler, description) => {
+    captureRoute("DELETE", path, description || "No description provided");
+    return originalRouterDelete(path, handler);
+  };
 }
 
 export function getRoutes() {

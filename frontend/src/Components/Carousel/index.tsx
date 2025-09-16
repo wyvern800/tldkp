@@ -104,8 +104,10 @@ export default function CaptionCarousel({
         <BiRightArrowAlt size="40px" />
       </IconButton>
       {/* Slider */}
-      <Slider {...settings} ref={(slider) => setSlider(slider)}>
-        {cards.map((card: any, index: number) => (
+      {(Slider as any)({ 
+        ...settings, 
+        ref: (slider: any) => setSlider(slider), 
+        children: cards.map((card: any, index: number) => (
           <Image
             key={index}
             objectFit="cover"
@@ -115,8 +117,8 @@ export default function CaptionCarousel({
             mt="10px"
             mb="10px"
           />
-        ))}
-      </Slider>
+        ))
+      })}
     </Box>
   );
 }

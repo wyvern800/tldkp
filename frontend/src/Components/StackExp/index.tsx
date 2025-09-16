@@ -190,6 +190,121 @@ function Feature({ title, desc, icon, badge, delay = 0 }: FeatureProps) {
 function StackExp(): ReactNode {
   const containerBg = useColorModeValue("transparent", "transparent");
   const textColor = useColorModeValue("gray.600", "gray.300");
+
+  const handleGetStartedClick = () => {
+    console.log('Get Started button clicked!');
+    
+    // Try multiple selectors to find the navbar - be more specific to avoid toast containers
+    const navbar = document.querySelector('nav') || 
+                  document.querySelector('[role="navigation"]') || 
+                  document.querySelector('header') ||
+                  document.querySelector('[data-testid="navbar"]') ||
+                  document.querySelector('.navbar') ||
+                  // Look for the actual navbar container, not toast managers
+                  document.querySelector('div[style*="position: fixed"][style*="top: 0"]') ||
+                  document.querySelector('div[style*="position: sticky"][style*="top: 0"]') ||
+                  // Look for the main navigation container
+                  document.querySelector('div[style*="position: fixed"]:not([id*="toast"]):not([aria-live])') ||
+                  // Fallback: look for any div with navigation-like content
+                  Array.from(document.querySelectorAll('div[style*="position: fixed"]')).find(div => 
+                    !div.id?.includes('toast') && 
+                    !div.getAttribute('aria-live') &&
+                    (div.querySelector('button') || div.querySelector('a'))
+                  );
+    
+    console.log('Found navbar:', navbar);
+    
+    if (navbar) {
+      // Scroll to the navbar with smooth behavior
+      navbar.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+      
+      console.log('Scrolled to navbar');
+      
+      // Add a visual highlight effect to the "Add to Server" button
+      setTimeout(() => {
+        // Debug: log all buttons in navbar
+        const allButtons = Array.from(navbar.querySelectorAll('button, [role="button"], a'));
+        console.log('All buttons in navbar:', allButtons.map(btn => ({
+          text: btn.textContent?.trim(),
+          tagName: btn.tagName,
+          className: btn.className
+        })));
+        
+        const addToServerButton = navbar.querySelector('[data-testid="add-to-server"]') || 
+                                 navbar.querySelector('[data-testid="add-to-server-mobile"]') ||
+                                 // Look for various possible button texts
+                                 Array.from(navbar.querySelectorAll('button, [role="button"], a')).find(btn => 
+                                   btn.textContent?.includes('Add to Server') ||
+                                   btn.textContent?.includes('Add to server') ||
+                                   btn.textContent?.includes('Install') ||
+                                   btn.textContent?.includes('Invite') ||
+                                   btn.textContent?.includes('Bot')
+                                 ) ||
+                                 // Look in the entire document if not found in navbar
+                                 Array.from(document.querySelectorAll('button, [role="button"], a')).find(btn => 
+                                   btn.textContent?.includes('Add to Server') ||
+                                   btn.textContent?.includes('Add to server') ||
+                                   btn.textContent?.includes('Install') ||
+                                   btn.textContent?.includes('Invite') ||
+                                   btn.textContent?.includes('Bot')
+                                 );
+        
+        console.log('Found Add to Server button:', addToServerButton);
+        
+        if (addToServerButton) {
+          const btn = addToServerButton as HTMLElement;
+          
+          // Create a temporary highlight effect inspired by magic-ui
+          const originalStyle = btn.style.cssText;
+          
+          // Apply magic-ui inspired styles
+          btn.style.cssText = `
+            ${originalStyle}
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.6), 0 0 40px rgba(14, 165, 233, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 9999;
+            animation: magic-pulse 1s ease-in-out infinite alternate;
+          `;
+          
+          // Add the pulse animation keyframes if not already present
+          if (!document.getElementById('magic-pulse-styles')) {
+            const style = document.createElement('style');
+            style.id = 'magic-pulse-styles';
+            style.textContent = `
+              @keyframes magic-pulse {
+                0% { 
+                  transform: scale(1.05);
+                  box-shadow: 0 0 20px rgba(14, 165, 233, 0.6), 0 0 40px rgba(14, 165, 233, 0.3);
+                }
+                100% { 
+                  transform: scale(1.1);
+                  box-shadow: 0 0 30px rgba(14, 165, 233, 0.8), 0 0 60px rgba(14, 165, 233, 0.4);
+                }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+          
+          console.log('Added magic-ui inspired animation to Add to Server button');
+          
+          // Remove animation after 3 seconds
+          setTimeout(() => {
+            btn.style.cssText = originalStyle;
+          }, 3000);
+        } else {
+          console.log('Could not find Add to Server button');
+        }
+      }, 500);
+    } else {
+      console.log('Could not find navbar element');
+      // Fallback: scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
   
   const features = [
     {
@@ -365,6 +480,8 @@ function StackExp(): ReactNode {
               textTransform="uppercase"
               letterSpacing="wide"
               boxShadow="lg"
+              onClick={handleGetStartedClick}
+              cursor="pointer"
               _hover={{
                 transform: "translateY(-2px)",
                 boxShadow: "2xl",

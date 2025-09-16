@@ -2,3 +2,13 @@ node_modules
 npm-debug.log
 frontend/node_modules
 frontend/npm-debug.log
+node_modules
+npm-debug.log
+Dockerfile*
+.dockerignore
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.development

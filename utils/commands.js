@@ -1,5 +1,5 @@
 import discord from "discord.js";
-const { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } = discord;
+const { REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits, InteractionType } = discord;
 import { config } from "dotenv";
 import { Logger } from "../utils/logger.js";
 import * as api from "../database/repository.js";
@@ -35,7 +35,8 @@ export async function loadCommands() {
       commandExecution: undefined,
       permissions: undefined,
       commandCategory: undefined,
-      new: undefined
+      new: undefined,
+      noExecution: undefined
     }));
 
     try {
@@ -129,6 +130,36 @@ export const commands = [
     commandExecution: api.checkOther,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System"
+  },
+  {
+    name: "set-ign",
+    description: "Set a member's In-Game Name (IGN)",
+    options: [
+      {
+        name: "user",
+        description: "The member whose IGN you want to set",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: "ign",
+        description: "The In-Game Name to set",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+    commandExecution: api.setMemberIgn,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System",
+    new: true
+  },
+  {
+    name: "view-igns",
+    description: "View all member IGNs in the guild",
+    commandExecution: api.viewMemberIgns,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System",
+    new: true
   },
   {
     name: "nickname",
@@ -348,7 +379,7 @@ export const commands = [
     commandExecution: api.generateDkpCode,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
     commandCategory: "DKP System",
-    new: true
+    new: false
   },
   {
     name: "claim",
@@ -364,7 +395,7 @@ export const commands = [
     commandExecution: api.redeemDkpCode,
     permissions: [PermissionFlagsBits.UseApplicationCommands],
     commandCategory: "DKP System",
-    new: true
+    new: false
   },
   {
     name: "set-on-member-join",
@@ -387,8 +418,163 @@ export const commands = [
     commandExecution: api.setRoleOnJoin,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "DKP System",
+    new: false
+  },
+  {
+    name: "auction-create",
+    description:
+      "Creates an auction for an item",
+    options: [
+      {
+        name: "item",
+        type: ApplicationCommandOptionType.String,
+        description: "The name of the item",
+        required: true,
+        autocomplete: true,
+      },
+      {
+        name: "note",
+        type: ApplicationCommandOptionType.String,
+        description: "Trait? Stats? Anything you want to add",
+        required: true,
+      },
+    ],
+    commandExecution: api.createAuction,
+    handleAutocomplete: api.handleAuctionAutocomplete,
+    handleSubmitModal: api.handleSubmitModalCreateAuction,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "Auction System",
     new: true
   },
+  {
+    name: "bid",
+    description:
+      "Bid on an auction",
+    options: [
+      {
+        name: "dkp",
+        type: ApplicationCommandOptionType.Number,
+        description: "The amount of DKP",
+        required: true,
+      }
+    ],
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
+    commandCategory: "Auction System",
+    new: true,
+    noExecution: true
+  },
+  {
+    name: "check-permissions",
+    description: "Check if the bot has all required permissions",
+    commandExecution: api.checkBotPermissions,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "General",
+    new: true
+  },
+  {
+    name: "admin-search-guilds",
+    description: "Search for guilds by name (Admin only)",
+    options: [
+      {
+        name: "search_term",
+        description: "The name or part of the name to search for",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: "limit",
+        description: "Maximum number of results to return (default: 10)",
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+        min_value: 1,
+        max_value: 50,
+      }
+    ],
+    commandExecution: api.searchGuilds,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Admin",
+    new: true,
+    isHidden: true
+  },
+  {
+    name: "admin-set-premium",
+    description: "Set premium status for a guild (Admin only)",
+    options: [
+      {
+        name: "guild_id",
+        description: "The ID of the guild to update",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: "is_premium",
+        description: "Whether to enable premium access",
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: "expires_at",
+        description: "When the subscription expires (YYYY-MM-DD format, leave empty for lifetime)",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+      {
+        name: "plan_type",
+        description: "The type of plan",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          {
+            name: "Free",
+            value: "free",
+          },
+          {
+            name: "Trial (7 days)",
+            value: "trial",
+          },
+          {
+            name: "Premium (Monthly)",
+            value: "premium",
+          },
+          {
+            name: "Lifetime",
+            value: "lifetime",
+          },
+        ],
+      }
+    ],
+    commandExecution: api.setGuildPremium,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Admin",
+    new: true,
+    isHidden: true
+  },
+  {
+    name: "admin-check-premium",
+    description: "Check premium status of a guild (Admin only)",
+    options: [
+      {
+        name: "guild_id",
+        description: "The ID of the guild to check",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      }
+    ],
+    commandExecution: api.checkGuildPremium,
+    permissions: [PermissionFlagsBits.Administrator],
+    commandCategory: "Admin",
+    new: true,
+    isHidden: true
+  },
+  {
+    name: "premium-status",
+    description: "Check your server's premium subscription status",
+    commandExecution: api.checkServerPremiumStatus,
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
+    commandCategory: "General",
+    new: true
+  }
+
   /*{
     name: "clear",
     description: "Cleans messages from a channel (Limited to 100 messages)",
@@ -425,6 +611,20 @@ export const getPermissionVerbose = (permission) => {
 }
 
 /**
+ * Answer correct based on the kind of the interaction
+ * 
+ * @param {any} interaction The interaction
+ * @param {any} answer The answer
+ */
+const anwerInteraction = async (interaction, answer) => {
+  if (interaction.isCommand() || interaction.type === InteractionType.ModalSubmit) {
+    return await interaction.reply(answer);
+  } else {
+    return await interaction.respond(answer);
+  } 
+}
+
+/**
  * Handles the commands
  *
  * @param { string } commandName The command name
@@ -432,17 +632,26 @@ export const getPermissionVerbose = (permission) => {
 export async function handleCommands(interaction, commandName) {
   const userId = interaction.user.id;
 
-  if (isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE)) {
-    interaction.reply({
-      content: "You have exceeded the maximum number of commands per minute. Please try again later.",
-      ephemeral: true,
-    });
-    return;
-  }
-
   const commandToFind = commands?.find(
     (c) => c.name?.toLowerCase() === commandName
   );
+
+  if (interaction.isCommand() && isRateLimited(userId, process.env.MAX_COMMANDS_PER_MINUTE) && !commandToFind?.noExecution) {
+    try {
+      await anwerInteraction(interaction, {
+        content: "You have exceeded the maximum number of commands per minute. Please try again later.",
+        ephemeral: true,
+      });
+    } catch (error) {
+      console.log(error)
+      new Logger(interaction).logLocal(
+        `${PREFIX}`,
+        `Error sending message to user about rate limit`,
+        error
+      );
+    }
+    return;
+  }
 
   if (!commandToFind) {
     new Logger(interaction).log(
@@ -455,23 +664,103 @@ export async function handleCommands(interaction, commandName) {
   // Check if user can use this command
   if (!isInteractionPermitted(interaction, commandToFind.permissions)) {
     const missingPermissions = commandToFind.permissions?.map((permission) => getPermissionVerbose(permission)).join(", ");
-    interaction.reply({
-      content: `You don't have permission to use this command.\nYou're missing the permissions: **${missingPermissions}**`,
-      ephemeral: true,
-    });
+    try {
+      await anwerInteraction(interaction, {
+        content: `You don't have permission to use this command.\nYou're missing the permissions: **${missingPermissions}**`,
+        ephemeral: true,
+      });
+    } catch (error) {
+      new Logger(interaction).logLocal(
+        `${PREFIX}`,
+        `Error sending message to user about missing permissions`,
+        error
+      );
+    }
   } else {
     try {
-      return commandToFind.commandExecution(interaction);
+        if (!commandToFind?.noExecution) {
+          return commandToFind.commandExecution(interaction);
+        }
     } catch (e) {
       new Logger(interaction).error(
         `${PREFIX}`,
         `Error executing command: ${commandName}`,
         e
       );
-      return await interaction.reply({
+      let toRespond = anwerInteraction(interaction, {
         content: "An error occurred while executing the command.",
         ephemeral: true,
       });
+      return await toRespond;
     }
+  }
+}
+
+/**
+ * Handles the submit of a modal
+ * @param {any} interaction  The interaction
+ * @param {*} commandName The commandName we're ggint the interaction from
+ */
+export const handleAutoComplete = async (interaction, commandName) => {
+  const commandToFind = commands?.find(
+    (c) => c.name?.toLowerCase() === commandName
+  );
+
+  if (!commandToFind) {
+    new Logger(interaction).log(
+      `${PREFIX}/SlashCommand`,
+      `Command not found: ${commandName}`
+    );
+    return;
+  }
+
+  try {
+    return commandToFind.handleAutocomplete(interaction);
+  } catch (e) {
+    new Logger(interaction).error(
+      `${PREFIX}`,
+      `Error parsing autocompletion for command: ${commandName}`,
+      e
+    );
+    let toRespond = anwerInteraction(interaction, {
+      content: "An error occurred while executing the command.",
+      ephemeral: true,
+    });
+    return await toRespond;
+  }
+}
+
+/**
+ * Handles the submit of a modal
+ * @param {any} interaction  The interaction
+ */
+export const handleSubmitModal = async (interaction) => {
+  const [command,] = interaction.customId.split("#");
+  
+  const commandToFind = commands?.find(
+    (c) => c.name?.toLowerCase() === command
+  );
+
+  if (!commandToFind) {
+    new Logger(interaction).log(
+      `${PREFIX}/SlashCommand`,
+      `Command not found: ${command}`
+    );
+    return;
+  }
+
+  try {
+    return commandToFind.handleSubmitModal(interaction);
+  } catch (e) {
+    new Logger(interaction).error(
+      `${PREFIX}`,
+      `Error sumitting modal for command: ${command}`,
+      e
+    );
+    let toRespond = anwerInteraction(interaction, {
+      content: "An error occurred while executing the command.",
+      ephemeral: true,
+    });
+    return await toRespond;
   }
 }
