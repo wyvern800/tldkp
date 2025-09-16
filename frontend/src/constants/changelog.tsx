@@ -1,5 +1,15 @@
 export const changelog = [
   {
+    version: 'v1.0.3',
+    date: '2025-09-10',
+    changes: [
+      "Audit log for codes is now available, to check who claimed the code, and how many times it was claimed",
+      "Guild admins can import members from a CSV file, to add them to the DKP system",
+      "Added a feature where you can check if the bot has all the required permissions to work properly, this will be needed for the auction system to work properly",
+      "Auction system is now available for everyone, you can create an auction, and people can bid on it. The auction will be closed when you decide, and the winner will be the one with the highest bid. The winner will have the DKP deducted from his account. The auction creator can also cancel it if the auction didn's start yet. The auction creator can also set a minimum bid incremented.",
+    ]
+  },
+  {
     version: 'v1.0.2^4',
     date: '2025-09-09',
     changes: [
@@ -57,6 +67,13 @@ export const changelog = [
       'Added commands for claiming DKP with funny redeeming codes',
       'Corrected bug where setting a name without having a dkp, would tell nothing, but give an error',
       'Implemented a feature: You can now set a role on join, and also give new members a fixed amount of DKP once (thanks for the suggestion @potetto)',
+    ]
+  },
+  {
+    version: 'v1.0.3',
+    date: '2024-11-20',
+    changes: [
+      "We've added an Auction System, where you can create an auctions, and people can bid on them. The auctions will be closed when you decide, and the winner will be the one with the highest bid. The winner will have the DKP deducted from his account. The auction creator can also cancel it if the auction didn's start yet. The auction creator can also set a minimum bid incremented. As you already know, there are some expenses we must pay to have this working since its usage is huge, hence that, the feature will be available free at start, but will become a premium feature soon, for those who supports the bot",
     ]
   },
 ];

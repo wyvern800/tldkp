@@ -50,7 +50,7 @@ import { MdDashboard, MdSubdirectoryArrowRight, MdDehaze } from "react-icons/md"
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa";
-import { RiSlashCommands } from "react-icons/ri";
+import { RiSlashCommands2 } from "react-icons/ri";
 import { IoAddOutline } from "react-icons/io5";
 import { BsFillMegaphoneFill } from "react-icons/bs";
 import { changelog } from "../../constants/changelog";
@@ -276,6 +276,30 @@ function Navbar() {
             {!isMobile && (
               <MagicStagger stagger={0.1} delay={0.4}>
                 <HStack spacing={3}>
+                  <Tooltip label="Knowledge Base - Guides and Documentation" hasArrow>
+                    <Link to="/knowledge-base">
+                      <MagicCard
+                        as="button"
+                        p={3}
+                        borderRadius="xl"
+                        bg="transparent"
+                        _hover={{
+                          bg: "teal.50",
+                          transform: "translateY(-3px)",
+                          boxShadow: "xl"
+                        }}
+                        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                        position="relative"
+                        overflow="hidden"
+                      >
+                        <HStack spacing={2}>
+                          <Icon as={MdSubdirectoryArrowRight} color="teal.500" boxSize={4} />
+                          <Text fontWeight="bold" color="teal.600">Knowledge Base</Text>
+                        </HStack>
+                      </MagicCard>
+                    </Link>
+                  </Tooltip>
+
                   {/*<Tooltip label="Share and get other player's HUDS" hasArrow>
                     <Link to="/huds">
                       <MagicCard
@@ -318,7 +342,7 @@ function Navbar() {
                   >
                     <HStack spacing={2}>
                       <Icon as={BsFillMegaphoneFill} color="teal.500" boxSize={4} />
-                      <Text fontWeight="bold" color="teal.600">What's New?</Text>
+                      <Text fontWeight="bold" color="teal.600">Recent Changes</Text>
                     </HStack>
                   </MagicCard>
 
@@ -336,7 +360,7 @@ function Navbar() {
                     transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                   >
                     <HStack spacing={2}>
-                      <Icon as={RiSlashCommands} color="teal.500" boxSize={4} />
+                      <Icon as={RiSlashCommands2} color="teal.500" boxSize={4} />
                       <Text fontWeight="bold" color="teal.600">Commands</Text>
                       <Badge colorScheme="green" variant="solid" fontSize="xs" borderRadius="full">
                         New
@@ -365,6 +389,7 @@ function Navbar() {
                       }}
                       transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                       fontWeight="bold"
+                      data-testid="add-to-server"
                     >
                       <HStack spacing={2}>
                         <Icon as={IoAddOutline} boxSize={4} />
@@ -433,14 +458,17 @@ function Navbar() {
                       zIndex={99999}
                       position="relative"
                     >
+                      <MenuItem icon={<MdSubdirectoryArrowRight />} as={Link} to="/knowledge-base">
+                        Knowledge Base
+                      </MenuItem>
                       {/*<MenuItem icon={<SiMaterialdesignicons />} as={Link} to="/huds">
                         HUDS
                         <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
                       </MenuItem>*/}
                       <MenuItem icon={<BsFillMegaphoneFill />} onClick={() => onNewModalOpen()}>
-                        What's New?
+                        Recent Changes
                       </MenuItem>
-                      <MenuItem icon={<RiSlashCommands />} onClick={() => onOpen()}>
+                      <MenuItem icon={<RiSlashCommands2 />} onClick={() => onOpen()}>
                         Commands
                         <Badge ml={2} colorScheme="green" fontSize="xs">New</Badge>
                       </MenuItem>
@@ -448,6 +476,7 @@ function Navbar() {
                       <MenuItem 
                         icon={<IoAddOutline />} 
                         onClick={() => window.open(import.meta.env.VITE_BOT_INSTALL, "_blank")}
+                        data-testid="add-to-server-mobile"
                       >
                         Add to Server
                       </MenuItem>
@@ -506,7 +535,7 @@ function Navbar() {
       </Modal>
 
       <Modal
-        title="What's new?"
+        title="Recent Changes"
         state={{ isOpen: isNewModalOpen, onClose: onNewModalClose }}
         isCentered={true}
         closeOnOverlayClick={true}

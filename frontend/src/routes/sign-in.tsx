@@ -52,6 +52,10 @@ export default function SignInPage() {
             p={8}
             border="1px"
             borderColor={useColorModeValue("gray.200", "gray.600")}
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            w="full"
           >
             <Wrapper>
               <SignIn 
