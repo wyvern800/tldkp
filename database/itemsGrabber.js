@@ -2,6 +2,7 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { Logger } from "../utils/logger.js";
+import puppeteer from "puppeteer";
 
 const baseURL =
   "https://questlog.gg/throne-and-liberty/api/trpc/database.getItems";
@@ -19,38 +20,72 @@ const transformIconPath = (iconPath) => {
 };
 
 export const searchItem = async (itemName) => {
-  const inputSearch = {
-    language,
-    page: 1,
-    mainCategory,
-    subCategory,
-    searchTerm: itemName?.toLowerCase()
-  };
-
-  const inputParam = encodeURIComponent(JSON.stringify(inputSearch));
-  const url = `${baseURL}?input=${inputParam}`;
-
+  let browser;
   try {
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": `https://questlog.gg/throne-and-liberty/en/db/item/${itemName}`,
-        "Content-Type": "application/json",
-        "Cookie": process.env.QUESTLOG_COOKIES
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      ]
+    });
+
+    const page = await browser.newPage();
+    
+    // Set viewport and user agent for better compatibility
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    
+    // Set extra headers to appear more like a real browser
+    await page.setExtraHTTPHeaders({
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+    });
+
+    // Monta o objeto de pesquisa
+    const inputSearch = {
+      language,
+      page: 1,
+      mainCategory,
+      subCategory,
+      searchTerm: itemName?.toLowerCase()
+    };
+
+    const inputParam = encodeURIComponent(JSON.stringify(inputSearch));
+    const url = `${baseURL}?input=${inputParam}`;
+
+    // Add a small delay to make the request appear more natural
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Vai até a página
+    await page.goto(url, { waitUntil: "networkidle2" });
+
+    // Captura os dados da página (aqui vai depender do que aparece na tela ou no JSON)
+    const data = await page.evaluate(() => {
+      try {
+        // se a resposta for JSON renderizado direto
+        return JSON.parse(document.querySelector("body").innerText);
+      } catch (err) {
+        return null;
       }
     });
 
-    console.log(response.data);
+    console.log(data);
 
-    if (
-      response.data &&
-      response.data.result &&
-      response.data.result.data
-    ) {
-      const result = response.data.result.data.pageData;
+    if (data && data.result && data.result.data) {
+      const result = data.result.data.pageData;
       const formatted = result.map((item) => {
         if (item.icon) {
           item.icon = transformIconPath(item.icon);
@@ -62,11 +97,10 @@ export const searchItem = async (itemName) => {
       return [];
     }
   } catch (error) {
-    new Logger().log(
-      "itemsGrabber",
-      `error searching item ${itemName}: ${error}`
-    );
+    new Logger().log("itemsGrabber", `error searching item ${itemName}: ${error}`);
     return [];
+  } finally {
+    if (browser) await browser.close();
   }
 };
 
