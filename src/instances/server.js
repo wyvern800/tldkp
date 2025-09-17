@@ -9,12 +9,15 @@ import ResponseBase from "../../utils/responses.js";
 import {
   getGuildsByOwnerOrUser,
   getAllGuilds,
+  getAllGuildsParallel,
+  getAllGuildsForAdmin,
   getGuildConfig,
   deleteGuild,
   searchGuildsByName,
   updateGuildSubscription,
   getGuildSubscription,
   isGuildPremium,
+  getGuildsMemberCounts,
 } from "../../database/repository.js";
 import "dotenv/config";
 import rateLimit from "express-rate-limit";
@@ -701,7 +704,7 @@ export const createServer = (client) => {
       const adminDiscordIds = process.env.ADMINS?.split(",");
       const isAdmin = adminDiscordIds.includes(userDiscordId);
 
-      const allGuilds = await getAllGuilds();
+      const allGuilds = await getAllGuildsParallel();
 
       if (isAdmin) {
         return new ResponseBase(res).success({ isAdmin, guilds: allGuilds });
@@ -837,7 +840,7 @@ export const createServer = (client) => {
 
       if (isAdmin) {
         try {
-          let guilds = await getAllGuilds();
+          let guilds = await getAllGuildsParallel();
           
           // Filter by search term if provided
           if (search) {
@@ -908,6 +911,298 @@ export const createServer = (client) => {
   },
   "Get all guilds with subscription status and pagination"
   );
+
+  // Admin guilds management endpoint (without memberDkps for performance)
+  apiRouter.get("/admin/guilds", async (req, res) => {
+    const { userDiscordId } = req;
+    const { page = 1, limit = 20, search = "", status = "all", sort = "name", order = "asc" } = req.query;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          // Get guilds without memberDkps for better performance
+          let guilds = await getAllGuildsForAdmin();
+          
+          // Filter by search term if provided
+          if (search) {
+            const searchLower = search.toLowerCase();
+            guilds = guilds.filter(guild => 
+              guild.guildData?.name?.toLowerCase().includes(searchLower)
+            );
+          }
+
+          // Filter by subscription status
+          if (status !== "all") {
+            guilds = guilds.filter(guild => {
+              const subscription = guild.subscription || { isPremium: false, expiresAt: null, planType: 'free' };
+              
+              if (status === "premium") {
+                return subscription.isPremium && (subscription.planType === 'lifetime' || 
+                  (subscription.expiresAt && subscription.expiresAt.toDate() > new Date()));
+              } else if (status === "expired") {
+                return subscription.isPremium && subscription.expiresAt && 
+                  subscription.expiresAt.toDate() <= new Date();
+              } else if (status === "free") {
+                return !subscription.isPremium;
+              }
+              return true;
+            });
+          }
+
+          // Get member counts for all guilds if sorting by members
+          let memberCounts = {};
+          if (sort === 'members') {
+            const allGuildIds = guilds.map(guild => guild.id);
+            memberCounts = await getGuildsMemberCounts(allGuildIds);
+          }
+
+          // Sort guilds
+          guilds.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch (sort) {
+              case 'name':
+                aValue = a.guildData?.name || '';
+                bValue = b.guildData?.name || '';
+                break;
+              case 'members':
+                aValue = memberCounts[a.id] || 0;
+                bValue = memberCounts[b.id] || 0;
+                break;
+              case 'created':
+                aValue = a.guildData?.createdAt || new Date(0);
+                bValue = b.guildData?.createdAt || new Date(0);
+                break;
+              default:
+                aValue = a.guildData?.name || '';
+                bValue = b.guildData?.name || '';
+            }
+
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+              return order === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+            } else {
+              return order === 'asc' ? aValue - bValue : bValue - aValue;
+            }
+          });
+
+          // Pagination
+          const startIndex = (parseInt(page) - 1) * parseInt(limit);
+          const endIndex = startIndex + parseInt(limit);
+          const paginatedGuilds = guilds.slice(startIndex, endIndex);
+
+          // Get member counts for paginated guilds if not already fetched
+          if (sort !== 'members') {
+            const guildIds = paginatedGuilds.map(guild => guild.id);
+            memberCounts = await getGuildsMemberCounts(guildIds);
+          }
+
+          // Add subscription status and owner info to each guild
+          const guildsWithStatus = await Promise.all(paginatedGuilds.map(async (guild) => {
+            let ownerDiscordData = {
+              displayName: 'Unknown',
+              avatarURL: ''
+            };
+
+            // Try to fetch owner's Discord data if guild is available in bot cache
+            try {
+              const guildData = client.guilds?.cache.get(guild.guildData.id);
+              if (guildData) {
+                const owner = await guildData.members.fetch(guild.guildData.ownerId);
+                if (owner) {
+                  ownerDiscordData = {
+                    displayName: owner.user.globalName || owner.user.username || 'Unknown',
+                    avatarURL: owner.user.displayAvatarURL({ dynamic: true, size: 32 })
+                  };
+                }
+              }
+            } catch (error) {
+              // Owner not found or guild not in cache, use default values
+              console.log(`Could not fetch owner data for guild ${guild.guildData.name}: ${error.message}`);
+            }
+
+            return {
+              id: guild.id,
+              guildData: {
+                ...guild.guildData,
+                ownerDiscordData
+              },
+              subscription: guild.subscription,
+              memberCount: memberCounts[guild.id] || 0, // Use the fetched member count
+              subscriptionStatus: guild.subscription ? {
+                isPremium: guild.subscription.isPremium,
+                expiresAt: guild.subscription.expiresAt ? guild.subscription.expiresAt.toDate() : null,
+                planType: guild.subscription.planType,
+                isActive: guild.subscription.isPremium && (
+                  guild.subscription.planType === 'lifetime' || 
+                  (guild.subscription.expiresAt && guild.subscription.expiresAt.toDate() > new Date())
+                )
+              } : {
+                isPremium: false,
+                expiresAt: null,
+                planType: 'free',
+                isActive: false
+              }
+            };
+          }));
+
+          return new ResponseBase(res).success({
+            guilds: guildsWithStatus,
+            pagination: {
+              page: parseInt(page),
+              limit: parseInt(limit),
+              total: guilds.length,
+              totalPages: Math.ceil(guilds.length / parseInt(limit))
+            }
+          });
+        } catch (error) {
+          console.error('Error fetching admin guilds:', error);
+          return new ResponseBase(res).error("Failed to get guilds");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Get all guilds with pagination, filtering, and sorting for admin"
+  );
+
+  // Get member DKP data for a specific guild
+  apiRouter.get("/admin/guilds/:guildId/members", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          // Get guild config with member DKP data
+          const guildConfig = await getGuildConfig(guildId, 'admin-guild-members');
+          
+          if (!guildConfig) {
+            return new ResponseBase(res).notFound("Guild not found");
+          }
+
+          // Get owner Discord data
+          let ownerDiscordData = {
+            displayName: 'Unknown',
+            avatarURL: ''
+          };
+
+          try {
+            const guildData = client.guilds?.cache.get(guildConfig.guildData.id);
+            if (guildData) {
+              const owner = await guildData.members.fetch(guildConfig.guildData.ownerId);
+              if (owner) {
+                ownerDiscordData = {
+                  displayName: owner.user.globalName || owner.user.username || 'Unknown',
+                  avatarURL: owner.user.displayAvatarURL({ dynamic: true, size: 32 })
+                };
+              }
+            }
+          } catch (error) {
+            console.log(`Could not fetch owner data for guild ${guildConfig.guildData.name}: ${error.message}`);
+          }
+
+          // Process member DKP data with Discord information
+          const memberDkps = await Promise.allSettled(
+            (guildConfig.memberDkps || []).map(async (memberDkp) => {
+              try {
+                const guildData = client.guilds?.cache.get(guildConfig.guildData.id);
+                if (guildData) {
+                  const memberData = await guildData.members.fetch(memberDkp.userId);
+                  return {
+                    ...memberDkp,
+                    discordData: {
+                      displayName: memberData?.user?.globalName || memberData?.user?.username || 'Unknown',
+                      avatarURL: memberData?.user?.displayAvatarURL({ dynamic: true, size: 32 }) || '',
+                    },
+                  };
+                } else {
+                  return {
+                    ...memberDkp,
+                    discordData: {
+                      displayName: 'Discord data unavailable',
+                      avatarURL: '',
+                    },
+                  };
+                }
+              } catch (error) {
+                return {
+                  ...memberDkp,
+                  discordData: {
+                    displayName: 'User not available',
+                    avatarURL: '',
+                  },
+                };
+              }
+            })
+          );
+
+          // Filter out failed fetches
+          const validMemberDkps = memberDkps
+            .filter(result => result.status === 'fulfilled')
+            .map(result => result.value);
+
+          return new ResponseBase(res).success({
+            guild: {
+              id: guildConfig.guildData.id,
+              name: guildConfig.guildData.name,
+              icon: guildConfig.guildData.icon,
+              ownerId: guildConfig.guildData.ownerId,
+              ownerDiscordData
+            },
+            memberDkps: validMemberDkps,
+            subscription: guildConfig.subscription
+          });
+        } catch (error) {
+          console.error('Error fetching guild members:', error);
+          return new ResponseBase(res).error("Failed to get guild members");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Get member DKP data for a specific guild"
+  );
+
+  // Delete guild endpoint for admin
+  /*apiRouter.delete("/admin/guilds/:guildId", async (req, res) => {
+    const { userDiscordId } = req;
+    const { guildId } = req.params;
+
+    if (userDiscordId) {
+      const adminDiscordIds = process.env.ADMINS?.split(",");
+      const isAdmin = adminDiscordIds.includes(userDiscordId);
+
+      if (isAdmin) {
+        try {
+          // Check if guild exists
+          const guildConfig = await getGuildConfig(guildId, 'admin-delete-guild');
+          if (!guildConfig) {
+            return new ResponseBase(res).notFound("Guild not found");
+          }
+
+          // Delete the guild
+          await deleteGuild(guildId);
+
+          return new ResponseBase(res).success("Guild deleted successfully");
+        } catch (error) {
+          console.error('Error deleting guild:', error);
+          return new ResponseBase(res).error("Failed to delete guild");
+        }
+      } else {
+        return new ResponseBase(res).notAllowed("Unauthorized");
+      }
+    }
+  },
+  "Delete a guild (admin only)"
+  );*/
 
   // Analytics tracking endpoint
   apiRouter.post("/analytics/track", async (req, res) => {
