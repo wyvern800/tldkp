@@ -196,9 +196,15 @@ export default function GuildImportPage() {
               <Text color="yellow.100" textAlign="center">
                 Data importing is a premium feature. Upgrade your guild to premium to import member data from CSV files.
               </Text>
-              <Text fontSize="sm" color="yellow.200" textAlign="center">
-                Contact an administrator to upgrade your guild's subscription.
-              </Text>
+              <Button
+                colorScheme="yellow"
+                variant="solid"
+                onClick={() => navigate(`/guild/${guildId}/subscription`)}
+                size="md"
+                fontWeight="medium"
+              >
+                Upgrade to Premium
+              </Button>
             </VStack>
           </Box>
         )}

@@ -18,22 +18,32 @@ export async function checkExportPermission(userId, guildId, isPremium) {
     }
 
     // Check free user's export history
+    // Use a simpler query to avoid index requirements
     const exportLogsRef = db.collection("exportLogs");
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const recentExports = await exportLogsRef
+    // Query by userId first (single field, no index needed)
+    const userExports = await exportLogsRef
       .where("userId", "==", userId)
-      .where("guildId", "==", guildId)
-      .where("timestamp", ">=", oneWeekAgo)
       .get();
 
-    if (recentExports.empty) {
+    // Filter by guildId and timestamp in memory
+    const recentExports = userExports.docs.filter(doc => {
+      const data = doc.data();
+      return data.guildId === guildId && 
+             data.timestamp && 
+             data.timestamp.toDate() >= oneWeekAgo;
+    });
+
+    if (recentExports.length === 0) {
       return { canExport: true };
     }
 
     // Free user has already exported this week
-    const lastExport = recentExports.docs[0].data();
+    // Sort by timestamp to get the most recent
+    recentExports.sort((a, b) => b.data().timestamp.toDate() - a.data().timestamp.toDate());
+    const lastExport = recentExports[0].data();
     const nextExportDate = new Date(lastExport.timestamp.toDate());
     nextExportDate.setDate(nextExportDate.getDate() + 7);
 
@@ -80,14 +90,19 @@ export async function logExportEvent(userId, guildId, exportType = "csv") {
 export async function getExportHistory(userId, guildId) {
   try {
     const exportLogsRef = db.collection("exportLogs");
-    const exports = await exportLogsRef
+    
+    // Query by userId first (single field, no index needed)
+    const userExports = await exportLogsRef
       .where("userId", "==", userId)
-      .where("guildId", "==", guildId)
-      .orderBy("timestamp", "desc")
-      .limit(10)
       .get();
 
-    return exports.docs.map(doc => ({
+    // Filter by guildId in memory and sort by timestamp
+    const exports = userExports.docs
+      .filter(doc => doc.data().guildId === guildId)
+      .sort((a, b) => b.data().timestamp.toDate() - a.data().timestamp.toDate())
+      .slice(0, 10); // Limit to 10 most recent
+
+    return exports.map(doc => ({
       id: doc.id,
       ...doc.data(),
       timestamp: doc.data().timestamp.toDate()

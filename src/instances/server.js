@@ -1439,7 +1439,7 @@ export const createServer = (client) => {
 
       // Get guild subscription status
       const subscription = await getGuildSubscription(guildId);
-      const isPremium = subscription.isPremium && subscription.isActive;
+      const isPremium = subscription && subscription.isPremium && subscription.isActive;
 
       // Check export permission
       const exportPermission = await checkExportPermission(userDiscordId, guildId, isPremium);
@@ -1489,7 +1489,7 @@ export const createServer = (client) => {
 
       // Get subscription status
       const subscription = await getGuildSubscription(guildId);
-      const isPremium = subscription.isPremium && subscription.isActive;
+      const isPremium = subscription && subscription.isPremium && subscription.isActive;
 
       // Check export permission
       const exportPermission = await checkExportPermission(userDiscordId, guildId, isPremium);
@@ -1555,6 +1555,7 @@ export const createServer = (client) => {
         await trackPremiumEvent({
           event: 'data_exported',
           guildId: guildId,
+          userId: userDiscordId,
           exportFormat: format,
           memberCount: memberDkps.length
         });

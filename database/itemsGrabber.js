@@ -2,11 +2,6 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { Logger } from "../utils/logger.js";
-import puppeteer from "puppeteer";
-
-// Environment-specific configuration
-const isRender = process.env.RENDER === 'true' || process.env.NODE_ENV === 'production';
-const isDocker = process.env.DOCKER === 'true' || fs.existsSync('/.dockerenv');
 
 const baseURL =
   "https://questlog.gg/throne-and-liberty/api/trpc/database.getItems";

@@ -2499,11 +2499,35 @@ export async function getGuildSubscription(guildId) {
   }
 
   const { isPremium, expiresAt, planType } = guildConfig.subscription;
-  const isActive = await isGuildPremium(guildId);
+  
+  // If not premium, return inactive
+  if (!isPremium) {
+    return {
+      isPremium: false,
+      expiresAt: null,
+      planType: 'free',
+      isActive: false
+    };
+  }
+
+  // If it's a lifetime plan, return active
+  if (planType === 'lifetime') {
+    return {
+      isPremium: true,
+      expiresAt: null,
+      planType: 'lifetime',
+      isActive: true
+    };
+  }
+
+  // Check if subscription is still valid for time-based plans
+  const now = new Date();
+  const expirationDate = expiresAt ? expiresAt.toDate() : null;
+  const isActive = expirationDate ? expirationDate > now : false;
 
   return {
     isPremium,
-    expiresAt: expiresAt ? expiresAt.toDate() : null,
+    expiresAt: expirationDate,
     planType,
     isActive
   };

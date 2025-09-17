@@ -144,12 +144,17 @@ export async function trackAuctionAction(action, guildId, auctionId) {
 export async function trackPremiumEvent(event, guildId, data) {
   new Logger().logLocal(PREFIX, `Premium Event: ${event} - Guild: ${guildId}`, data);
   
+  // Handle both object and string parameters for backward compatibility
+  const eventData = typeof event === 'object' ? event : { event, guildId, ...data };
+  const actualGuildId = typeof event === 'object' ? event.guildId : guildId;
+  const actualData = typeof event === 'object' ? event : data;
+  
   await sendToGoogleAnalytics('premium_event', 'subscriptions', {
-    eventType: event,
+    eventType: eventData.event || event,
     premiumStatus: 'premium',
-    ...data,
+    ...actualData,
     success: true
-  }, data.userId || 'system', guildId);
+  }, actualData?.userId || 'system', actualGuildId);
 }
 
 /**
