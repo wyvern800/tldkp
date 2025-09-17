@@ -82,7 +82,7 @@ interface AdminGuildsProps {
   onGuildUpdate?: () => void;
 }
 
-const AdminGuilds: React.FC<AdminGuildsProps> = ({ onGuildUpdate }) => {
+const AdminGuilds: React.FC<AdminGuildsProps> = () => {
   const { getToken } = useAuth();
   const toast = useToast();
   const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
@@ -194,7 +194,7 @@ const AdminGuilds: React.FC<AdminGuildsProps> = ({ onGuildUpdate }) => {
     setMemberDkps([]); // Clear member data when modal closes
   };
 
-  const handleDeleteGuild = async (guildId: string, guildName: string) => {
+  /*const handleDeleteGuild = async (guildId: string, guildName: string) => {
     if (!window.confirm(`Are you sure you want to delete guild "${guildName}"? This action cannot be undone.`)) {
       return;
     }
@@ -230,7 +230,7 @@ const AdminGuilds: React.FC<AdminGuildsProps> = ({ onGuildUpdate }) => {
         isClosable: true,
       });
     }
-  };
+  };*/
 
   const getStatusBadge = (guild: Guild) => {
     const subscription = guild.subscription || { isPremium: false, expiresAt: null, planType: 'free' };
