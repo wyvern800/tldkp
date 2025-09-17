@@ -13,8 +13,8 @@
     "dev:site": "concurrently \"npm run dev:client\" \"npm run dev:api\"",
     "build": "npm --prefix frontend install && npm --prefix frontend run build && npm install",
     "stripe:webhook": "stripe listen --forward-to localhost:3000/api/stripe/webhook",
-    "setup:puppeteer": "npx puppeteer browsers install chrome",
-    "postinstall": "npm run setup:puppeteer"
+    "setup:puppeteer": "npx puppeteer browsers install chrome || echo 'Puppeteer Chrome installation failed, will retry at runtime'",
+    "postinstall": "npm run setup:puppeteer || echo 'Postinstall failed, continuing...'"
   },
   "dependencies": {
     "@clerk/backend": "1.16.1",

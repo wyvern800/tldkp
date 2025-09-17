@@ -147,14 +147,54 @@ export const searchItem = async (itemName) => {
           console.log('No Chrome executable found, attempting to install...');
           try {
             const { execSync } = await import('child_process');
-            execSync('npx puppeteer browsers install chrome', { stdio: 'inherit' });
-            console.log('Chrome installation completed, retrying...');
+            
+            // Try different installation methods
+            const installCommands = [
+              'npx puppeteer browsers install chrome',
+              'npm install puppeteer --force',
+              'yarn add puppeteer --force',
+              'apt-get update && apt-get install -y google-chrome-stable',
+              'apt-get update && apt-get install -y chromium-browser'
+            ];
+            
+            for (const cmd of installCommands) {
+              try {
+                console.log(`Trying installation command: ${cmd}`);
+                execSync(cmd, { stdio: 'inherit', timeout: 60000 });
+                console.log(`Installation command succeeded: ${cmd}`);
+                break;
+              } catch (cmdError) {
+                console.log(`Installation command failed: ${cmd} - ${cmdError.message}`);
+              }
+            }
             
             // Try again with the default path
             const newExecPath = puppeteer.executablePath();
+            console.log('Checking for Chrome after installation at:', newExecPath);
+            
             if (fs.existsSync(newExecPath)) {
               launchOptions.executablePath = newExecPath;
               console.log('Using newly installed Chrome:', newExecPath);
+            } else {
+              console.log('Chrome still not found after installation attempts');
+              
+              // Try to find Chrome in common locations after installation
+              const commonPaths = [
+                '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome',
+                '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome-linux64/chrome',
+                '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome-linux64/chrome-linux64/chrome',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium'
+              ];
+              
+              for (const commonPath of commonPaths) {
+                if (fs.existsSync(commonPath)) {
+                  launchOptions.executablePath = commonPath;
+                  console.log('Found Chrome at common path:', commonPath);
+                  break;
+                }
+              }
             }
           } catch (installError) {
             console.log('Chrome installation failed:', installError.message);
