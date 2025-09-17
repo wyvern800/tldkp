@@ -1,6 +1,7 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { Logger } from "../utils/logger.js";
 
 const baseURL =
   "https://questlog.gg/throne-and-liberty/api/trpc/database.getItems";
