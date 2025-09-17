@@ -4,6 +4,10 @@ import path from "path";
 import { Logger } from "../utils/logger.js";
 import puppeteer from "puppeteer";
 
+// Environment-specific configuration
+const isRender = process.env.RENDER === 'true' || process.env.NODE_ENV === 'production';
+const isDocker = process.env.DOCKER === 'true' || fs.existsSync('/.dockerenv');
+
 const baseURL =
   "https://questlog.gg/throne-and-liberty/api/trpc/database.getItems";
 
@@ -22,7 +26,8 @@ const transformIconPath = (iconPath) => {
 export const searchItem = async (itemName) => {
   let browser;
   try {
-    browser = await puppeteer.launch({
+    // Configure launch options with proper executable path handling
+    const launchOptions = {
       headless: true,
       args: [
         '--no-sandbox',
@@ -34,9 +39,54 @@ export const searchItem = async (itemName) => {
         '--disable-gpu',
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       ]
-    });
+    };
+
+    // Try to get the executable path, with fallback for different environments
+    console.log('Environment detection - isRender:', isRender, 'isDocker:', isDocker);
+    try {
+      const execPath = puppeteer.executablePath();
+      console.log('Found Puppeteer executable at:', execPath);
+      
+      // Check if the executable actually exists
+      const fs = await import('fs');
+      if (fs.existsSync(execPath)) {
+        launchOptions.executablePath = execPath;
+        console.log('Using Puppeteer executable:', execPath);
+      } else {
+        console.log('Executable path does not exist, trying alternative paths...');
+        
+        // Try alternative paths based on environment
+        const alternativePaths = isRender ? [
+          '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome',
+          '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome-linux64/chrome',
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/chromium-browser',
+          '/usr/bin/chromium'
+        ] : [
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/chromium-browser',
+          '/usr/bin/chromium'
+        ];
+        
+        for (const altPath of alternativePaths) {
+          if (fs.existsSync(altPath)) {
+            launchOptions.executablePath = altPath;
+            console.log('Using alternative executable path:', altPath);
+            break;
+          }
+        }
+      }
+    } catch (execPathError) {
+      console.log('Could not get Puppeteer executable path, using default');
+      // Let Puppeteer find Chrome automatically
+    }
+
+    browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
     
