@@ -84,7 +84,6 @@ const SubscriptionPage: React.FC = () => {
       <Container maxW="container.md" py={8}>
         <Box textAlign="center">
           <Spinner size="xl" />
-          <Text mt={4} color="gray.300">Loading subscription information...</Text>
         </Box>
       </Container>
     );

@@ -81,7 +81,7 @@ export default function DashboardPage() {
               Dashboard
             </Heading>
             <Text color={textColor} textAlign="center" maxW="md">
-              Manage your Discord servers and DKP systems
+              Manage your <s>Discord servers</s> Guilds and DKP systems
             </Text>
           </motion.div>
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
                     </Box>
                     <VStack align="start" spacing={0}>
                       <Text fontSize="sm" color={textColor}>
-                        Owned Servers
+                        Owned guilds
                       </Text>
                       <Text fontSize="2xl" fontWeight="bold" color={headingColor}>
                         {data?.ownerGuilds?.length || 0}
@@ -128,7 +128,7 @@ export default function DashboardPage() {
                     </Box>
                     <VStack align="start" spacing={0}>
                       <Text fontSize="sm" color={textColor}>
-                        Member Servers
+                        Others' guilds
                       </Text>
                       <Text fontSize="2xl" fontWeight="bold" color={headingColor}>
                         {data?.memberGuilds?.length || 0}

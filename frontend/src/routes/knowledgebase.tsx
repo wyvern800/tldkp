@@ -34,6 +34,13 @@ export default function KnowledgeBasePage() {
       "how-to-bid": 0,
       "how-can-i-customize-my-hud": 1,
       "how-do-i-share-my-hud-with-others": 2,
+      "what-is-dkp": 3,
+      "how-to-earn-dkp": 4,
+      "premium-features": 5,
+      "data-export": 6,
+      "guild-setup": 7,
+      "bot-commands": 8,
+      "troubleshooting": 9,
     };
     return theFaqs[faq] ?? 0;
   };
@@ -154,6 +161,142 @@ export default function KnowledgeBasePage() {
                 </h2>
                 <AccordionPanel pb={4}>
                   You can share your HUD by clicking HUDS and then upload clicking on the button 'Upload HUD', have in mind that your HUD must be accepted in order for it to be freely available to others.
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      What is DKP and how does it work?
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  DKP (Dragon Kill Points) is a currency system used in guilds to track member contributions and participation. Members earn DKP through various activities like raids, dungeons, or other guild events. DKP is then used to bid on items during auctions, ensuring fair distribution of loot based on member participation and contribution.
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      How do I earn DKP?
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  DKP can be earned through various activities determined by your guild leadership:
+                  <br/>• Participating in raids and dungeons
+                  <br/>• Completing guild quests and objectives
+                  <br/>• Attending scheduled guild events
+                  <br/>• Contributing to guild resources
+                  <br/>• Special achievements or milestones
+                  <br/><br/>The specific DKP rewards are set by your guild administrators and may vary between different guilds.
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      What are the premium features?
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  Premium features include:
+                  <br/>• <b>Unlimited data exports</b> - Export your guild data as often as needed
+                  <br/>• <b>Advanced auction features</b> - Enhanced bidding and auction management
+                  <br/>• <b>Priority support</b> - Faster response times for technical issues
+                  <br/>• <b>Custom bot settings</b> - Advanced configuration options
+                  <br/>• <b>Analytics dashboard</b> - Detailed insights and statistics
+                  <br/>• <b>Lifetime subscription option</b> - One-time payment for permanent access
+                  <br/><br/>Free users get basic functionality with limited exports (1 per week).
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      How do I export my guild data?
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  To export your guild data:
+                  <br/>1. Go to your guild in the dashboard
+                  <br/>2. Click the green download icon (Export Data button)
+                  <br/>3. Choose your preferred format (CSV or JSON)
+                  <br/>4. Click "Export" to download the file
+                  <br/><br/>The export includes member information, DKP values, IGNs, and Discord data. Free users can export once per week, while premium users have unlimited exports.
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      How do I set up the bot for my guild?
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  To set up the TL-DKP bot for your guild:
+                  <br/>1. <b>Invite the bot</b> - Use the invite link with proper permissions
+                  <br/>2. <b>Configure settings</b> - Set up DKP rewards, auction rules, and member roles
+                  <br/>3. <b>Import member data</b> - Upload your existing member list or add members manually
+                  <br/>4. <b>Test the system</b> - Run a test auction to ensure everything works correctly
+                  <br/><br/>Make sure the bot has the necessary permissions to read messages, send messages, and manage roles.
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      What bot commands are available?
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  Common bot commands include:
+                    <br/>• <b>/help</b> - Display all available commands
+                    <br/>• Check the 'commands' above in the list
+                </AccordionPanel>
+              </AccordionItem>
+
+              <AccordionItem>
+                <h2>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      Troubleshooting common issues
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                </h2>
+                <AccordionPanel pb={4}>
+                  <b>Bot not responding:</b>
+                  <br/>• Check if the bot is online and has proper permissions
+                  <br/>• Verify the bot can read and send messages in the channel
+                  <br/><br/><b>DKP not updating:</b>
+                  <br/>• Ensure you're using the correct command format
+                  <br/>• Check if you have admin permissions for DKP management
+                  <br/><br/><b>Export not working:</b>
+                  <br/>• Free users are limited to 1 export per week
+                  <br/>• Check your internet connection
+                  <br/>• Try refreshing the page and attempting again
+                  <br/><br/><b>Can't see guild data:</b>
+                  <br/>• Make sure you're logged in with the correct Discord account
+                  <br/>• Verify you have access to the guild
+                  <br/>• Contact your guild administrator if issues persist
                 </AccordionPanel>
               </AccordionItem>
             </Accordion>

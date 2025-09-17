@@ -161,12 +161,22 @@ export const itemsGrabber = async () => {
 
 export const updateAuctions = async () => {
   const auctionsTask = cron.schedule(
-    process.env.ENV === "dev" ? "*/10 * * * * *" : "0 1 * * *",
+    process.env.ENV === "dev" ? "*/10 * * * * *" : "0 2 * * *",
     async () => {
+      // First, do a simple count check to avoid heavy processing if no auctions exist
+      const auctionsCountSnapshot = await db.collection("auctions").count().get();
+      const totalAuctions = auctionsCountSnapshot.data().count;
+      
+      if (totalAuctions === 0) {
+        new Logger().log(PREFIX, `No auctions found (count check)`);
+        return;
+      }
+
+      // Now fetch the actual auctions for processing
       const auctionsSnapshot = await db.collection("auctions").get();
 
       if (auctionsSnapshot.empty) {
-        new Logger().log(PREFIX, `No auctions found`);
+        new Logger().log(PREFIX, `No auctions found (after count check)`);
         return;
       }
 
