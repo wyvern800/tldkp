@@ -18,16 +18,16 @@ import { useEffect, useState } from "react";
 import api from "../services/axiosInstance";
 import { useAuth } from "@clerk/clerk-react";
 import SubscriptionManagement from "../Components/SubscriptionManagement";
-import Guilds from "../Components/Guilds";
+import AdminGuilds from "../Components/AdminGuilds";
 
 export default function AdminPage() {
   const { getToken, isLoaded } = useAuth();
   const navigate = useNavigate();
 
    
-  const [data, setData] = useState<any>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [premiumCount, setPremiumCount] = useState<number>(0);
+  const [totalGuildsCount, setTotalGuildsCount] = useState<number>(0);
 
   // Function to calculate premium server count
   const calculatePremiumCount = (guilds: any[]) => {
@@ -92,7 +92,6 @@ export default function AdminPage() {
         },
       });
       if (res?.data?.data?.isAdmin) {
-        setData(res?.data?.data);
         setLoaded(true);
         
         // Calculate premium count
@@ -121,13 +120,17 @@ export default function AdminPage() {
         },
       });
       if (res?.data?.data?.isAdmin) {
-        setData(res?.data?.data);
         const premiumServers = calculatePremiumCount(res?.data?.data?.guilds);
         setPremiumCount(premiumServers);
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
+  };
+
+  // Function to handle total guilds count change from AdminGuilds component
+  const handleTotalGuildsCountChange = (total: number) => {
+    setTotalGuildsCount(total);
   };
 
   return (
@@ -183,14 +186,14 @@ export default function AdminPage() {
             colorScheme="teal"
           >
             <TabList>
-              <Tab>All Guilds {data?.guilds?.length && <Tag marginLeft="8px" colorScheme="gray">{data?.guilds?.length}</Tag>}</Tab>
+              <Tab>All Guilds {totalGuildsCount > 0 && <Tag marginLeft="8px" colorScheme="gray">{totalGuildsCount}</Tag>}</Tab>
               <Tab>Subscriptions <Tag marginLeft="8px" colorScheme="green">{premiumCount}</Tag></Tab>
               <Tab>Configurations</Tab>
             </TabList>
 
             <TabPanels>
               <TabPanel>
-                <Guilds data={data?.guilds} loaded={loaded} isBackoffice />
+                <AdminGuilds onGuildUpdate={refreshPremiumCount} onTotalCountChange={handleTotalGuildsCountChange} />
               </TabPanel>
               <TabPanel>
                 <SubscriptionManagement onSubscriptionUpdate={refreshPremiumCount} />
