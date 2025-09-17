@@ -80,9 +80,10 @@ interface Pagination {
 
 interface AdminGuildsProps {
   onGuildUpdate?: () => void;
+  onTotalCountChange?: (total: number) => void;
 }
 
-const AdminGuilds: React.FC<AdminGuildsProps> = () => {
+const AdminGuilds: React.FC<AdminGuildsProps> = ({ onTotalCountChange }) => {
   const { getToken } = useAuth();
   const toast = useToast();
   const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
@@ -136,6 +137,13 @@ const AdminGuilds: React.FC<AdminGuildsProps> = () => {
   useEffect(() => {
     fetchGuilds();
   }, [fetchGuilds]);
+
+  // Notify parent component when total count changes
+  useEffect(() => {
+    if (onTotalCountChange && pagination.total > 0) {
+      onTotalCountChange(pagination.total);
+    }
+  }, [pagination.total, onTotalCountChange]);
 
   const handleSearch = () => {
     fetchGuilds(1, searchTerm, statusFilter, sortBy, sortOrder);
