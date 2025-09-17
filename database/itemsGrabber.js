@@ -54,6 +54,7 @@ export const searchItem = async (itemName) => {
       
       // Check if the executable actually exists
       const fs = await import('fs');
+      const path = await import('path');
       if (fs.existsSync(execPath)) {
         launchOptions.executablePath = execPath;
         console.log('Using Puppeteer executable:', execPath);
@@ -64,6 +65,8 @@ export const searchItem = async (itemName) => {
         const alternativePaths = isRender ? [
           '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome',
           '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome-linux64/chrome',
+          '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome-linux64/chrome-linux64/chrome',
+          '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82/chrome-linux64/chrome-linux64/chrome-linux64/chrome-linux64/chrome',
           '/usr/bin/google-chrome-stable',
           '/usr/bin/chromium-browser',
           '/usr/bin/chromium'
@@ -72,6 +75,45 @@ export const searchItem = async (itemName) => {
           '/usr/bin/chromium-browser',
           '/usr/bin/chromium'
         ];
+        
+        // Debug: List the actual directory contents
+        try {
+          const puppeteerCacheDir = '/opt/render/.cache/puppeteer/chrome/linux-140.0.7339.82';
+          if (fs.existsSync(puppeteerCacheDir)) {
+            console.log('Puppeteer cache directory exists, listing contents:');
+            const contents = fs.readdirSync(puppeteerCacheDir, { recursive: true });
+            console.log('Cache directory contents:', contents);
+            
+            // Look for chrome executable in subdirectories
+            const findChromeExecutable = (dir) => {
+              try {
+                const items = fs.readdirSync(dir);
+                for (const item of items) {
+                  const fullPath = path.join(dir, item);
+                  const stat = fs.statSync(fullPath);
+                  if (stat.isDirectory()) {
+                    const found = findChromeExecutable(fullPath);
+                    if (found) return found;
+                  } else if (item === 'chrome' || item === 'chrome-linux64') {
+                    console.log('Found potential Chrome executable:', fullPath);
+                    return fullPath;
+                  }
+                }
+              } catch (e) {
+                // Ignore permission errors
+              }
+              return null;
+            };
+            
+            const foundChrome = findChromeExecutable(puppeteerCacheDir);
+            if (foundChrome) {
+              alternativePaths.unshift(foundChrome);
+              console.log('Added found Chrome path to alternatives:', foundChrome);
+            }
+          }
+        } catch (debugError) {
+          console.log('Debug listing failed:', debugError.message);
+        }
         
         for (const altPath of alternativePaths) {
           if (fs.existsSync(altPath)) {
