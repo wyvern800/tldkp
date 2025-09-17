@@ -25,18 +25,31 @@ export const searchItem = async (itemName) => {
     mainCategory,
     subCategory,
     searchTerm: itemName?.toLowerCase()
-  }
+  };
 
   const inputParam = encodeURIComponent(JSON.stringify(inputSearch));
-
   const url = `${baseURL}?input=${inputParam}`;
 
   try {
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": `https://questlog.gg/throne-and-liberty/en/db/item/${itemName}`,
+        "Content-Type": "application/json",
+        "Cookie": process.env.QUESTLOG_COOKIES
+      }
+    });
 
     console.log(response.data);
 
-    if (response.data && response.data.result && response.data.result.data) {
+    if (
+      response.data &&
+      response.data.result &&
+      response.data.result.data
+    ) {
       const result = response.data.result.data.pageData;
       const formatted = result.map((item) => {
         if (item.icon) {
@@ -49,10 +62,13 @@ export const searchItem = async (itemName) => {
       return [];
     }
   } catch (error) {
-    new Logger().log('itemsGrabber', `error searching item ${itemName}: ${error}`);
+    new Logger().log(
+      "itemsGrabber",
+      `error searching item ${itemName}: ${error}`
+    );
     return [];
   }
-}
+};
 
 const fetchPage = async (page) => {
   const input = {
