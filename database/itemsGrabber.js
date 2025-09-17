@@ -33,6 +33,8 @@ export const searchItem = async (itemName) => {
   try {
     const response = await axios.get(url);
 
+    console.log(response.data);
+
     if (response.data && response.data.result && response.data.result.data) {
       const result = response.data.result.data.pageData;
       const formatted = result.map((item) => {
@@ -46,6 +48,7 @@ export const searchItem = async (itemName) => {
       return [];
     }
   } catch (error) {
+    new Logger().log('itemsGrabber', `error searching item ${itemName}: ${error}`);
     return [];
   }
 }
