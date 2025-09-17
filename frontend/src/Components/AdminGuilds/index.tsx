@@ -33,7 +33,7 @@ import {
   Divider,
   Avatar,
 } from '@chakra-ui/react';
-import { SearchIcon, ViewIcon, DeleteIcon } from '@chakra-ui/icons';
+import { SearchIcon, ViewIcon } from '@chakra-ui/icons';
 import { FaCrown, FaStar } from 'react-icons/fa';
 import { useAuth } from '@clerk/clerk-react';
 import api from '../../services/axiosInstance';
