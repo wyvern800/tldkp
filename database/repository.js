@@ -137,7 +137,7 @@ export async function processBid(interaction, auction) {
       const subscription = await getGuildSubscription(interaction.guild.id);
       const embed = {
         title: "🔒 Premium Feature Required",
-        description: "The auction system is only available to premium servers. Upgrade your server to access this feature and many more!",
+        description: `The auction system is only available to premium servers. Upgrade your server to access this feature and many more!\n\n[Click here to upgrade your server's subscription](https://tldkp.org/guild/${interaction.guild.id}/subscription)`,
         color: 0xff6b6b,
         fields: [
           {
@@ -152,10 +152,7 @@ export async function processBid(interaction, auction) {
             value: "• **Trial (7 days)** - Full access for 7 days\n• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
             inline: false
           }
-        ],
-        footer: {
-          text: "Contact an administrator to upgrade your server's subscription"
-        }
+        ]
       };
 
       return await interaction.reply({
@@ -2823,7 +2820,7 @@ export const checkServerPremiumStatus = async (interaction) => {
       
       embed.fields.push({
         name: "Upgrade Your Server",
-        value: "Contact a server administrator to upgrade your subscription and unlock all premium features!",
+        value: `[Click here to upgrade your server's subscription](https://tldkp.org/guild/${interaction.guild.id}/subscription)`,
         inline: false
       });
     } else {
@@ -3040,6 +3037,146 @@ export const statusParser = (_auctionStatus) => {
     modal: modalColor,
   };
 };
+
+/**
+ * Process auction winner - send messages and deduct DKP
+ * @param {Object} auction - The auction object
+ * @param {Object} message - The Discord message object
+ * @param {Object} client - The Discord client
+ */
+export async function processAuctionWinner(auction, message, client) {
+  try {
+    // Check if auction has bids
+    if (!auction.bids || auction.bids.length === 0) {
+      new Logger().logLocal(PREFIX, `Auction ${auction.itemName} has no bids, skipping winner processing`);
+      return;
+    }
+
+    // Find the highest bidder
+    const highestBid = Math.max(...auction.bids.map(bid => bid.bid));
+    const winnerBid = auction.bids.find(bid => bid.bid === highestBid);
+    
+    if (!winnerBid) {
+      new Logger().logLocal(PREFIX, `No winner found for auction ${auction.itemName}`);
+      return;
+    }
+
+    const winnerUserId = winnerBid.userId;
+    const winnerBidAmount = winnerBid.bid;
+
+    // Get winner member info
+    const winnerMember = await message.guild.members.fetch(winnerUserId).catch(() => null);
+    if (!winnerMember) {
+      new Logger().logLocal(PREFIX, `Could not fetch winner member ${winnerUserId} for auction ${auction.itemName}`);
+      return;
+    }
+
+    const winnerName = winnerMember.nickname || winnerMember.user.globalName || winnerMember.user.username;
+
+    // Get guild data to update DKP
+    const guildData = await getGuildConfig(message.guild.id, 'processAuctionWinner');
+    if (!guildData) {
+      new Logger().logLocal(PREFIX, `Could not fetch guild data for auction ${auction.itemName}`);
+      return;
+    }
+
+    // Deduct DKP from winner
+    const updatedMemberDkps = [...(guildData.memberDkps || [])];
+    const userIndex = updatedMemberDkps.findIndex(member => member.userId === winnerUserId);
+    
+    if (userIndex !== -1) {
+      const currentDkp = updatedMemberDkps[userIndex].dkp;
+      const newDkp = Math.max(0, currentDkp - winnerBidAmount);
+      updatedMemberDkps[userIndex].dkp = newDkp;
+
+      // Update guild data
+      await db.collection("guilds").doc(message.guild.id).update({
+        memberDkps: updatedMemberDkps,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      new Logger().logLocal(PREFIX, `Deducted ${winnerBidAmount} DKP from ${winnerName} (${winnerUserId}) for winning auction ${auction.itemName}`);
+    }
+
+    // Send victory message to thread
+    try {
+      const thread = await client.channels.fetch(auction.data.threadId);
+      if (thread) {
+        const victoryEmbed = {
+          title: "🎉 Leilão Finalizado! 🎉",
+          description: `**${auction.itemName}** foi vendido!`,
+          color: 0x00ff00,
+          fields: [
+            {
+              name: "🏆 Vencedor",
+              value: `<@${winnerUserId}> (${winnerName})`,
+              inline: true
+            },
+            {
+              name: "💰 Lance Vencedor",
+              value: `**${winnerBidAmount} DKP**`,
+              inline: true
+            },
+            {
+              name: "📦 Item",
+              value: `${auction.itemName}${auction.itemNote ? ` (${auction.itemNote})` : ''}`,
+              inline: true
+            }
+          ],
+          footer: {
+            text: `Parabéns ${winnerName}! Seu DKP foi descontado automaticamente.`,
+            iconURL: winnerMember.user.displayAvatarURL()
+          },
+          timestamp: new Date().toISOString()
+        };
+
+        await thread.send({ embeds: [victoryEmbed] });
+        new Logger().logLocal(PREFIX, `Sent victory message to thread for auction ${auction.itemName}`);
+      }
+    } catch (error) {
+      new Logger().logLocal(PREFIX, `Error sending victory message to thread: ${error.message}`);
+    }
+
+    // Send private message to winner
+    try {
+      const dmEmbed = {
+        title: "🎉 Parabéns! Você ganhou o leilão! 🎉",
+        description: `Você ganhou o leilão de **${auction.itemName}**!`,
+        color: 0x00ff00,
+        fields: [
+          {
+            name: "📦 Item",
+            value: `${auction.itemName}${auction.itemNote ? ` (${auction.itemNote})` : ''}`,
+            inline: true
+          },
+          {
+            name: "💰 Seu Lance",
+            value: `**${winnerBidAmount} DKP**`,
+            inline: true
+          },
+          {
+            name: "🏆 Servidor",
+            value: `${message.guild.name}`,
+            inline: true
+          }
+        ],
+        footer: {
+          text: "Seu DKP foi descontado automaticamente. Entre em contato com um administrador para receber seu item!",
+          iconURL: message.guild.iconURL()
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      await winnerMember.send({ embeds: [dmEmbed] });
+      new Logger().logLocal(PREFIX, `Sent victory DM to ${winnerName} for auction ${auction.itemName}`);
+    } catch (error) {
+      new Logger().logLocal(PREFIX, `Error sending victory DM to ${winnerName}: ${error.message}`);
+    }
+
+  } catch (error) {
+    new Logger().logLocal(PREFIX, `Error processing auction winner: ${error.message}`);
+  }
+}
 
 export const updateAuction = async ({ _message = null, auction }) => {
   const message = _message;
@@ -3711,7 +3848,7 @@ export const createAuction = async (interaction) => {
     const subscription = await getGuildSubscription(interaction.guild.id);
     const embed = {
       title: "🔒 Premium Feature Required",
-      description: "The auction system is only available to premium servers. Upgrade your server to access this feature and many more!",
+      description: `The auction system is only available to premium servers. Upgrade your server to access this feature and many more!\n\n[Click here to upgrade your server's subscription](https://tldkp.org/guild/${interaction.guild.id}/subscription)`,
       color: 0xff6b6b,
       fields: [
         {
@@ -3726,10 +3863,7 @@ export const createAuction = async (interaction) => {
           value: "• **Trial (7 days)** - Full access for 7 days\n• **Premium Monthly** - Full access to all features\n• **Lifetime** - One-time payment, permanent access",
           inline: false
         }
-      ],
-      footer: {
-        text: "Contact an administrator to upgrade your server's subscription"
-      }
+      ]
     };
 
     return await interaction.reply({
@@ -4195,7 +4329,7 @@ export async function importMemberData(interaction) {
     const isPremium = await checkAuctionPremiumAccess(interaction);
     if (!isPremium) {
       return await interaction.reply({
-        content: '❌ **Premium Required**\n\nData importing is a premium feature. Your guild needs an active premium subscription to use this command.\n\nContact an administrator to upgrade your guild\'s subscription.',
+        content: `❌ **Premium Required**\n\nData importing is a premium feature. Your guild needs an active premium subscription to use this command.\n\n[Click here to upgrade your server's subscription](https://tldkp.org/guild/${interaction.guild.id}/subscription)`,
         ephemeral: true
       });
     }

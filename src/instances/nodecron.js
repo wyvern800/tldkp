@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import * as api from "../../database/repository.js";
+import { processAuctionWinner } from "../../database/repository.js";
 import { add, isEqual, isAfter } from "date-fns";
 import admin from "firebase-admin";
 import { Logger } from "../../utils/logger.js";
@@ -271,6 +272,26 @@ export const updateAuctions = async () => {
                 new Logger().logLocal(
                   PREFIX,
                   `Failed to update embed for auction ${auction.itemName}: ${embedError.message}`
+                );
+              }
+
+              // Process auction winner - send messages and deduct DKP
+              try {
+                const channel = discordBot.channels.cache.get(auction.data.channelId);
+                if (channel) {
+                  const message = await channel.messages.fetch(auction.data.messageId);
+                  if (message) {
+                    await processAuctionWinner(auction, message, discordBot);
+                    new Logger().logLocal(
+                      PREFIX,
+                      `Processed winner for auction ${auction.itemName}`
+                    );
+                  }
+                }
+              } catch (winnerError) {
+                new Logger().logLocal(
+                  PREFIX,
+                  `Failed to process winner for auction ${auction.itemName}: ${winnerError.message}`
                 );
               }
             } catch (updateError) {

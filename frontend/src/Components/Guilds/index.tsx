@@ -319,11 +319,11 @@ const navigate = useNavigate();
             </AlertDialogBody>
 
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={() => setIsDeleteOpen(false)}>
-                Cancel
-              </Button>
-              <Button colorScheme="red" onClick={confirmDelete} ml={3}>
+              <Button onClick={confirmDelete} mr={3}>
                 Delete
+              </Button>
+              <Button colorScheme="red" ref={cancelRef} onClick={() => setIsDeleteOpen(false)}>
+                Cancel
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
