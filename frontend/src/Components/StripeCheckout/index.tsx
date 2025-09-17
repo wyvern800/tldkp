@@ -199,7 +199,13 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
         gap={4}
         w="full"
       >
-        {products.map((product) => (
+        {products
+          .sort((a, b) => {
+            const priceA = a.default_price?.unit_amount || 0;
+            const priceB = b.default_price?.unit_amount || 0;
+            return priceA - priceB;
+          })
+          .map((product) => (
           <Box
             key={product.id}
             borderWidth={1}
