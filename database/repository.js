@@ -539,10 +539,195 @@ export async function getAllGuilds() {
     return [];
   }
 
+  // Use batch processing for better performance with large collections
+  const batchSize = 100; // Process 100 guilds at a time
+  const allGuilds = [];
+  let lastDoc = null;
+  let hasMore = true;
+
+  try {
+    while (hasMore) {
+      let query = db.collection("guilds")
+        .select('togglables', 'memberDkps', 'guildData', 'createdAt', 'updatedAt', 'subscription')
+        .limit(batchSize);
+
+      // Use cursor pagination for consistent results
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
+
+      const snapshot = await query.get();
+
+      if (snapshot.empty) {
+        hasMore = false;
+        break;
+      }
+
+      // Process batch results
+      const batchGuilds = [];
+      snapshot.forEach((doc) => {
+        batchGuilds.push({ id: doc.id, ...doc.data() });
+      });
+
+      allGuilds.push(...batchGuilds);
+
+      // Check if we have more data to fetch
+      if (snapshot.size < batchSize) {
+        hasMore = false;
+      } else {
+        // Set the last document for the next iteration
+        lastDoc = snapshot.docs[snapshot.docs.length - 1];
+      }
+
+      // Log progress for large collections
+      if (allGuilds.length % 500 === 0) {
+        new Logger().log(PREFIX, `Processed ${allGuilds.length}/${totalGuilds} guilds`);
+      }
+    }
+
+    new Logger().log(PREFIX, `Successfully fetched ${allGuilds.length} guilds using batch processing`);
+    return allGuilds;
+
+  } catch (error) {
+    new Logger().log(PREFIX, `Error in batch processing getAllGuilds`, error);
+    
+    // Fallback to single query if batch processing fails
+    new Logger().log(PREFIX, `Falling back to single query approach`);
+    try {
+      const snapshot = await db.collection("guilds")
+        .select('togglables', 'memberDkps', 'guildData', 'createdAt', 'updatedAt', 'subscription')
+        .get();
+
+      if (snapshot.empty) {
+        new Logger().log(PREFIX, `No guilds found (fallback)`);
+        return [];
+      }
+
+      const guilds = [];
+      snapshot.forEach((doc) => {
+        guilds.push({ id: doc.id, ...doc.data() });
+      });
+
+      return guilds;
+    } catch (fallbackError) {
+      new Logger().log(PREFIX, `Fallback query also failed`, fallbackError);
+      return [];
+    }
+  }
+}
+
+/**
+ * Gets all guilds with parallel batch processing for maximum performance
+ * Use this for very large collections where parallel processing is beneficial
+ *
+ * @returns { any[] } Array of guild data
+ */
+export async function getAllGuildsParallel() {
+  trackFunctionExecution('getAllGuildsParallel');
+  
+  // First, do a simple count check to avoid heavy processing if no guilds exist
+  const guildsCountSnapshot = await db.collection("guilds").count().get();
+  const totalGuilds = guildsCountSnapshot.data().count;
+  
+  if (totalGuilds === 0) {
+    new Logger().log(PREFIX, `No guilds found (count check)`);
+    return [];
+  }
+
+  // Use parallel batch processing for maximum performance
+  const batchSize = 100;
+  const maxConcurrentBatches = 5; // Process up to 5 batches in parallel
+  const allGuilds = [];
+  
+  try {
+    // First, get all document IDs to determine how many batches we need
+    const idSnapshot = await db.collection("guilds").select().get();
+    const allDocIds = idSnapshot.docs.map(doc => doc.id);
+    
+    if (allDocIds.length === 0) {
+      new Logger().log(PREFIX, `No guilds found`);
+      return [];
+    }
+
+    // Split into batches
+    const batches = [];
+    for (let i = 0; i < allDocIds.length; i += batchSize) {
+      batches.push(allDocIds.slice(i, i + batchSize));
+    }
+
+    new Logger().log(PREFIX, `Processing ${batches.length} batches of ${batchSize} guilds each`);
+
+    // Process batches in parallel with concurrency limit
+    for (let i = 0; i < batches.length; i += maxConcurrentBatches) {
+      const currentBatches = batches.slice(i, i + maxConcurrentBatches);
+      
+      const batchPromises = currentBatches.map(async (batchIds, batchIndex) => {
+        try {
+          const batchSnapshot = await db.collection("guilds")
+            .where(admin.firestore.FieldPath.documentId(), 'in', batchIds)
+            .select('togglables', 'memberDkps', 'guildData', 'createdAt', 'updatedAt', 'subscription')
+            .get();
+
+          const batchGuilds = [];
+          batchSnapshot.forEach((doc) => {
+            batchGuilds.push({ id: doc.id, ...doc.data() });
+          });
+
+          return batchGuilds;
+        } catch (error) {
+          new Logger().log(PREFIX, `Error processing batch ${i + batchIndex + 1}`, error);
+          return [];
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Flatten and add results
+      batchResults.forEach(batchGuilds => {
+        allGuilds.push(...batchGuilds);
+      });
+
+      // Log progress
+      if (allGuilds.length % 500 === 0) {
+        new Logger().log(PREFIX, `Processed ${allGuilds.length}/${totalGuilds} guilds`);
+      }
+    }
+
+    new Logger().log(PREFIX, `Successfully fetched ${allGuilds.length} guilds using parallel batch processing`);
+    return allGuilds;
+
+  } catch (error) {
+    new Logger().log(PREFIX, `Error in parallel batch processing getAllGuilds`, error);
+    
+    // Fallback to sequential batch processing
+    new Logger().log(PREFIX, `Falling back to sequential batch processing`);
+    return await getAllGuilds();
+  }
+}
+
+/**
+ * Gets the guild config
+ *
+ * @param { string } guildId The guild id
+ * @returns { any } Data
+ */
+export async function getAllGuildsForAdmin() {
+  trackFunctionExecution('getAllGuildsForAdmin');
+  
+  // First, do a simple count check to avoid heavy processing if no guilds exist
+  const guildsCountSnapshot = await db.collection("guilds").count().get();
+  const totalGuilds = guildsCountSnapshot.data().count;
+  
+  if (totalGuilds === 0) {
+    new Logger().log(PREFIX, `No guilds found (count check)`);
+    return [];
+  }
+
   // Now fetch the actual guilds for processing with optimized query
-  // Only select essential fields for decay processing to reduce data transfer
+  // Only select essential fields for admin display to reduce data transfer
+  // Exclude memberDkps to avoid heavy data usage
   const snapshot = await db.collection("guilds")
-    .select('togglables.decaySystem', 'memberDkps', 'guildData.name')
+    .select('guildData', 'createdAt', 'updatedAt', 'subscription')
     .get();
 
   if (snapshot.empty) {
@@ -557,6 +742,76 @@ export async function getAllGuilds() {
 
   return guilds;
 }
+
+/**
+ * Gets member count for a specific guild
+ *
+ * @param { string } guildId The guild id
+ * @returns { number } Member count
+ */
+export async function getGuildMemberCount(guildId) {
+  trackFunctionExecution('getGuildMemberCount');
+  
+  try {
+    const doc = await db.collection("guilds").doc(guildId).get();
+    
+    if (!doc.exists) {
+      new Logger().log(PREFIX, `Guild ${guildId} not found`);
+      return 0;
+    }
+    
+    const data = doc.data();
+    const memberDkps = data.memberDkps || {};
+    
+    // Count the number of members in memberDkps
+    const memberCount = Object.keys(memberDkps).length;
+    
+    return memberCount;
+  } catch (error) {
+    new Logger().log(PREFIX, `Error getting member count for guild ${guildId}`, error);
+    return 0;
+  }
+}
+
+/**
+ * Gets member counts for multiple guilds in batch
+ *
+ * @param { string[] } guildIds Array of guild ids
+ * @returns { Object } Object with guildId as key and member count as value
+ */
+export async function getGuildsMemberCounts(guildIds) {
+  trackFunctionExecution('getGuildsMemberCounts');
+  
+  if (!guildIds || guildIds.length === 0) {
+    return {};
+  }
+  
+  try {
+    // Use batch get for better performance
+    const memberCounts = {};
+    
+    // Process in batches of 10 to avoid Firestore batch limits
+    const batchSize = 10;
+    for (let i = 0; i < guildIds.length; i += batchSize) {
+      const batch = guildIds.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (guildId) => {
+        const count = await getGuildMemberCount(guildId);
+        return { guildId, count };
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      batchResults.forEach(({ guildId, count }) => {
+        memberCounts[guildId] = count;
+      });
+    }
+    
+    return memberCounts;
+  } catch (error) {
+    new Logger().log(PREFIX, `Error getting member counts for guilds`, error);
+    return {};
+  }
+}
+
 
 export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
   trackFunctionExecution('getGuildsByOwnerOrUser');
