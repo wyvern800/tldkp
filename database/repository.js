@@ -529,10 +529,24 @@ export async function loadAllAuctions(discordBot) {
  */
 export async function getAllGuilds() {
   trackFunctionExecution('getAllGuilds');
-  const snapshot = await db.collection("guilds").get();
+  
+  // First, do a simple count check to avoid heavy processing if no guilds exist
+  const guildsCountSnapshot = await db.collection("guilds").count().get();
+  const totalGuilds = guildsCountSnapshot.data().count;
+  
+  if (totalGuilds === 0) {
+    new Logger().log(PREFIX, `No guilds found (count check)`);
+    return [];
+  }
+
+  // Now fetch the actual guilds for processing with optimized query
+  // Only select essential fields for decay processing to reduce data transfer
+  const snapshot = await db.collection("guilds")
+    .select('togglables.decaySystem', 'memberDkps', 'guildData.name')
+    .get();
 
   if (snapshot.empty) {
-    new Logger().log(PREFIX, `No guilds found`);
+    new Logger().log(PREFIX, `No guilds found (after count check)`);
     return [];
   }
 
@@ -547,18 +561,46 @@ export async function getAllGuilds() {
 export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
   trackFunctionExecution('getGuildsByOwnerOrUser');
   try {
-    const guildsRef = db.collection("guilds");
-    const allGuildsSnapshot = await guildsRef.get();
+    // First, do a simple count check to avoid heavy processing if no guilds exist
+    const guildsCountSnapshot = await db.collection("guilds").count().get();
+    const totalGuilds = guildsCountSnapshot.data().count;
+    
+    if (totalGuilds === 0) {
+      new Logger().log(PREFIX, `No guilds found for user ${userOrOwnerId} (count check)`);
+      return { ownerGuilds: [], memberGuilds: [] };
+    }
+
+    // Use optimized Firestore queries with field selection
+    // First, get guilds where user is owner (more efficient than filtering all)
+    const ownerGuildsSnapshot = await db.collection("guilds")
+      .where('guildData.ownerId', '==', userOrOwnerId)
+      .get();
 
     const ownerGuilds = [];
+    ownerGuildsSnapshot.forEach((doc) => {
+      ownerGuilds.push({ id: doc.id, ...doc.data() });
+    });
+
+    // For member guilds, we still need to check all guilds since Firestore doesn't support
+    // array-contains queries on nested fields efficiently
+    const allGuildsSnapshot = await db.collection("guilds")
+      .select('guildData.ownerId', 'memberDkps', 'guildData.name', 'guildData.id')
+      .get();
+
+    if (allGuildsSnapshot.empty) {
+      new Logger().log(PREFIX, `No guilds found for user ${userOrOwnerId} (after count check)`);
+      return { ownerGuilds, memberGuilds: [] };
+    }
+
     const memberGuilds = [];
 
     allGuildsSnapshot.forEach((doc) => {
       const data = doc.data();
       const members = data?.memberDkps || [];
 
+      // Skip if this is already an owner guild
       if (data.guildData.ownerId === userOrOwnerId) {
-        ownerGuilds.push({ ...data });
+        return;
       }
 
       const filteredMembers = members.filter(
@@ -567,6 +609,7 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
 
       if (filteredMembers.length > 0) {
         memberGuilds.push({
+          id: doc.id,
           ...data,
           memberDkps: members,
         });
@@ -581,6 +624,30 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
           let owner = {};
           let avatarURL = "";
 
+          // Skip Discord API calls if guild is not available in cache
+          if (!guildData) {
+            new Logger().logLocal(PREFIX, `Guild ${id} not found in Discord cache, skipping Discord API calls`);
+            return {
+              ...guild,
+              guildData: {
+                ...guild?.guildData,
+                ownerDiscordData: {
+                  displayName: "Guild not available",
+                  preferredColor: "",
+                  avatarURL: "",
+                },
+              },
+              memberDkps: guild?.memberDkps?.map(member => ({
+                ...member,
+                discordData: {
+                  displayName: "Discord data unavailable",
+                  preferredColor: "",
+                  avatarURL: "",
+                },
+              })) || [],
+            };
+          }
+
           try {
             owner = await guildData?.members?.fetch(ownerId);
             avatarURL = owner?.user.displayAvatarURL({
@@ -588,38 +655,38 @@ export async function getGuildsByOwnerOrUser(userOrOwnerId, discordBot) {
               size: 32,
             });
           } catch (error) {
-            new Logger().logLocal(PREFIX, `Owner not found for guild ${id}`);
+            new Logger().logLocal(PREFIX, `Owner not found for guild ${id}: ${error.message}`);
           }
 
-           const memberDkps = await Promise.all(
-             guild?.memberDkps.map(async (memberDkp) => {
-               let memberData = {};
-               let avatarURL = "";
+          // Batch member fetches to reduce API calls
+          const memberDkps = await Promise.allSettled(
+            guild?.memberDkps?.map(async (memberDkp) => {
+              try {
+                const memberData = await guildData?.members?.fetch(memberDkp.userId);
+                const avatarURL = memberData?.user?.displayAvatarURL({
+                  dynamic: true,
+                  size: 32,
+                });
 
-               try {
-                 memberData = await guildData?.members?.fetch(memberDkp.userId);
-                 avatarURL = memberData?.user?.displayAvatarURL({
-                   dynamic: true,
-                   size: 32,
-                 });
-               } catch (error) {
-                 new Logger().logLocal(PREFIX, `Member not found for guild ${id} - user likely left the server`);
-                 return null; // Return null for members who can't be fetched
-               }
+                return {
+                  ...memberDkp,
+                  discordData: {
+                    displayName: memberData?.user?.globalName ?? "User not available",
+                    preferredColor: memberData?.user?.accentColor ?? "",
+                    avatarURL,
+                  },
+                };
+              } catch (error) {
+                new Logger().logLocal(PREFIX, `Member not found for guild ${id} - user likely left the server: ${error.message}`);
+                return null; // Return null for members who can't be fetched
+              }
+            }) || []
+          );
 
-               return {
-                 ...memberDkp,
-                 discordData: {
-                   displayName: memberData?.user?.globalName ?? "User not available (Banned or left the server)",
-                   preferredColor: memberData?.user?.accentColor ?? "",
-                   avatarURL,
-                 },
-               };
-             })
-           );
-
-           // Filter out null values (members who left the server)
-           const validMemberDkps = memberDkps.filter(member => member !== null);
+          // Filter out failed fetches and null values
+          const validMemberDkps = memberDkps
+            .filter(result => result.status === 'fulfilled' && result.value !== null)
+            .map(result => result.value);
            
            // Log how many members were filtered out
            const filteredCount = memberDkps.length - validMemberDkps.length;
@@ -2029,10 +2096,24 @@ export async function searchGuildsByName(searchTerm, limit = 10) {
     return [];
   }
 
-  const snapshot = await db.collection("guilds").get();
+  // First, do a simple count check to avoid heavy processing if no guilds exist
+  const guildsCountSnapshot = await db.collection("guilds").count().get();
+  const totalGuilds = guildsCountSnapshot.data().count;
+  
+  if (totalGuilds === 0) {
+    new Logger().log(PREFIX, `No guilds found for search term: ${searchTerm} (count check)`);
+    return [];
+  }
+
+  // Use Firestore query with field selection to reduce data transfer
+  // Only fetch the fields we need for search results
+  const snapshot = await db.collection("guilds")
+    .select('guildData.name', 'guildData.ownerId', 'subscription')
+    .limit(limit * 3) // Fetch more than needed to account for filtering
+    .get();
   
   if (snapshot.empty) {
-    new Logger().log(PREFIX, `No guilds found for search term: ${searchTerm}`);
+    new Logger().log(PREFIX, `No guilds found for search term: ${searchTerm} (after count check)`);
     return [];
   }
 
