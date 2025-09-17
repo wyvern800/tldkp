@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import api from "../services/axiosInstance";
 import { useAuth } from "@clerk/clerk-react";
 import SubscriptionManagement from "../Components/SubscriptionManagement";
-import AdminGuilds from "../Components/AdminGuilds";
+import Guilds from "../Components/Guilds";
 
 export default function AdminPage() {
   const { getToken, isLoaded } = useAuth();
@@ -190,7 +190,7 @@ export default function AdminPage() {
 
             <TabPanels>
               <TabPanel>
-                <AdminGuilds onGuildUpdate={refreshPremiumCount} />
+                <Guilds data={data?.guilds} loaded={loaded} isBackoffice />
               </TabPanel>
               <TabPanel>
                 <SubscriptionManagement onSubscriptionUpdate={refreshPremiumCount} />
