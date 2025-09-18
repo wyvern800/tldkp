@@ -24,6 +24,9 @@ const threadListeners = api.threadListeners;
 // Map to store last known auction status to avoid unnecessary API calls
 const lastKnownStatus = new Map();
 
+// Map to track recently processed auctions to prevent duplicate processing
+const recentlyProcessed = new Map();
+
 /**
  * Schedules a cron job to run once per day at midnight.
  * The job retrieves all guilds, processes each guild's DKP decay system,
@@ -173,6 +176,17 @@ export const updateAuctions = async () => {
         return;
       }
 
+      // Add a small delay to prevent rapid processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Clean up old entries from recentlyProcessed map (older than 5 minutes)
+      const now = Date.now();
+      for (const [auctionId, timestamp] of recentlyProcessed.entries()) {
+        if (now - timestamp > 300000) { // 5 minutes
+          recentlyProcessed.delete(auctionId);
+        }
+      }
+
       // Now fetch the actual auctions for processing
       const auctionsSnapshot = await db.collection("auctions").get();
 
@@ -181,9 +195,65 @@ export const updateAuctions = async () => {
         return;
       }
 
+      // First, clean up any finalized auctions that might still be in the active collection
+      const finalizedAuctions = [];
+      auctionsSnapshot.forEach((doc) => {
+        const auction = { id: doc.id, ...doc.data() };
+        if (auction.finalized || auction.auctionStatus === "finalized") {
+          finalizedAuctions.push(auction);
+        }
+      });
+
+      // Only process if we have finalized auctions
+      if (finalizedAuctions.length > 0) {
+        new Logger().logLocal(PREFIX, `Found ${finalizedAuctions.length} finalized auctions still in active collection, cleaning them up`);
+        
+        for (const auction of finalizedAuctions) {
+          // Skip if this auction was recently processed (within last 30 seconds)
+          const now = Date.now();
+          const lastProcessed = recentlyProcessed.get(auction.id);
+          if (lastProcessed && (now - lastProcessed) < 30000) {
+            new Logger().logLocal(PREFIX, `Skipping recently processed auction: ${auction.itemName}`);
+            continue;
+          }
+          
+          try {
+            // Mark as being processed
+            recentlyProcessed.set(auction.id, now);
+            
+            // Check if auction has bids to determine archive reason
+            if (auction.bids && auction.bids.length > 0) {
+              const highestBid = Math.max(...auction.bids.map(bid => bid.bid));
+              const winnerBid = auction.bids.find(bid => bid.bid === highestBid);
+              
+              const winnerInfo = winnerBid ? {
+                userId: winnerBid.userId,
+                bidAmount: winnerBid.bid,
+                winnerName: `User ${winnerBid.userId}`
+              } : null;
+              
+              await archiveAuction(auction, 'finalized_cleanup', winnerInfo);
+            } else {
+              await archiveAuction(auction, 'finalized_no_bids_cleanup');
+            }
+            
+            // Double-check deletion using the correct document ID
+            await db.collection("auctions").doc(auction.id).delete();
+            new Logger().logLocal(PREFIX, `Cleaned up finalized auction: ${auction.itemName} (docId: ${auction.id})`);
+          } catch (error) {
+            new Logger().logLocal(PREFIX, `Error cleaning up finalized auction ${auction.itemName}: ${error.message}`);
+          }
+        }
+      }
+
+      // Now process only the active auctions (non-finalized ones)
       const auctions = [];
       auctionsSnapshot.forEach((doc) => {
-        auctions.push({ id: doc.id, ...doc.data() });
+        const auction = { id: doc.id, ...doc.data() };
+        // Only include non-finalized auctions in the processing loop
+        if (!auction.finalized && auction.auctionStatus !== "finalized") {
+          auctions.push(auction);
+        }
       });
 
       try {
@@ -205,6 +275,54 @@ export const updateAuctions = async () => {
             PREFIX,
             `Checking auction ${auction.itemName}: endTime=${auctionEndTime}, now=${now}, isAfter=${auctionEndTime ? isAfter(now, auctionEndTime) : 'N/A'}, finalized=${auction.finalized}, cancelled=${auction.cancelled}, status=${auction.auctionStatus}, hasBids=${auction.bidCount > 0}, data=${JSON.stringify(auction.data)}`
           );
+
+          // Cleanup: If auction is already finalized but still in active collection, archive it
+          if (auction.finalized || auction.auctionStatus === "finalized") {
+            new Logger().logLocal(
+              PREFIX,
+              `Found finalized auction ${auction.itemName} still in active collection, archiving it`
+            );
+            
+            try {
+              // Check if auction has bids to determine archive reason
+              if (auction.bids && auction.bids.length > 0) {
+                // Find the highest bidder for archive data
+                const highestBid = Math.max(...auction.bids.map(bid => bid.bid));
+                const winnerBid = auction.bids.find(bid => bid.bid === highestBid);
+                
+                const winnerInfo = winnerBid ? {
+                  userId: winnerBid.userId,
+                  bidAmount: winnerBid.bid,
+                  winnerName: `User ${winnerBid.userId}` // We don't have access to member info here
+                } : null;
+                
+                await archiveAuction(auction, 'finalized_cleanup', winnerInfo);
+              } else {
+                await archiveAuction(auction, 'finalized_no_bids_cleanup');
+              }
+              
+              // Double-check: Delete from auctions collection if it still exists
+              try {
+                await db.collection("auctions").doc(auction.id).delete();
+                new Logger().logLocal(PREFIX, `Deleted auction ${auction.itemName} from active collection`);
+              } catch (deleteError) {
+                new Logger().logLocal(PREFIX, `Error deleting auction ${auction.itemName} from active collection: ${deleteError.message}`);
+              }
+              
+              new Logger().logLocal(
+                PREFIX,
+                `Successfully archived finalized auction ${auction.itemName}`
+              );
+              
+              // Skip processing this auction further
+              continue;
+            } catch (error) {
+              new Logger().logLocal(
+                PREFIX,
+                `Error archiving finalized auction ${auction.itemName}: ${error.message}`
+              );
+            }
+          }
 
           // If auction has expired and is not already finalized/cancelled, update it
           if (auctionEndTime && isAfter(now, auctionEndTime) && 
