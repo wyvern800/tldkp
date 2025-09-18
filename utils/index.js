@@ -301,10 +301,10 @@ export function createOrModifyAuctionEmbed(data) {
     { name: '\u200b', value: '\u200b', inline: true }
   )
   .addFields(
-    { name: "Starting at", value: `${data?.startingAt?.replace('-', ' ')} **(UTC-3)**`, inline: true },
+    { name: "Starting at", value: `${typeof data?.startingAt === 'string' ? data?.startingAt?.replace('-', ' ') : data?.startingAt} **(UTC-3)**`, inline: true },
     {
       name: "Auction valid until",
-      value: `${data?.auctionMaxTime?.replace('-', ' ')} **(UTC-3)**`,
+      value: `${typeof data?.auctionMaxTime === 'string' ? data?.auctionMaxTime?.replace('-', ' ') : data?.auctionMaxTime} **(UTC-3)**`,
       inline: true,
     },
     {

@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import * as api from "../../database/repository.js";
-import { processAuctionWinner } from "../../database/repository.js";
+import { processAuctionWinner, archiveAuction } from "../../database/repository.js";
 import { add, isEqual, isAfter } from "date-fns";
 import admin from "firebase-admin";
 import { Logger } from "../../utils/logger.js";
@@ -281,11 +281,21 @@ export const updateAuctions = async () => {
                 if (channel) {
                   const message = await channel.messages.fetch(auction.data.messageId);
                   if (message) {
-                    await processAuctionWinner(auction, message, discordBot);
-                    new Logger().logLocal(
-                      PREFIX,
-                      `Processed winner for auction ${auction.itemName}`
-                    );
+                    // Check if auction has any bids
+                    if (auction.bids && auction.bids.length > 0) {
+                      await processAuctionWinner(auction, message, discordBot);
+                      new Logger().logLocal(
+                        PREFIX,
+                        `Processed winner for auction ${auction.itemName}`
+                      );
+                    } else {
+                      // No bids - archive as expired with no winner
+                      await archiveAuction(auction, 'expired_no_winner');
+                      new Logger().logLocal(
+                        PREFIX,
+                        `Archived auction ${auction.itemName} with no winner`
+                      );
+                    }
                   }
                 }
               } catch (winnerError) {

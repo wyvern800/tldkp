@@ -3096,6 +3096,38 @@ export const statusParser = (_auctionStatus) => {
 };
 
 /**
+ * Archive completed auction to oldAuctions collection
+ * @param {Object} auction - The auction object to archive
+ * @param {string} reason - Reason for archiving (completed, expired, cancelled, no_winner)
+ * @param {Object} winner - Winner information (if any)
+ */
+export async function archiveAuction(auction, reason, winner = null) {
+  try {
+    const archiveData = {
+      ...auction,
+      archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      archiveReason: reason,
+      winner: winner ? {
+        userId: winner.userId,
+        bidAmount: winner.bidAmount,
+        winnerName: winner.winnerName
+      } : null,
+      finalStatus: 'archived'
+    };
+
+    // Add to oldAuctions collection
+    await db.collection("oldAuctions").add(archiveData);
+    
+    // Delete from active auctions collection
+    await db.collection("auctions").doc(auction.data.messageId).delete();
+    
+    new Logger().logLocal(PREFIX, `Archived auction ${auction.itemName} (${reason}) to oldAuctions collection`);
+  } catch (error) {
+    new Logger().logLocal(PREFIX, `Error archiving auction ${auction.itemName}: ${error.message}`);
+  }
+}
+
+/**
  * Send outbid notification to user
  * @param {Object} user - The Discord user object
  * @param {string} itemName - The auction item name
@@ -3258,6 +3290,15 @@ export async function processAuctionWinner(auction, message, client) {
     } catch (error) {
       new Logger().logLocal(PREFIX, `Error sending victory DM to ${winnerName}: ${error.message}`);
     }
+
+    // Archive the completed auction
+    const winnerInfo = {
+      userId: winnerUserId,
+      bidAmount: winnerBidAmount,
+      winnerName: winnerName
+    };
+    
+    await archiveAuction(auction, 'completed', winnerInfo);
 
   } catch (error) {
     new Logger().logLocal(PREFIX, `Error processing auction winner: ${error.message}`);
