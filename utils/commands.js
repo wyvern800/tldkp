@@ -623,7 +623,8 @@ export const commands = [
     ],
     commandExecution: api.handleTimeBan,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
-    commandCategory: "DKP System"
+    commandCategory: "General",
+    new: true
   },
   {
     name: "time-unban",
@@ -638,7 +639,8 @@ export const commands = [
     ],
     commandExecution: api.handleTimeUnban,
     permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
-    commandCategory: "DKP System"
+    commandCategory: "General",
+    new: true
   },
 ];
 
