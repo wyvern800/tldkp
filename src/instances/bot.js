@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, InteractionType } from "discord.js";
-import { handleCommands, handleAutoComplete, handleSubmitModal } from "../../utils/commands.js";
+import { handleCommands, handleAutoComplete, handleSubmitModal, handleButtonInteraction } from "../../utils/commands.js";
 import { loadCommands } from "../../utils/commands.js";
 import * as api from "../../database/repository.js";
 import { Logger } from "../../utils/logger.js";
@@ -157,6 +157,16 @@ export const createBotClient = () => {
       await handleSubmitModal(interaction, command?.toLowerCase());
     } else if (interaction.isAutocomplete()) {
       await handleAutoComplete(interaction, commandName?.toLowerCase());
+    } else if (interaction.isButton()) {
+      // Only handle specific button types that we know about
+      // Let collectors handle auction buttons and other system buttons
+      const customId = interaction.customId;
+      
+      // Only handle challenge buttons - let everything else pass through to collectors
+      if (customId.startsWith('challenge_accept_') || customId.startsWith('challenge_decline_')) {
+        await handleButtonInteraction(interaction);
+      }
+      // All other buttons (including auction buttons) will be handled by their respective collectors
     }
   });
 

@@ -642,6 +642,37 @@ export const commands = [
     commandCategory: "General",
     new: true
   },
+  {
+    name: "challenge",
+    description: "Challenge another player to a DKP gamble",
+    options: [
+      {
+        name: "user",
+        description: "The player you want to challenge",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: "amount",
+        description: "The amount of DKP to bet (minimum 5)",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+        min_value: 5,
+      },
+    ],
+    commandExecution: api.handleChallenge,
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
+    commandCategory: "Gambling System",
+    new: true
+  },
+  {
+    name: "accept",
+    description: "Accept a pending challenge",
+    commandExecution: api.handleAcceptChallenge,
+    permissions: [PermissionFlagsBits.UseApplicationCommands],
+    commandCategory: "Gambling System",
+    new: true
+  },
 ];
 
 /**
@@ -814,5 +845,41 @@ export const handleSubmitModal = async (interaction) => {
       ephemeral: true,
     });
     return await toRespond;
+  }
+}
+
+/**
+ * Handles button interactions
+ * @param {any} interaction The interaction
+ */
+export const handleButtonInteraction = async (interaction) => {
+  const customId = interaction.customId;
+  
+  try {
+    // Handle challenge accept button
+    if (customId.startsWith('challenge_accept_')) {
+      const challengeId = customId.replace('challenge_accept_', '');
+      return await api.handleAcceptChallengeButton(interaction, challengeId);
+    }
+    
+    // Handle challenge decline button
+    if (customId.startsWith('challenge_decline_')) {
+      const challengeId = customId.replace('challenge_decline_', '');
+      return await api.handleDeclineChallengeButton(interaction, challengeId);
+    }
+    
+    // This function should only be called for challenge buttons now
+    // All other buttons are handled by their respective collectors
+    return false;
+  } catch (e) {
+    new Logger(interaction).error(
+      `${PREFIX}`,
+      `Error handling button interaction: ${customId}`,
+      e
+    );
+    return await interaction.reply({
+      content: "An error occurred while processing the button interaction.",
+      ephemeral: true,
+    });
   }
 }

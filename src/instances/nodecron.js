@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import * as api from "../../database/repository.js";
-import { processAuctionWinner, archiveAuction } from "../../database/repository.js";
+import { processAuctionWinner, archiveAuction, cleanupExpiredChallenges } from "../../database/repository.js";
 import { add, isEqual, isAfter } from "date-fns";
 import admin from "firebase-admin";
 import { Logger } from "../../utils/logger.js";
@@ -841,6 +841,36 @@ export const updateAuctions = async () => {
 };
 
 /**
+ * Schedules a cron job to clean up expired challenges.
+ * The job runs every 5 minutes in dev mode and every 10 minutes in production.
+ * It removes challenges that have been pending for more than 5 minutes.
+ */
+const cleanupExpiredChallengesCron = async () => {
+  const cleanupTask = cron.schedule(
+    process.env.ENV === "dev" ? "*/5 * * * *" : "*/10 * * * *",
+    async () => {
+      try {
+        const cleanedCount = await cleanupExpiredChallenges();
+        if (cleanedCount > 0) {
+          new Logger().log(
+            PREFIX,
+            `Cleaned up ${cleanedCount} expired challenges at ${new Date()}`
+          );
+        }
+      } catch (error) {
+        new Logger().error(PREFIX, `Error cleaning up expired challenges:`, error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "America/Sao_Paulo",
+    }
+  );
+
+  return cleanupTask;
+};
+
+/**
  * Schedules a cron job to run once per day at midnight.
  * The job retrieves all guilds, processes each guild's DKP decay system,
  * and updates the guild's data in the Firestore database.
@@ -855,6 +885,7 @@ export async function start() {
     await decay(),
     await deleteExpiredCodes(),
     await updateAuctions(),
+    await cleanupExpiredChallengesCron(),
   ];
   tasks.forEach((task) => task.start());
   new Logger().log(

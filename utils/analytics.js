@@ -158,6 +158,28 @@ export async function trackPremiumEvent(event, guildId, data) {
 }
 
 /**
+ * Track challenge actions
+ * @param {string} action - The challenge action (created, accepted, declined, executed, cancelled)
+ * @param {string} guildId - Guild ID
+ * @param {string} challengerId - Challenger user ID
+ * @param {string} targetId - Target user ID
+ * @param {number} amount - Challenge amount
+ * @param {Object} data - Additional data
+ */
+export async function trackChallengeAction(action, guildId, challengerId, targetId, amount, data = {}) {
+  new Logger().logLocal(PREFIX, `Challenge Action: ${action} - Guild: ${guildId} - Amount: ${amount}`, data);
+  
+  await sendToGoogleAnalytics('challenge_action', 'challenges', {
+    action,
+    challengerId,
+    targetId,
+    amount,
+    ...data,
+    success: true
+  }, challengerId, guildId);
+}
+
+/**
  * Track bot status
  * @param {Object} statusData - Bot status data object
  */

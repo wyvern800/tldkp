@@ -1,5 +1,20 @@
 export const changelog = [
   {
+    version: 'v1.0.6',
+    date: '2025-01-27',
+    changes: [
+      "Added DKP Gambling System - players can now challenge each other to DKP bets!",
+      "New `/challenge` command allows players to challenge others with a minimum bet of 5 DKP",
+      "New `/accept` command allows players to accept pending challenges",
+      "Interactive challenge system with buttons for easy acceptance/decline",
+      "Dice rolling system (1-100) determines the winner - higher number wins",
+      "Easter egg feature: Draws give both players 2 DKP bonus instead of losing DKP!",
+      "Challenge system includes 5-minute timeout and proper DKP validation",
+      "Beautiful embeds show challenge details, results, and DKP changes",
+      "Private DMs notify players of challenge outcomes and results"
+    ]
+  },
+  {
     version: 'v1.0.5',
     date: '2025-01-27',
     changes: [

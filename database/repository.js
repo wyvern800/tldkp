@@ -1,7 +1,7 @@
 import { db } from "./firebase.js"; // Import Firestore
 import admin from "firebase-admin";
 import { Logger } from "../utils/logger.js";
-import { trackDkpAction, trackAuctionAction, trackPremiumEvent } from "../utils/analytics.js";
+import { trackDkpAction, trackAuctionAction, trackPremiumEvent, trackChallengeAction } from "../utils/analytics.js";
 import {
   updateDkp,
   decreaseDkp,
@@ -4922,5 +4922,811 @@ export async function isUserTimeBanned(guildId, userId) {
   } catch (error) {
     new Logger().error(PREFIX, `Error checking time-ban status: ${error.message}`, error);
     return false;
+  }
+}
+
+// Challenge system storage - using Firebase for persistent storage
+
+/**
+ * Creates a new challenge in Firebase
+ *
+ * @param { any } challenge The challenge object
+ * @returns { Promise<string> } The challenge ID
+ */
+export async function createChallenge(challenge) {
+  try {
+    const challengeRef = await db.collection("challenges").add({
+      ...challenge,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    new Logger().log(PREFIX, `Challenge created with ID: ${challengeRef.id}`);
+    return challengeRef.id;
+  } catch (error) {
+    new Logger().error(PREFIX, `Error creating challenge:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Gets a challenge by ID from Firebase
+ *
+ * @param { string } challengeId The challenge ID
+ * @returns { Promise<any> } The challenge object or null
+ */
+export async function getChallenge(challengeId) {
+  try {
+    const challengeDoc = await db.collection("challenges").doc(challengeId).get();
+    
+    if (!challengeDoc.exists) {
+      return null;
+    }
+    
+    return {
+      id: challengeDoc.id,
+      ...challengeDoc.data()
+    };
+  } catch (error) {
+    new Logger().error(PREFIX, `Error getting challenge:`, error);
+    return null;
+  }
+}
+
+/**
+ * Updates a challenge in Firebase
+ *
+ * @param { string } challengeId The challenge ID
+ * @param { any } updateData The data to update
+ * @returns { Promise<boolean> } Success status
+ */
+export async function updateChallenge(challengeId, updateData) {
+  try {
+    await db.collection("challenges").doc(challengeId).update({
+      ...updateData,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    new Logger().log(PREFIX, `Challenge updated: ${challengeId}`);
+    return true;
+  } catch (error) {
+    new Logger().error(PREFIX, `Error updating challenge:`, error);
+    return false;
+  }
+}
+
+/**
+ * Deletes a challenge from Firebase
+ *
+ * @param { string } challengeId The challenge ID
+ * @returns { Promise<boolean> } Success status
+ */
+export async function deleteChallenge(challengeId) {
+  try {
+    await db.collection("challenges").doc(challengeId).delete();
+    
+    new Logger().log(PREFIX, `Challenge deleted: ${challengeId}`);
+    return true;
+  } catch (error) {
+    new Logger().error(PREFIX, `Error deleting challenge:`, error);
+    return false;
+  }
+}
+
+/**
+ * Gets all pending challenges for a user
+ *
+ * @param { string } userId The user ID
+ * @returns { Promise<Array> } Array of pending challenges
+ */
+export async function getPendingChallengesForUser(userId) {
+  try {
+    // Query by targetUserId first (single field, no index needed)
+    const challengesSnapshot = await db
+      .collection("challenges")
+      .where("targetUserId", "==", userId)
+      .get();
+    
+    // Filter by status in memory and sort by createdAt
+    const pendingChallenges = challengesSnapshot.docs
+      .filter(doc => doc.data().status === "pending")
+      .sort((a, b) => {
+        const aTime = a.data().createdAt?.toDate?.() || new Date(0);
+        const bTime = b.data().createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime; // Descending order
+      });
+    
+    return pendingChallenges.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    new Logger().error(PREFIX, `Error getting pending challenges:`, error);
+    return [];
+  }
+}
+
+/**
+ * Gets all pending challenges for a guild
+ *
+ * @param { string } guildId The guild ID
+ * @returns { Promise<Array> } Array of pending challenges
+ */
+export async function getPendingChallengesForGuild(guildId) {
+  try {
+    // Query by guildId first (single field, no index needed)
+    const challengesSnapshot = await db
+      .collection("challenges")
+      .where("guildId", "==", guildId)
+      .get();
+    
+    // Filter by status in memory and sort by createdAt
+    const pendingChallenges = challengesSnapshot.docs
+      .filter(doc => doc.data().status === "pending")
+      .sort((a, b) => {
+        const aTime = a.data().createdAt?.toDate?.() || new Date(0);
+        const bTime = b.data().createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime; // Descending order
+      });
+    
+    return pendingChallenges.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    new Logger().error(PREFIX, `Error getting guild challenges:`, error);
+    return [];
+  }
+}
+
+/**
+ * Cleans up expired challenges (older than 5 minutes)
+ *
+ * @returns { Promise<number> } Number of challenges cleaned up
+ */
+export async function cleanupExpiredChallenges() {
+  try {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    // Query by status first (single field, no index needed)
+    const challengesSnapshot = await db
+      .collection("challenges")
+      .where("status", "==", "pending")
+      .get();
+    
+    // Filter by createdAt in memory
+    const expiredChallenges = challengesSnapshot.docs.filter(doc => {
+      const createdAt = doc.data().createdAt?.toDate?.() || new Date(0);
+      return createdAt < fiveMinutesAgo;
+    });
+    
+    if (expiredChallenges.length === 0) {
+      return 0;
+    }
+    
+    const batch = db.batch();
+    expiredChallenges.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    new Logger().log(PREFIX, `Cleaned up ${expiredChallenges.length} expired challenges`);
+    
+    return expiredChallenges.length;
+  } catch (error) {
+    new Logger().error(PREFIX, `Error cleaning up expired challenges:`, error);
+    return 0;
+  }
+}
+
+/**
+ * Handles the challenge command
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function handleChallenge(interaction) {
+  trackFunctionExecution('handleChallenge');
+  const targetUser = interaction.options.getUser("user");
+  const amount = interaction.options.getInteger("amount");
+  const challenger = interaction.user;
+
+  // Validate amount
+  if (amount < 5) {
+    return await interaction.reply({
+      content: "The minimum bet amount is 5 DKP.",
+      ephemeral: true,
+    });
+  }
+
+  // Can't challenge yourself
+  if (targetUser.id === challenger.id) {
+    return await interaction.reply({
+      content: "You cannot challenge yourself!",
+      ephemeral: true,
+    });
+  }
+
+  // Can't challenge bots
+  if (targetUser.bot) {
+    return await interaction.reply({
+      content: "You cannot challenge bots!",
+      ephemeral: true,
+    });
+  }
+
+  try {
+    const guildDataResponse = await getGuildConfig(interaction.guild.id, 'handleChallenge');
+    
+    if (!guildDataResponse) {
+      return await interaction.reply({
+        content: "Guild configuration not found.",
+        ephemeral: true,
+      });
+    }
+
+    const { memberDkps } = guildDataResponse;
+    
+    // Check if challenger has enough DKP
+    const challengerDkp = memberDkps?.find(member => member.userId === challenger.id)?.dkp || 0;
+    if (challengerDkp < amount) {
+      return await interaction.reply({
+        content: `You don't have enough DKP! You have ${challengerDkp} DKP but need ${amount} DKP to challenge.`,
+        ephemeral: true,
+      });
+    }
+
+    // Check if target user has enough DKP
+    const targetDkp = memberDkps?.find(member => member.userId === targetUser.id)?.dkp || 0;
+    if (targetDkp < amount) {
+      return await interaction.reply({
+        content: `<@${targetUser.id}> doesn't have enough DKP! They have ${targetDkp} DKP but need ${amount} DKP to accept the challenge.`,
+        ephemeral: true,
+      });
+    }
+
+    // Check if there's already a pending challenge for this user
+    const existingChallenges = await getPendingChallengesForUser(targetUser.id);
+    
+    if (existingChallenges.length > 0) {
+      return await interaction.reply({
+        content: `<@${targetUser.id}> already has a pending challenge! Please wait for them to respond.`,
+        ephemeral: true,
+      });
+    }
+
+    // Create challenge
+    const challenge = {
+      challengerId: challenger.id,
+      targetUserId: targetUser.id,
+      amount: amount,
+      guildId: interaction.guild.id,
+      channelId: interaction.channel.id,
+      status: 'pending',
+    };
+
+    const challengeId = await createChallenge(challenge);
+
+    // Send ephemeral message to challenger
+    await interaction.reply({
+      content: `Challenge sent to <@${targetUser.id}> for ${amount} DKP!`,
+      ephemeral: true,
+    });
+
+    // Send DM to target user about the challenge
+    let challengeMessageId = null;
+    let challengeChannelId = null;
+    
+    try {
+      const dmEmbed = {
+        color: 0x00ff00,
+        title: "🎲 DKP Challenge!",
+        description: `<@${challenger.id}> has challenged you to a DKP gamble!`,
+        fields: [
+          {
+            name: "💰 Bet Amount",
+            value: `${amount} DKP`,
+            inline: true,
+          },
+          {
+            name: "🎯 Rules",
+            value: "• Roll 1-100\n• Higher number wins\n• Draw = both get 2 DKP bonus!",
+            inline: false,
+          },
+          {
+            name: "⏰ Time Limit",
+            value: "5 minutes to respond",
+            inline: true,
+          },
+        ],
+        footer: {
+          text: "Click the buttons below to respond, or use /accept command",
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`challenge_accept_${challengeId}`)
+            .setLabel("Accept Challenge")
+            .setStyle(ButtonStyle.Success)
+            .setEmoji("✅"),
+          new ButtonBuilder()
+            .setCustomId(`challenge_decline_${challengeId}`)
+            .setLabel("Decline")
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji("❌")
+        );
+
+      const dmMessage = await targetUser.send({
+        content: `You have a DKP challenge from <@${challenger.id}>!`,
+        embeds: [dmEmbed],
+        components: [row],
+      });
+      
+      challengeMessageId = dmMessage.id;
+      challengeChannelId = dmMessage.channel.id;
+      } catch (error) {
+        // If we can't DM the user, notify the challenger privately and cancel the challenge
+        new Logger().log(PREFIX, `Could not send DM to ${targetUser.username}: ${error.message}`);
+        
+        // Send ephemeral follow-up to the challenger
+        await interaction.followUp({
+          content: `❌ Could not send challenge to <@${targetUser.id}> - they may have DMs disabled. The challenge has been cancelled.`,
+          ephemeral: true,
+        });
+        
+        // Track challenge cancellation due to DM failure
+        await trackChallengeAction('cancelled', interaction.guild.id, challenger.id, targetUser.id, amount, {
+          challengeId,
+          reason: 'dm_failed',
+          error: error.message
+        });
+
+        // Cancel the challenge since we can't reach the target user
+        await updateChallenge(challengeId, { status: 'cancelled' });
+        await deleteChallenge(challengeId);
+        return;
+      }
+    
+    // Update challenge with message ID for deletion later
+    if (challengeMessageId) {
+      await updateChallenge(challengeId, { 
+        messageId: challengeMessageId,
+        messageChannelId: challengeChannelId 
+      });
+    }
+
+    // Track challenge creation
+    await trackChallengeAction('created', interaction.guild.id, challenger.id, targetUser.id, amount, {
+      challengeId,
+      channelId: interaction.channel.id
+    });
+
+    // Note: Challenge expiration is now handled by the cleanup system
+    // No need for individual timeouts as Firebase handles persistence
+
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error creating challenge:`, error);
+    return await interaction.reply({
+      content: "An error occurred while creating the challenge.",
+      ephemeral: true,
+    });
+  }
+}
+
+/**
+ * Handles the accept command
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function handleAcceptChallenge(interaction) {
+  trackFunctionExecution('handleAcceptChallenge');
+  
+  try {
+    // Find pending challenge for this user
+    const challenges = await getPendingChallengesForUser(interaction.user.id);
+    
+    if (challenges.length === 0) {
+      return await interaction.reply({
+        content: "You don't have any pending challenges!",
+        ephemeral: true,
+      });
+    }
+
+    // Get the most recent challenge
+    const challenge = challenges[0];
+    return await executeChallenge(interaction, challenge);
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error accepting challenge:`, error);
+    return await interaction.reply({
+      content: "An error occurred while accepting the challenge.",
+      ephemeral: true,
+    });
+  }
+}
+
+/**
+ * Handles accept challenge button
+ *
+ * @param { any } interaction The interaction
+ * @param { string } challengeId The challenge ID
+ * @returns { any } Response
+ */
+export async function handleAcceptChallengeButton(interaction, challengeId) {
+  trackFunctionExecution('handleAcceptChallengeButton');
+  
+  try {
+    // Defer the reply first to prevent timeout (not ephemeral so it can be deleted)
+    await interaction.deferReply();
+    
+    const challenge = await getChallenge(challengeId);
+    
+    if (!challenge) {
+      await interaction.editReply({
+        content: "This challenge has expired or doesn't exist!",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+      return;
+    }
+
+    if (challenge.targetUserId !== interaction.user.id) {
+      await interaction.editReply({
+        content: "This challenge is not for you!",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+      return;
+    }
+
+    if (challenge.status !== 'pending') {
+      await interaction.editReply({
+        content: "This challenge has already been processed!",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+      return;
+    }
+
+    // Delete the original challenge message
+    if (challenge.messageId && challenge.messageChannelId) {
+      try {
+        const challengeChannel = await interaction.client.channels.fetch(challenge.messageChannelId);
+        const challengeMessage = await challengeChannel.messages.fetch(challenge.messageId);
+        await challengeMessage.delete();
+      } catch (error) {
+        new Logger().log(PREFIX, `Could not delete challenge message: ${error.message}`);
+      }
+    }
+
+    // Track challenge acceptance
+    await trackChallengeAction('accepted', challenge.guildId, challenge.challengerId, challenge.targetUserId, challenge.amount, {
+      challengeId: challenge.id,
+      acceptedBy: interaction.user.id
+    });
+
+    return await executeChallenge(interaction, challenge);
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error accepting challenge via button:`, error);
+    try {
+      await interaction.editReply({
+        content: "An error occurred while accepting the challenge.",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+    } catch (editError) {
+      await interaction.followUp({
+        content: "An error occurred while accepting the challenge.",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+    }
+  }
+}
+
+/**
+ * Handles decline challenge button
+ *
+ * @param { any } interaction The interaction
+ * @param { string } challengeId The challenge ID
+ * @returns { any } Response
+ */
+export async function handleDeclineChallengeButton(interaction, challengeId) {
+  trackFunctionExecution('handleDeclineChallengeButton');
+  
+  try {
+    // Defer the reply first to prevent timeout (not ephemeral so it can be deleted)
+    await interaction.deferReply();
+    
+    const challenge = await getChallenge(challengeId);
+    
+    if (!challenge) {
+      await interaction.editReply({
+        content: "This challenge has expired or doesn't exist!",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+      return;
+    }
+
+    if (challenge.targetUserId !== interaction.user.id) {
+      await interaction.editReply({
+        content: "This challenge is not for you!",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+      return;
+    }
+
+    // Delete the original challenge message
+    if (challenge.messageId && challenge.messageChannelId) {
+      try {
+        const challengeChannel = await interaction.client.channels.fetch(challenge.messageChannelId);
+        const challengeMessage = await challengeChannel.messages.fetch(challenge.messageId);
+        await challengeMessage.delete();
+      } catch (error) {
+        new Logger().log(PREFIX, `Could not delete challenge message: ${error.message}`);
+      }
+    }
+
+    // Mark challenge as declined and delete it
+    await updateChallenge(challengeId, { status: 'declined' });
+    await deleteChallenge(challengeId);
+
+    // Track challenge decline
+    await trackChallengeAction('declined', challenge.guildId, challenge.challengerId, challenge.targetUserId, challenge.amount, {
+      challengeId: challenge.id,
+      declinedBy: interaction.user.id
+    });
+
+    // Notify challenger
+    try {
+      const challenger = await interaction.client.users.fetch(challenge.challengerId);
+      await challenger.send({
+        content: `<@${interaction.user.id}> declined your DKP challenge for ${challenge.amount} DKP.`,
+      });
+    } catch (error) {
+      new Logger().log(PREFIX, `Could not notify challenger about declined challenge: ${error.message}`);
+    }
+
+    await interaction.editReply({
+      content: "Challenge declined!",
+    });
+    // Delete the message instantly
+    await interaction.deleteReply().catch(() => {});
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error declining challenge:`, error);
+    try {
+      await interaction.editReply({
+        content: "An error occurred while declining the challenge.",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+    } catch (editError) {
+      await interaction.followUp({
+        content: "An error occurred while declining the challenge.",
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+    }
+  }
+}
+
+/**
+ * Executes the challenge game
+ *
+ * @param { any } interaction The interaction
+ * @param { any } challenge The challenge object
+ * @returns { any } Response
+ */
+async function executeChallenge(interaction, challenge) {
+  try {
+    // Mark challenge as accepted and delete it
+    await updateChallenge(challenge.id, { status: 'accepted' });
+    await deleteChallenge(challenge.id);
+
+    const guildDataResponse = await getGuildConfig(challenge.guildId, 'executeChallenge');
+    const { memberDkps } = guildDataResponse;
+
+    // Get current DKP values
+    const challengerDkp = memberDkps?.find(member => member.userId === challenge.challengerId)?.dkp || 0;
+    const targetDkp = memberDkps?.find(member => member.userId === challenge.targetUserId)?.dkp || 0;
+
+    // Roll dice (1-100)
+    const challengerRoll = Math.floor(Math.random() * 100) + 1;
+    const targetRoll = Math.floor(Math.random() * 100) + 1;
+
+    let result;
+    let winnerId;
+    let loserId;
+    let dkpChange = 0;
+    let isDraw = false;
+
+    if (challengerRoll > targetRoll) {
+      result = "challenger_wins";
+      winnerId = challenge.challengerId;
+      loserId = challenge.targetUserId;
+      dkpChange = challenge.amount;
+    } else if (targetRoll > challengerRoll) {
+      result = "target_wins";
+      winnerId = challenge.targetUserId;
+      loserId = challenge.challengerId;
+      dkpChange = challenge.amount;
+    } else {
+      result = "draw";
+      isDraw = true;
+      dkpChange = 2; // Easter egg bonus
+    }
+
+    // Fetch Discord users from cache
+    const challengerUser = await interaction.client.users.fetch(challenge.challengerId);
+    const targetUser = await interaction.client.users.fetch(challenge.targetUserId);
+
+    // Update DKP
+    let newMemberDkps = memberDkps ? [...memberDkps] : [];
+
+    if (isDraw) {
+      // Both players get 2 DKP bonus
+      updateDkp(newMemberDkps, challenge.challengerId, dkpChange, challengerUser, guildDataResponse?.guildData?.name, guildDataResponse);
+      updateDkp(newMemberDkps, challenge.targetUserId, dkpChange, targetUser, guildDataResponse?.guildData?.name, guildDataResponse);
+    } else {
+      // Winner gets the bet amount, loser loses it
+      const winnerUser = winnerId === challenge.challengerId ? challengerUser : targetUser;
+      const loserUser = loserId === challenge.challengerId ? challengerUser : targetUser;
+      updateDkp(newMemberDkps, winnerId, dkpChange, winnerUser, guildDataResponse?.guildData?.name, guildDataResponse);
+      decreaseDkp(newMemberDkps, loserId, dkpChange, loserUser, guildDataResponse?.guildData?.name, guildDataResponse);
+    }
+
+    // Update guild data
+    const newGuildData = {
+      ...guildDataResponse,
+      memberDkps: newMemberDkps,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("guilds").doc(challenge.guildId).update(newGuildData);
+
+    // Create result embed
+    const resultEmbed = {
+      color: isDraw ? 0xffa500 : (result === "challenger_wins" ? 0x00ff00 : 0xff0000),
+      title: isDraw ? "🎉 DRAW! Easter Egg Bonus! 🎉" : "🎲 Challenge Results",
+      description: isDraw 
+        ? `Both players rolled **${challengerRoll}**! It's a draw! Both players receive 2 DKP bonus! 🎁`
+        : `**${winnerId === challenge.challengerId ? challengerUser.username : targetUser.username}** wins the challenge!`,
+      fields: [
+        {
+          name: `**${challengerUser.username}**'s Roll`,
+          value: `**${challengerRoll}**`,
+          inline: true,
+        },
+        {
+          name: `**${targetUser.username}**'s Roll`,
+          value: `**${targetRoll}**`,
+          inline: true,
+        },
+        {
+          name: "💰 DKP Change",
+          value: isDraw 
+            ? `Both players: +2 DKP (Easter Egg!)`
+            : `**${winnerId === challenge.challengerId ? challengerUser.username : targetUser.username}**: +${dkpChange} DKP\n**${loserId === challenge.challengerId ? challengerUser.username : targetUser.username}**: -${dkpChange} DKP`,
+          inline: false,
+        },
+      ],
+      footer: {
+        text: isDraw ? "Rare draw event! Both players get bonus DKP!" : "Good luck next time!",
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    // Send result to the original channel where the challenge was started
+    // Only send if the winner is not the one who received the challenge (to avoid duplicates)
+    if (!isDraw && winnerId !== interaction.user.id) {
+      try {
+        const originalChannel = await interaction.client.channels.fetch(challenge.channelId);
+        if (originalChannel) {
+          await originalChannel.send({
+            embeds: [resultEmbed],
+          });
+        }
+      } catch (error) {
+        new Logger().log(PREFIX, `Could not send results to original channel: ${error.message}`);
+      }
+    }
+
+    // Also send result to the interaction (DM or channel where button was clicked)
+    if (interaction.deferred) {
+      // If interaction was deferred, use editReply
+      await interaction.editReply({
+        embeds: [resultEmbed],
+      });
+      // Delete the message instantly
+      await interaction.deleteReply().catch(() => {});
+    } else if (interaction.channel) {
+      // If interaction is from a channel, send to channel
+      await interaction.reply({
+        embeds: [resultEmbed],
+      });
+    } else {
+      // If interaction is from DM, send as DM reply
+      await interaction.reply({
+        embeds: [resultEmbed],
+        ephemeral: true,
+      });
+    }
+
+    // Send DM to winner/loser (if not a draw)
+    if (!isDraw) {
+      try {
+        const winner = await interaction.client.users.fetch(winnerId);
+        const loser = await interaction.client.users.fetch(loserId);
+        
+        // Create separate embeds for winner and loser to avoid reusing the same object
+        const winnerEmbed = {
+          ...resultEmbed,
+          color: 0x00ff00,
+          footer: {
+            text: `Congratulations ${winner.username}! You won the challenge!`,
+          },
+        };
+        
+        const loserEmbed = {
+          ...resultEmbed,
+          color: 0xff0000,
+          footer: {
+            text: `Sorry ${loser.username}! You lost the challenge!`,
+          },
+        };
+        
+        await winner.send({
+          embeds: [winnerEmbed],
+        });
+        
+        await loser.send({
+          embeds: [loserEmbed],
+        });
+      } catch (error) {
+        new Logger().log(PREFIX, `Could not send DM to winner/loser: ${error.message}`);
+      }
+    }
+
+    // Track challenge execution
+    await trackChallengeAction('executed', challenge.guildId, challenge.challengerId, challenge.targetUserId, challenge.amount, {
+      challengeId: challenge.id,
+      result: isDraw ? 'draw' : (result === "challenger_wins" ? "challenger_wins" : "target_wins"),
+      challengerRoll,
+      targetRoll,
+      dkpChange,
+      winnerId: isDraw ? null : winnerId,
+      loserId: isDraw ? null : loserId
+    });
+
+    // Send DM to both players if it's a draw
+    if (isDraw) {
+      try {
+        const challenger = await interaction.client.users.fetch(challenge.challengerId);
+        const target = await interaction.client.users.fetch(challenge.targetUserId);
+        
+        await challenger.send({
+          content: `🎉 Draw! You both rolled ${challengerRoll}! You each earned 2 DKP bonus!`,
+          embeds: [resultEmbed],
+        });
+        
+        await target.send({
+          content: `🎉 Draw! You both rolled ${targetRoll}! You each earned 2 DKP bonus!`,
+          embeds: [resultEmbed],
+        });
+      } catch (error) {
+        new Logger().log(PREFIX, `Could not send DM to players: ${error.message}`);
+      }
+    }
+
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error executing challenge:`, error);
+    return await interaction.reply({
+      content: "An error occurred while executing the challenge.",
+      ephemeral: true,
+    });
   }
 }
