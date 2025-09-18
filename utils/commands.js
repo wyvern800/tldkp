@@ -589,7 +589,57 @@ export const commands = [
     commandExecution: api.handleClear,
     permissions: [PermissionFlagsBits.Administrator],
     commandCategory: "General"
-  },*/
+  },*/,
+  {
+    name: "time-ban",
+    description: "Time-ban a user from claiming DKP points",
+    options: [
+      {
+        name: "user",
+        description: "The user to time-ban from claiming DKP",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: "duration",
+        description: "Duration of the ban in minutes",
+        type: ApplicationCommandOptionType.Integer,
+        required: true,
+        min_value: 1,
+        max_value: 10080, // 1 week max
+      },
+      {
+        name: "expose",
+        description: "Whether to expose the ban publicly (default: false)",
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: "reason",
+        description: "Reason for the time-ban",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+    commandExecution: api.handleTimeBan,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System"
+  },
+  {
+    name: "time-unban",
+    description: "Remove time-ban from a user, allowing them to claim DKP again",
+    options: [
+      {
+        name: "user",
+        description: "The user to unban from claiming DKP",
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+    ],
+    commandExecution: api.handleTimeUnban,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System"
+  },
 ];
 
 /**

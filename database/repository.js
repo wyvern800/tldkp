@@ -2199,6 +2199,14 @@ export async function redeemDkpCode(interaction) {
       return await interaction.reply({ content: msg, ephemeral: true });
     }
 
+    // Check if user is time-banned from claiming DKP
+    const isBanned = await isUserTimeBanned(codeData.guildId, interaction.user.id);
+    if (isBanned) {
+      const msg = `🚫 You are currently time-banned from claiming DKP points. Please wait for the ban to expire before trying again.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
     // Get the guild and user data
     const guildId = codeData.guildId;
     const userId = interaction.user.id;
@@ -4648,5 +4656,271 @@ export async function importMemberData(interaction) {
     const msg = "Error importing member data. Please check the file format and try again.";
     new Logger(interaction).log(PREFIX, msg);
     return await interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Handles time-banning a user from claiming DKP
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function handleTimeBan(interaction) {
+  trackFunctionExecution('handleTimeBan');
+  const user = interaction.options.getUser("user");
+  const duration = interaction.options.getInteger("duration");
+  const expose = interaction.options.getBoolean("expose") || false;
+  const reason = interaction.options.getString("reason") || "No reason provided";
+
+  if (!user || !duration) {
+    const msg = `User and duration are required.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  // Validate duration (1 minute to 1 week)
+  if (duration < 1 || duration > 10080) {
+    const msg = `Duration must be between 1 minute and 10080 minutes (1 week).`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  try {
+    const guildDataResponse = await getGuildConfig(interaction.guild.id, 'handleTimeBan');
+    
+    if (!guildDataResponse) {
+      const msg = `Guild configuration not found.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    // Calculate expiration time
+    const expirationTime = new Date();
+    expirationTime.setMinutes(expirationTime.getMinutes() + duration);
+
+    // Initialize timeBans array if it doesn't exist
+    const timeBans = guildDataResponse.timeBans || [];
+
+    // Check if user is already time-banned
+    const existingBanIndex = timeBans.findIndex(ban => ban.userId === user.id);
+    
+    if (existingBanIndex !== -1) {
+      // Update existing ban
+      timeBans[existingBanIndex] = {
+        userId: user.id,
+        bannedBy: interaction.user.id,
+        bannedAt: admin.firestore.Timestamp.fromDate(new Date()),
+        expiresAt: admin.firestore.Timestamp.fromDate(expirationTime),
+        reason: reason,
+        duration: duration
+      };
+    } else {
+      // Add new ban
+      timeBans.push({
+        userId: user.id,
+        bannedBy: interaction.user.id,
+        bannedAt: admin.firestore.Timestamp.fromDate(new Date()),
+        expiresAt: admin.firestore.Timestamp.fromDate(expirationTime),
+        reason: reason,
+        duration: duration
+      });
+    }
+
+    // Update guild data
+    const newGuildData = {
+      ...guildDataResponse,
+      timeBans: timeBans,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+
+    // Create funny ban messages
+    const funnyMessages = [
+      `🔨 **${user.username}** has been time-banned from claiming DKP! They're now in the "DKP timeout corner" until <t:${Math.floor(expirationTime.getTime() / 1000)}:F>!`,
+      `⏰ **${user.username}** is now in DKP jail! They'll be released at <t:${Math.floor(expirationTime.getTime() / 1000)}:F> - time to reflect on their DKP crimes!`,
+      `🚫 **${user.username}** got the DKP ban hammer! They're banned until <t:${Math.floor(expirationTime.getTime() / 1000)}:F> - maybe they'll learn to behave!`,
+      `⛔ **${user.username}** is now in the DKP penalty box! They can't claim any points until <t:${Math.floor(expirationTime.getTime() / 1000)}:F>!`,
+      `🔒 **${user.username}** has been locked out of DKP claiming! They're in timeout until <t:${Math.floor(expirationTime.getTime() / 1000)}:F>!`
+    ];
+
+    const randomMessage = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+    const durationText = duration >= 60 ? 
+      `${Math.floor(duration / 60)} hour${Math.floor(duration / 60) > 1 ? 's' : ''} and ${duration % 60} minute${duration % 60 !== 1 ? 's' : ''}` :
+      `${duration} minute${duration !== 1 ? 's' : ''}`;
+
+    const banEmbed = {
+      title: '🔨 Time-Ban Applied',
+      description: randomMessage,
+      color: 0xff6b6b,
+      fields: [
+        {
+          name: '👤 Banned User',
+          value: `<@${user.id}> (${user.username})`,
+          inline: true
+        },
+        {
+          name: '⏱️ Duration',
+          value: durationText,
+          inline: true
+        },
+        {
+          name: '🕐 Expires At',
+          value: `<t:${Math.floor(expirationTime.getTime() / 1000)}:F>`,
+          inline: true
+        },
+        {
+          name: '📝 Reason',
+          value: reason,
+          inline: false
+        },
+        {
+          name: '👮 Banned By',
+          value: `<@${interaction.user.id}>`,
+          inline: true
+        }
+      ],
+      footer: {
+        text: 'Time-ban applied successfully'
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    const response = {
+      embeds: [banEmbed],
+      ephemeral: !expose
+    };
+
+    new Logger(interaction).log(PREFIX, `Time-banned user ${user.username} for ${durationText}`);
+    return await interaction.reply(response);
+
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error time-banning user: ${error.message}`, error);
+    const msg = `An error occurred while time-banning the user.`;
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Handles removing time-ban from a user
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function handleTimeUnban(interaction) {
+  trackFunctionExecution('handleTimeUnban');
+  const user = interaction.options.getUser("user");
+
+  if (!user) {
+    const msg = `User is required.`;
+    new Logger(interaction).log(PREFIX, msg);
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+
+  try {
+    const guildDataResponse = await getGuildConfig(interaction.guild.id, 'handleTimeUnban');
+    
+    if (!guildDataResponse) {
+      const msg = `Guild configuration not found.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    const timeBans = guildDataResponse.timeBans || [];
+    const banIndex = timeBans.findIndex(ban => ban.userId === user.id);
+    
+    if (banIndex === -1) {
+      const msg = `User <@${user.id}> is not currently time-banned.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
+
+    // Remove the ban
+    timeBans.splice(banIndex, 1);
+
+    // Update guild data
+    const newGuildData = {
+      ...guildDataResponse,
+      timeBans: timeBans,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("guilds").doc(interaction.guild.id).update(newGuildData);
+
+    const unbanEmbed = {
+      title: '🔓 Time-Ban Removed',
+      description: `**${user.username}** has been freed from the DKP timeout corner! They can now claim DKP points again.`,
+      color: 0x00ff00,
+      fields: [
+        {
+          name: '👤 Unbanned User',
+          value: `<@${user.id}> (${user.username})`,
+          inline: true
+        },
+        {
+          name: '👮 Unbanned By',
+          value: `<@${interaction.user.id}>`,
+          inline: true
+        }
+      ],
+      footer: {
+        text: 'Time-ban removed successfully'
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    new Logger(interaction).log(PREFIX, `Time-unbanned user ${user.username}`);
+    return await interaction.reply({ embeds: [unbanEmbed], ephemeral: true });
+
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error time-unbanning user: ${error.message}`, error);
+    const msg = `An error occurred while removing the time-ban.`;
+    return await interaction.reply({ content: msg, ephemeral: true });
+  }
+}
+
+/**
+ * Checks if a user is currently time-banned
+ *
+ * @param { string } guildId The guild ID
+ * @param { string } userId The user ID
+ * @returns { boolean } Whether the user is time-banned
+ */
+export async function isUserTimeBanned(guildId, userId) {
+  try {
+    const guildDataResponse = await getGuildConfig(guildId, 'isUserTimeBanned');
+    
+    if (!guildDataResponse || !guildDataResponse.timeBans) {
+      return false;
+    }
+
+    const userBan = guildDataResponse.timeBans.find(ban => ban.userId === userId);
+    
+    if (!userBan) {
+      return false;
+    }
+
+    // Check if ban has expired
+    const now = new Date();
+    const expirationTime = userBan.expiresAt.toDate();
+    
+    if (now > expirationTime) {
+      // Ban has expired, remove it
+      const timeBans = guildDataResponse.timeBans.filter(ban => ban.userId !== userId);
+      
+      const newGuildData = {
+        ...guildDataResponse,
+        timeBans: timeBans,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await db.collection("guilds").doc(guildId).update(newGuildData);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    new Logger().error(PREFIX, `Error checking time-ban status: ${error.message}`, error);
+    return false;
   }
 }

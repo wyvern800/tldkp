@@ -1,5 +1,17 @@
 export const changelog = [
   {
+    version: 'v1.0.5',
+    date: '2025-01-27',
+    changes: [
+      "Added time-ban system for DKP claims - guild admins can now temporarily ban users from claiming DKP points",
+      "New `/time-ban` command allows admins to ban users from claiming DKP for a specified duration (1 minute to 1 week)",
+      "New `/time-unban` command allows admins to remove time-bans and restore DKP claiming privileges",
+      "Time-banned users receive funny messages when trying to claim DKP codes",
+      "Ban messages can be exposed publicly or kept private based on admin preference",
+      "Automatic cleanup of expired time-bans to keep the system clean"
+    ]
+  },
+  {
     version: 'v1.0.4',
     date: '2025-09-16',
     changes: [
