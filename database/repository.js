@@ -292,6 +292,10 @@ export async function processBid(interaction, auction) {
         return;
       }
 
+      // Find the previous highest bidder to notify them
+      const previousHighestBid = Math.max(...(bids?.map((bid) => bid.bid) || []), 0);
+      const previousHighestBidder = bids?.find((bid) => bid.bid === previousHighestBid);
+      
       const copyBids = [
         ...bids,
         { userId: interaction.user.id, bid: bidAmount, createdAt: new Date() },
@@ -305,6 +309,59 @@ export async function processBid(interaction, auction) {
 
       try {
         await updateAuctionConfig(auction.data.messageId, auctionDTO);
+
+        // Handle DKP transactions for outbidding
+        const updatedMemberDkps = [...(allDkps.memberDkps || [])];
+        
+        // If there was a previous highest bidder, handle their DKP
+        if (previousHighestBidder) {
+          if (previousHighestBidder.userId !== interaction.user.id) {
+            // Different user outbid - notify them and return their DKP
+            try {
+              const previousBidder = await interaction.guild.members.fetch(previousHighestBidder.userId);
+              if (previousBidder) {
+                await sendOutbidNotification(
+                  previousBidder.user,
+                  updatedAuction.itemName,
+                  bidAmount,
+                  interaction.guild.name
+                );
+                
+                // Return DKP to the outbid user
+                const outbidUserIndex = updatedMemberDkps.findIndex(member => member.userId === previousHighestBidder.userId);
+                
+                if (outbidUserIndex !== -1) {
+                  updatedMemberDkps[outbidUserIndex].dkp += previousHighestBid;
+                  new Logger().logLocal(PREFIX, `Returned ${previousHighestBid} DKP to outbid user ${previousBidder.user.username} for auction ${updatedAuction.itemName}`);
+                }
+              }
+            } catch (error) {
+              new Logger().logLocal(PREFIX, `Error processing outbid notification: ${error.message}`);
+            }
+          } else {
+            // Same user outbid themselves - return their previous bid amount
+            const selfBidderIndex = updatedMemberDkps.findIndex(member => member.userId === interaction.user.id);
+            
+            if (selfBidderIndex !== -1) {
+              updatedMemberDkps[selfBidderIndex].dkp += previousHighestBid;
+              new Logger().logLocal(PREFIX, `Returned ${previousHighestBid} DKP to self-outbid user ${interaction.user.username} for auction ${updatedAuction.itemName}`);
+            }
+          }
+        }
+
+        // Deduct DKP from the new highest bidder
+        const newBidderIndex = updatedMemberDkps.findIndex(member => member.userId === interaction.user.id);
+        
+        if (newBidderIndex !== -1) {
+          updatedMemberDkps[newBidderIndex].dkp -= bidAmount;
+          new Logger().logLocal(PREFIX, `Deducted ${bidAmount} DKP from new bidder ${interaction.user.username} for auction ${updatedAuction.itemName}`);
+        }
+
+        // Update guild data with all DKP changes at once
+        await db.collection("guilds").doc(interaction.guild.id).update({
+          memberDkps: updatedMemberDkps,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
 
         // Process the bid
         if (!interaction.replied) {
@@ -3039,6 +3096,50 @@ export const statusParser = (_auctionStatus) => {
 };
 
 /**
+ * Send outbid notification to user
+ * @param {Object} user - The Discord user object
+ * @param {string} itemName - The auction item name
+ * @param {number} bidAmount - The amount they were outbid by
+ * @param {string} guildName - The guild name
+ */
+async function sendOutbidNotification(user, itemName, bidAmount, guildName) {
+  try {
+    const dmEmbed = {
+      title: "💸 You've been outbid!",
+      description: `Someone has placed a higher bid on **${itemName}**!`,
+      color: 0xffa500,
+      fields: [
+        {
+          name: "📦 Item",
+          value: itemName,
+          inline: true
+        },
+        {
+          name: "💰 New Highest Bid",
+          value: `**${bidAmount} DKP**`,
+          inline: true
+        },
+        {
+          name: "🏆 Server",
+          value: guildName,
+          inline: true
+        }
+      ],
+      footer: {
+        text: "Your DKP has been returned. You can place a new bid if you want!",
+        iconURL: user.displayAvatarURL()
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    await user.send({ embeds: [dmEmbed] });
+    new Logger().logLocal(PREFIX, `Sent outbid notification to ${user.username} for item ${itemName}`);
+  } catch (error) {
+    new Logger().logLocal(PREFIX, `Error sending outbid notification to ${user.username}: ${error.message}`);
+  }
+}
+
+/**
  * Process auction winner - send messages and deduct DKP
  * @param {Object} auction - The auction object
  * @param {Object} message - The Discord message object
@@ -3080,23 +3181,8 @@ export async function processAuctionWinner(auction, message, client) {
       return;
     }
 
-    // Deduct DKP from winner
-    const updatedMemberDkps = [...(guildData.memberDkps || [])];
-    const userIndex = updatedMemberDkps.findIndex(member => member.userId === winnerUserId);
-    
-    if (userIndex !== -1) {
-      const currentDkp = updatedMemberDkps[userIndex].dkp;
-      const newDkp = Math.max(0, currentDkp - winnerBidAmount);
-      updatedMemberDkps[userIndex].dkp = newDkp;
-
-      // Update guild data
-      await db.collection("guilds").doc(message.guild.id).update({
-        memberDkps: updatedMemberDkps,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      new Logger().logLocal(PREFIX, `Deducted ${winnerBidAmount} DKP from ${winnerName} (${winnerUserId}) for winning auction ${auction.itemName}`);
-    }
+    // DKP has already been deducted during bidding, so we just log the winner
+    new Logger().logLocal(PREFIX, `Auction ${auction.itemName} won by ${winnerName} (${winnerUserId}) with bid of ${winnerBidAmount} DKP`);
 
     // Send victory message to thread
     try {
