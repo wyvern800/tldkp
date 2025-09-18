@@ -301,10 +301,14 @@ export function createOrModifyAuctionEmbed(data) {
     { name: '\u200b', value: '\u200b', inline: true }
   )
   .addFields(
-    { name: "Starting at", value: `${typeof data?.startingAt === 'string' ? data?.startingAt?.replace('-', ' ') : data?.startingAt} **(UTC-3)**`, inline: true },
+    { 
+      name: "Starting at", 
+      value: data?.startingAt ? `<t:${Math.floor(parseCustomDateString(data.startingAt).getTime() / 1000)}:F>` : "Not set", 
+      inline: true 
+    },
     {
       name: "Auction valid until",
-      value: `${typeof data?.auctionMaxTime === 'string' ? data?.auctionMaxTime?.replace('-', ' ') : data?.auctionMaxTime} **(UTC-3)**`,
+      value: data?.auctionMaxTime ? `<t:${Math.floor(parseCustomDateString(data.auctionMaxTime).getTime() / 1000)}:F>` : "Not set",
       inline: true,
     },
     {
@@ -369,4 +373,35 @@ export function convertDateObjectToDateString(date) {
           .replace(",", "")
           .replace(" ", "-");
   return formattedStartingNew;
+}
+
+/**
+ * Parse custom date string format "dd/mm/yyyy-hh:mm:ss" to Date object
+ *
+ * @param { string } dateString The date string in format "dd/mm/yyyy-hh:mm:ss"
+ * @returns { Date } Parsed Date object
+ */
+export function parseCustomDateString(dateString) {
+  if (!dateString) return new Date();
+  
+  // Handle the format "dd/mm/yyyy-hh:mm:ss"
+  const parts = dateString.split('-');
+  if (parts.length !== 2) return new Date();
+  
+  const datePart = parts[0]; // "dd/mm/yyyy"
+  const timePart = parts[1]; // "hh:mm:ss"
+  
+  const dateComponents = datePart.split('/');
+  const timeComponents = timePart.split(':');
+  
+  if (dateComponents.length !== 3 || timeComponents.length !== 3) return new Date();
+  
+  const day = parseInt(dateComponents[0], 10);
+  const month = parseInt(dateComponents[1], 10) - 1; // Month is 0-indexed
+  const year = parseInt(dateComponents[2], 10);
+  const hour = parseInt(timeComponents[0], 10);
+  const minute = parseInt(timeComponents[1], 10);
+  const second = parseInt(timeComponents[2], 10);
+  
+  return new Date(year, month, day, hour, minute, second);
 }
