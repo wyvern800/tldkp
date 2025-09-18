@@ -3103,17 +3103,17 @@ export async function processAuctionWinner(auction, message, client) {
       const thread = await client.channels.fetch(auction.data.threadId);
       if (thread) {
         const victoryEmbed = {
-          title: "🎉 Leilão Finalizado! 🎉",
-          description: `**${auction.itemName}** foi vendido!`,
+          title: "Auction Finished! 🎉",
+          description: `**${auction.itemName}** has been sold!`,
           color: 0x00ff00,
           fields: [
             {
-              name: "🏆 Vencedor",
+              name: "🏆 Winner",
               value: `<@${winnerUserId}> (${winnerName})`,
               inline: true
             },
             {
-              name: "💰 Lance Vencedor",
+              name: "💰 Winning Bid",
               value: `**${winnerBidAmount} DKP**`,
               inline: true
             },
@@ -3124,7 +3124,7 @@ export async function processAuctionWinner(auction, message, client) {
             }
           ],
           footer: {
-            text: `Parabéns ${winnerName}! Seu DKP foi descontado automaticamente.`,
+            text: `Congratulations ${winnerName}! Your DKP has been deducted automatically.`,
             iconURL: winnerMember.user.displayAvatarURL()
           },
           timestamp: new Date().toISOString()
@@ -3140,8 +3140,8 @@ export async function processAuctionWinner(auction, message, client) {
     // Send private message to winner
     try {
       const dmEmbed = {
-        title: "🎉 Parabéns! Você ganhou o leilão! 🎉",
-        description: `Você ganhou o leilão de **${auction.itemName}**!`,
+        title: "Congratulations! You won the auction! 🎉",
+        description: `You won the auction for **${auction.itemName}**!`,
         color: 0x00ff00,
         fields: [
           {
@@ -3150,18 +3150,18 @@ export async function processAuctionWinner(auction, message, client) {
             inline: true
           },
           {
-            name: "💰 Seu Lance",
+            name: "💰 Your Bid",
             value: `**${winnerBidAmount} DKP**`,
             inline: true
           },
           {
-            name: "🏆 Servidor",
+            name: "🏆 Server",
             value: `${message.guild.name}`,
             inline: true
           }
         ],
         footer: {
-          text: "Seu DKP foi descontado automaticamente. Entre em contato com um administrador para receber seu item!",
+          text: "Your DKP has been deducted automatically. Contact an administrator to receive your item!",
           iconURL: message.guild.iconURL()
         },
         timestamp: new Date().toISOString()
