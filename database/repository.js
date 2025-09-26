@@ -29,7 +29,7 @@ import {
 } from "discord.js";
 import { items } from "../database/allItems.js";
 import { client } from "../src/index.js";
-import { searchItem } from "../database/itemsGrabber.js";
+import { searchItem, searchLocalItems } from "../database/itemsGrabber.js";
 
 const PREFIX = "Firebase";
 
@@ -3048,18 +3048,36 @@ export const setRoleOnJoin = async (interaction) => {
 export const handleAuctionAutocomplete = async (interaction) => {
   const focusedValue = interaction.options.getFocused();
 
-  await searchItem(focusedValue).then(async (res) => {
-    const items = res ?? [];
-    const choices = items?.map((item) => item.name?.trim());
+  try {
+    // Try local search first (faster and more reliable)
+    const localItems = searchLocalItems(focusedValue);
+    
+    if (localItems && localItems.length > 0) {
+      const choices = localItems.map((item) => item.name?.trim()).filter(Boolean);
+      
+      await interaction.respond(
+        choices.slice(0, 25).map((choice) => ({ name: choice, value: choice }))
+      );
+      return;
+    }
 
-    const filtered = choices.filter((choice) =>
-      choice.toLowerCase().trim().includes(focusedValue.toLowerCase().trim())
-    );
+    // Fallback to API search if local search fails
+    await searchItem(focusedValue).then(async (res) => {
+      const items = res ?? [];
+      const choices = items?.map((item) => item.name?.trim()).filter(Boolean);
 
-    await interaction.respond(
-      filtered.slice(0, 25).map((choice) => ({ name: choice, value: choice }))
-    );
-  });
+      const filtered = choices.filter((choice) =>
+        choice.toLowerCase().trim().includes(focusedValue.toLowerCase().trim())
+      );
+
+      await interaction.respond(
+        filtered.slice(0, 25).map((choice) => ({ name: choice, value: choice }))
+      );
+    });
+  } catch (error) {
+    new Logger().error(PREFIX, `Error in auction autocomplete: ${error.message}`);
+    await interaction.respond([]);
+  }
 };
 
 /**
@@ -4007,7 +4025,13 @@ export const createAuction = async (interaction) => {
     });
   }
 
-  const theItem = await searchItem(itemName?.toLowerCase()?.trim());
+  // Try local search first for item validation
+  let theItem = searchLocalItems(itemName?.toLowerCase()?.trim());
+  
+  // If local search fails, fallback to API search
+  if (!theItem || theItem.length === 0) {
+    theItem = await searchItem(itemName?.toLowerCase()?.trim());
+  }
 
   // Avoid this command to be used in threads
   if (interaction?.channel?.type && interaction?.channel?.type !== 0) {
@@ -4020,8 +4044,8 @@ export const createAuction = async (interaction) => {
 
   // Check if the item is valid
   if (
-    !theItem?.length &&
-    theItem[0]?.name !== itemName?.toLowerCase()?.trim()
+    !theItem?.length ||
+    !theItem.some(item => item.name?.toLowerCase()?.trim() === itemName?.toLowerCase()?.trim())
   ) {
     await interaction.reply({
       content: "Invalid item selected",

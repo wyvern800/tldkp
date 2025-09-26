@@ -5,7 +5,7 @@ import { add, isEqual, isAfter } from "date-fns";
 import admin from "firebase-admin";
 import { Logger } from "../../utils/logger.js";
 import { config } from "dotenv";
-import { main as itemGrabber } from "../../database/itemsGrabber.js";
+import { main as itemGrabber, mainWithComparison as itemGrabberIncremental } from "../../database/itemsGrabber.js";
 import { client as discordBot } from "../../src/index.js";
 import { db } from "../../database/firebase.js";
 import { canManageThreads, getPermissionUpdateInstructions } from "../../utils/permissionChecker.js";
@@ -146,14 +146,30 @@ const deleteExpiredCodes = async () => {
 
 export const itemsGrabber = async () => {
   const itemsTask = cron.schedule(
-    process.env.ENV === "dev" ? "*/30 * * * * *" : "0 1 * * *",
+    process.env.ENV === "dev" ? "*/30 * * * * *" : "0 0 * * 0", // Weekly on Sunday at midnight
     async () => {
-      await itemGrabber();
-
-      new Logger().log(
-        PREFIX,
-        `Grabbed ${expiredCodes.length} expired codes at ${new Date()}`
-      );
+      try {
+        new Logger().log(PREFIX, "Starting weekly items update...");
+        
+        const result = await itemGrabberIncremental();
+        
+        if (result && result.success) {
+          new Logger().log(
+            PREFIX,
+            `Weekly items update completed: ${result.stats?.added || 0} new items added, ${result.stats?.total || 0} total items at ${new Date()}`
+          );
+        } else {
+          new Logger().error(
+            PREFIX,
+            `Weekly items update failed: ${result?.error || 'Unknown error'} at ${new Date()}`
+          );
+        }
+      } catch (error) {
+        new Logger().error(
+          PREFIX,
+          `Weekly items update error: ${error.message} at ${new Date()}`
+        );
+      }
     },
     {
       scheduled: true,
