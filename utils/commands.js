@@ -673,6 +673,28 @@ export const commands = [
     commandCategory: "Gambling System",
     new: true
   },
+  {
+    name: "list-dkp",
+    description: "Display all members' DKP, Discord names, and IGNs in an embed",
+    options: [
+      {
+        name: "note",
+        description: "Optional note to display in the embed (e.g., 'DKP Events - Past Event Name')",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+      {
+        name: "public",
+        description: "Show the embed to everyone in the channel (default: false - only you can see it)",
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+    commandExecution: api.listAllDkp,
+    permissions: [PermissionFlagsBits.Administrator, PermissionFlagsBits.CreateEvents],
+    commandCategory: "DKP System",
+    new: true
+  },
 ];
 
 /**

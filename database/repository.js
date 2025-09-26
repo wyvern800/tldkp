@@ -5754,3 +5754,121 @@ async function executeChallenge(interaction, challenge) {
     });
   }
 }
+
+/**
+ * List all members' DKP, Discord names, and IGNs in an embed
+ *
+ * @param { any } interaction The interaction
+ * @returns { any } Response
+ */
+export async function listAllDkp(interaction) {
+  trackFunctionExecution('listAllDkp');
+  
+  try {
+    const note = interaction.options.getString("note");
+    const isPublic = interaction.options.getBoolean("public") || false;
+    const guildDataResponse = await getGuildConfig(interaction.guild.id);
+    const { memberDkps } = guildDataResponse;
+
+    if (!memberDkps || memberDkps.length === 0) {
+      const msg = `No member data found for this guild.`;
+      new Logger(interaction).log(PREFIX, msg);
+      return await interaction.reply({ content: msg, ephemeral: !isPublic });
+    }
+
+    // Fetch Discord member data for all users
+    const guild = interaction.guild;
+    const memberDataPromises = memberDkps.map(async (memberDkp) => {
+      try {
+        const member = await guild.members.fetch(memberDkp.userId);
+        return {
+          ...memberDkp,
+          discordName: member.user.globalName || member.user.username || "Unknown User",
+          displayName: member.displayName || member.user.username || "Unknown User"
+        };
+      } catch (error) {
+        // User might have left the server
+        new Logger().logLocal(PREFIX, `Could not fetch member ${memberDkp.userId}: ${error.message}`);
+        return {
+          ...memberDkp,
+          discordName: "User Left Server",
+          displayName: "User Left Server"
+        };
+      }
+    });
+
+    const membersWithDiscordData = await Promise.all(memberDataPromises);
+
+    // Sort members by DKP (highest first)
+    const sortedMembers = membersWithDiscordData.sort((a, b) => (b.dkp || 0) - (a.dkp || 0));
+
+    // Create embed
+    const embed = {
+      title: `📊 DKP Leaderboard - ${interaction.guild.name}`,
+      description: note ? `**${note}**` : undefined,
+      color: 0x00ff00,
+      thumbnail: {
+        url: "https://www.tldkp.org/images.jpg"
+      },
+      fields: [],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: `Total members: ${sortedMembers.length}`
+      }
+    };
+
+    // Display all members in a single embed without pagination
+    let rankValue = '';
+    let userValue = '';
+    let dkpValue = '';
+    
+    sortedMembers.forEach((member, index) => {
+      const rank = index + 1;
+      const dkp = member.dkp || 0;
+      const ign = member.ign ? ` (${member.ign})` : '';
+      
+      rankValue += `**${rank}.**\n`;
+      userValue += `<@${member.userId}>${ign}\n`;
+      dkpValue += `**${dkp} DKP**\n`;
+    });
+    
+    embed.fields.push(
+      {
+        name: `Rank`,
+        value: rankValue || 'No members found',
+        inline: true
+      },
+      {
+        name: `Member`,
+        value: userValue || 'No members found',
+        inline: true
+      },
+      {
+        name: `DKP`,
+        value: dkpValue || 'No members found',
+        inline: true
+      }
+    );
+
+    // Add summary statistics
+    const totalDkp = sortedMembers.reduce((sum, member) => sum + (member.dkp || 0), 0);
+    const averageDkp = sortedMembers.length > 0 ? Math.round(totalDkp / sortedMembers.length) : 0;
+    const membersWithIgn = sortedMembers.filter(member => member.ign && member.ign.trim() !== '').length;
+
+    embed.fields.unshift({
+      name: '📈 Statistics',
+      value: `**Total DKP:** ${totalDkp.toLocaleString()}\n**Average DKP:** ${averageDkp.toLocaleString()}\n**Members with IGN:** ${membersWithIgn}/${sortedMembers.length}`,
+      inline: false
+    });
+
+    new Logger(interaction).log(PREFIX, `Displayed DKP list for ${sortedMembers.length} members`);
+    return await interaction.reply({ embeds: [embed], ephemeral: !isPublic });
+
+  } catch (error) {
+    new Logger(interaction).error(PREFIX, `Error listing DKP:`, error);
+    return await interaction.reply({
+      content: "An error occurred while listing DKP data.",
+      ephemeral: !isPublic,
+    });
+  }
+}

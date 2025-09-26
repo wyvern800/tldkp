@@ -1,5 +1,18 @@
 export const changelog = [
   {
+    version: 'v1.0.7',
+    date: '2025-01-27',
+    changes: [
+      "Added new `/list-dkp` command for administrators and server event managers",
+      "Command displays comprehensive DKP leaderboard with all members' DKP, Discord names, and IGNs",
+      "Features paginated display for large guilds with up to 10 members per page",
+      "Shows detailed statistics including total DKP, average DKP, and members with IGNs",
+      "Ranks members by DKP amount (highest first) for easy leaderboard viewing",
+      "Gracefully handles users who have left the server with appropriate fallback messages",
+      "Professional embed format with guild branding and timestamps"
+    ]
+  },
+  {
     version: 'v1.0.6',
     date: '2025-01-27',
     changes: [
